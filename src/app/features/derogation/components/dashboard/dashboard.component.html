@@ -1,17 +1,25 @@
 <div class="dashboard-container">
   
   <div class="section-header">
-    <h2>QuickFlow - Gestion des demandes</h2>
+
+      <!-- Ajoutez après section-header -->
+  <div class="success-message" *ngIf="successMessage">
+    {{ successMessage }}
+  </div>
+    <h2>QuickFlow - Gestion des demandes de dérogation</h2>
+    <!-- BOUTON NOUVELLE DEMANDE -->
+    <button class="btn-new-request" (click)="onNewRequest()">
+      + NOUVELLE DEMANDE
+    </button>
   </div>
 
   <!-- Section 1: Demandes à traiter -->
   <div class="workflow-section">
     <div class="section-title">
       <div class="status-icon status-to-process">
-        <i class="checkmark">✓</i>
+        <i class="icon-section-placeholder">✓</i>
       </div>
       <h3>Demandes à traiter</h3>
-      <span class="item-count">{{ (requestsToProcess$ | async)?.length || 0 }} éléments</span>
     </div>
     
     <div class="requests-table" *ngIf="(requestsToProcess$ | async) && (requestsToProcess$ | async)!.length > 0">
@@ -33,7 +41,7 @@
             <td>
               <div class="request-id">
                 <div class="request-icon">
-                  <i class="checkmark">✓</i>
+                  <i class="icon-row-placeholder">✓</i>
                 </div>
                 {{ request.id.toString().padStart(8, '0') }}
               </div>
@@ -41,14 +49,18 @@
             <td>{{ request.requestType }}</td>
             <td>
               <div class="client-info">
-                <div class="user-icon">👤</div>
+                <div class="user-icon">
+                  <i class="icon-user-placeholder">👤</i>
+                </div>
                 {{ request.clientName }}
               </div>
             </td>
             <td>{{ request.sabClientId }}</td>
             <td>
               <div class="responsable-info">
-                <div class="user-icon">👤</div>
+                <div class="user-icon">
+                  <i class="icon-user-placeholder">👤</i>
+                </div>
                 {{ request.responsable }}
               </div>
             </td>
@@ -78,10 +90,9 @@
   <div class="workflow-section">
     <div class="section-title">
       <div class="status-icon status-pending">
-        <i class="checkmark">✓</i>
+        <i class="icon-section-placeholder">✓</i>
       </div>
       <h3>Demandes en attente de validation</h3>
-      <span class="item-count">{{ (requestsPendingValidation$ | async)?.length || 0 }} éléments</span>
     </div>
     
     <div class="requests-table" *ngIf="(requestsPendingValidation$ | async) && (requestsPendingValidation$ | async)!.length > 0">
@@ -104,7 +115,7 @@
             <td>
               <div class="request-id">
                 <div class="request-icon">
-                  <i class="checkmark">✓</i>
+                  <i class="icon-row-placeholder">✓</i>
                 </div>
                 {{ request.id.toString().padStart(8, '0') }}
               </div>
@@ -112,20 +123,26 @@
             <td>{{ request.requestType }}</td>
             <td>
               <div class="client-info">
-                <div class="user-icon">👤</div>
+                <div class="user-icon">
+                  <i class="icon-user-placeholder">👤</i>
+                </div>
                 {{ request.clientName }}
               </div>
             </td>
             <td>{{ request.sabClientId }}</td>
             <td>
               <div class="owner-info">
-                <div class="user-icon">👤</div>
+                <div class="user-icon">
+                  <i class="icon-user-placeholder">👤</i>
+                </div>
                 {{ request.owner }}
               </div>
             </td>
             <td>
               <div class="responsable-info">
-                <div class="user-icon">👤</div>
+                <div class="user-icon">
+                  <i class="icon-user-placeholder">👤</i>
+                </div>
                 {{ request.responsable }}
               </div>
             </td>
@@ -151,14 +168,13 @@
     </div>
   </div>
 
-  <!-- Section 3: Demandes traitées - Pas visible dans l'image, mais logique similaire -->
+  <!-- Section 3: Demandes traitées -->
   <div class="workflow-section" *ngIf="(requestsProcessed$ | async) && (requestsProcessed$ | async)!.length > 0">
     <div class="section-title">
       <div class="status-icon status-processed">
-        <i class="checkmark">✓</i>
+        <i class="icon-section-placeholder">✓</i>
       </div>
       <h3>Demandes traitées</h3>
-      <span class="item-count">{{ (requestsProcessed$ | async)?.length || 0 }} éléments</span>
     </div>
     
     <div class="requests-table">
@@ -183,7 +199,7 @@
             <td>
               <div class="request-id">
                 <div class="request-icon processed">
-                  <i class="checkmark">✓</i>
+                  <i class="icon-row-placeholder">✓</i>
                 </div>
                 {{ request.id.toString().padStart(8, '0') }}
               </div>
@@ -192,14 +208,18 @@
             <td>{{ request.requestType }}</td>
             <td>
               <div class="client-info">
-                <div class="user-icon">👤</div>
+                <div class="user-icon">
+                  <i class="icon-user-placeholder">👤</i>
+                </div>
                 {{ request.clientName }}
               </div>
             </td>
             <td>{{ request.sabClientId }}</td>
             <td>
               <div class="responsable-info">
-                <div class="user-icon">👤</div>
+                <div class="user-icon">
+                  <i class="icon-user-placeholder">👤</i>
+                </div>
                 {{ request.responsable }}
               </div>
             </td>

@@ -1,19 +1,19 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { DashboardComponent } from './features/derogation/components/dashboard/dashboard.component';
 
 const routes: Routes = [
   {
     path: '',
-    component: DashboardComponent
+    redirectTo: '/derogation',
+    pathMatch: 'full'
   },
   {
-    path: 'dashboard',
-    component: DashboardComponent
+    path: 'derogation',
+    loadChildren: () => import('./features/derogation/derogation.module').then(m => m.DerogationModule)
   },
   {
     path: '**',
-    redirectTo: ''
+    redirectTo: '/derogation'
   }
 ];
 

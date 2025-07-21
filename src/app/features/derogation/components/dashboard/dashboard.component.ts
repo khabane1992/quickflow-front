@@ -1,60 +1,94 @@
 import { Component, OnInit } from '@angular/core';
+import { Router, ActivatedRoute } from '@angular/router';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { DashboardService } from '../../services/dashboard/dashboard.service';
 import { DashboardRequestDTO, DerogationStatus } from '../../models/dashboard/request.interface';
-import { RequestService } from '../../../../core/services/request.service';
 
 @Component({
-  selector: 'app-dashboard',
+  selector: 'app-derogation-dashboard',
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
-export class DashboardComponent implements OnInit {
+export class DerogationDashboardComponent implements OnInit {
 
   requestsToProcess$!: Observable<DashboardRequestDTO[]>;
   requestsPendingValidation$!: Observable<DashboardRequestDTO[]>;
   requestsProcessed$!: Observable<DashboardRequestDTO[]>;
 
   private currentUserId = 'user123';
+  
+  // Message de succès
+  successMessage: string | null = null;
 
-  constructor(private requestService: RequestService) {}
+  constructor(
+    private dashboardService: DashboardService,
+    private router: Router,
+    private route: ActivatedRoute
+  ) {}
 
   ngOnInit(): void {
     this.loadRequests();
+    this.checkSuccessMessage();
   }
 
   private loadRequests(): void {
-    // TEMPORAIRE: Utiliser les données mockées
-    this.requestsToProcess$ = this.requestService.getMockData().pipe(
+    // TEMPORAIRE: Données mockées
+    this.requestsToProcess$ = this.dashboardService.getMockData().pipe(
       map(requests => requests.filter(r => r.status === DerogationStatus.TO_PROCESS))
     );
-    this.requestsPendingValidation$ = this.requestService.getMockData().pipe(
+    this.requestsPendingValidation$ = this.dashboardService.getMockData().pipe(
       map(requests => requests.filter(r => r.status === DerogationStatus.PENDING_VALIDATION))
     );
-    this.requestsProcessed$ = this.requestService.getMockData().pipe(
+    this.requestsProcessed$ = this.dashboardService.getMockData().pipe(
       map(requests => requests.filter(r => r.status === DerogationStatus.PROCESSED))
     );
-
-    // QUAND LE BACKEND EST PRÊT, remplacez par :
-    // this.requestsToProcess$ = this.requestService.getDemandsToProcess(this.currentUserId);
-    // this.requestsPendingValidation$ = this.requestService.getDemandsPendingValidation(this.currentUserId);
-    // this.requestsProcessed$ = this.requestService.getDemandsProcessed(this.currentUserId);
   }
 
-  // Actions
+  private checkSuccessMessage(): void {
+    this.route.queryParams.subscribe(params => {
+      if (params['success'] === 'true') {
+        this.successMessage = params['requestId'] 
+          ? `Demande ${params['requestId']} soumise avec succès !`
+          : 'Demande sauvegardée avec succès !';
+        
+        // Supprimer le message après 5 secondes
+        setTimeout(() => {
+          this.successMessage = null;
+        }, 5000);
+        
+        // Nettoyer l'URL
+        this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: {}
+        });
+      }
+    });
+  }
+
+  // NOUVELLE MÉTHODE: Navigation vers nouvelle demande
+  onNewRequest(): void {
+    this.router.navigate(['/derogation/nouvelle-demande']);
+  }
+
+  // Actions existantes
   viewRequest(request: DashboardRequestDTO): void {
     console.log('Voir la demande:', request.id);
+    // Navigation vers détail ou édition
+    this.router.navigate(['/derogation/edit', request.id]);
   }
 
   validateRequest(request: DashboardRequestDTO): void {
     console.log('Valider la demande:', request.id);
+    // Logique de validation
   }
 
   processRequest(request: DashboardRequestDTO): void {
     console.log('Traiter la demande:', request.id);
+    // Logique de traitement
   }
 
-  // Formatage
+  // Méthodes de formatage existantes
   formatPrice(value: number): string {
     if (!value && value !== 0) return '0 €';
     return Math.round(value).toLocaleString('fr-FR') + ' €';

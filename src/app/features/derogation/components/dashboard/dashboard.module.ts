@@ -1,16 +1,16 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { DashboardComponent } from './dashboard.component';
+import { DerogationDashboardComponent } from './dashboard.component';  // ← Bon nom
 
 @NgModule({
   declarations: [
-    DashboardComponent
+    DerogationDashboardComponent  // ← Bon nom au lieu de DashboardComponent
   ],
   imports: [
     CommonModule
   ],
   exports: [
-    DashboardComponent
+    DerogationDashboardComponent  // ← Bon nom au lieu de DashboardComponent
   ]
 })
 export class DashboardModule { }

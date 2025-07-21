@@ -1,0 +1,389 @@
+.form-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  background: #e8e8e8; // Arrière-plan gris comme dans l'image
+  min-height: calc(100vh - 60px);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.form-header {
+  margin-bottom: 30px;
+
+  h2 {
+    color: #36b37e;
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+  }
+}
+
+.derogation-form {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+// Grille principale - 4 colonnes égales
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 25px;
+
+  // Grille split pour commentaire et documents côte à côte
+  &.form-grid-split {
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #36b37e;
+    margin-bottom: 8px;
+    text-transform: none;
+
+    .required {
+      color: #e53e3e;
+      margin-left: 2px;
+    }
+  }
+
+  input, select, textarea {
+    padding: 14px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 12px; // Plus arrondi comme dans l'image
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.2s;
+    background: #f8f9fa; // Fond gris clair comme dans l'image
+    color: #374151;
+
+    &:focus {
+      outline: none;
+      border-color: #36b37e;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(54, 179, 126, 0.1);
+    }
+
+    &:hover:not(:focus) {
+      border-color: #9ca3af;
+      background: white;
+    }
+
+    &.error {
+      border-color: #e53e3e;
+      box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.1);
+    }
+
+    &[readonly] {
+      background-color: #f3f4f6;
+      color: #6b7280;
+      cursor: not-allowed;
+    }
+
+    &::placeholder {
+      color: #9ca3af;
+      font-style: italic;
+    }
+  }
+
+  select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 5"><path fill="%236b7280" d="m0 1 2 2 2-2z"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    background-size: 12px;
+    padding-right: 45px;
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 100px;
+    line-height: 1.6;
+  }
+}
+
+.error-message {
+  color: #e53e3e;
+  font-size: 11px;
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+// Input avec bouton à l'intérieur (ID SAB)
+.input-with-button {
+  position: relative;
+
+  input {
+    width: 100%;
+    padding-right: 130px; // Espace pour le bouton
+  }
+
+  .btn-confirm-inside {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #36b37e;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    min-width: 110px;
+    height: 36px;
+
+    &:hover:not(:disabled) {
+      background: #00875a;
+      transform: translateY(-50%) translateY(-1px);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    &.validated {
+      background: #00875a;
+    }
+  }
+}
+
+// Champs spéciaux pour commentaire et documents
+.form-field-comment {
+  textarea {
+    min-height: 150px;
+    resize: none;
+  }
+}
+
+.form-field-documents {
+  .file-upload-area {
+    min-height: 180px; // Même hauteur que le textarea commentaire
+    display: flex;
+    flex-direction: column;
+    border: 2px dashed #d1d5db;
+    border-radius: 12px;
+    padding: 20px;
+    background: #f8f9fa;
+    transition: all 0.2s;
+    margin-top: 8px;
+
+    &:hover {
+      border-color: #36b37e;
+      background: #f0fdf4;
+    }
+  }
+}
+
+.uploaded-files {
+  flex: 0 0 auto;
+  margin-bottom: 15px;
+}
+
+.file-item {
+  margin-bottom: 8px;
+
+  .file-badge {
+    display: inline-flex;
+    align-items: center;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    position: relative;
+
+    .btn-file-remove {
+      background: #ef4444;
+      color: white;
+      border: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      cursor: pointer;
+      margin-left: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+
+      .remove-icon {
+        font-size: 11px;
+        font-weight: bold;
+        line-height: 1;
+      }
+
+      &:hover {
+        background: #dc2626;
+        transform: scale(1.1);
+      }
+    }
+  }
+}
+
+// Espace flexible pour pousser le bouton vers le bas
+.upload-spacer {
+  flex: 1;
+}
+
+.upload-zone {
+  display: flex;
+  justify-content: flex-end; // Aligné à droite
+  flex: 0 0 auto;
+}
+
+.btn-upload {
+  background: #36b37e;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 4px rgba(54, 179, 126, 0.2);
+
+  &:hover {
+    background: #00875a;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(54, 179, 126, 0.3);
+  }
+}
+
+// Boutons d'action du formulaire
+.form-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: flex-end;
+  margin-top: 30px;
+  padding-top: 25px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-return, .btn-save-exit, .btn-submit {
+  padding: 14px 28px;
+  border: none;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 160px;
+  letter-spacing: 0.5px;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.btn-return {
+  background: #374151; // Noir/gris foncé comme dans l'image
+  color: white;
+
+  &:hover:not(:disabled) {
+    background: #1f2937;
+    transform: translateY(-1px);
+  }
+}
+
+.btn-save-exit {
+  background: #f59e0b; // Orange comme dans l'image
+  color: white;
+
+  &:hover:not(:disabled) {
+    background: #d97706;
+    transform: translateY(-1px);
+  }
+}
+
+.btn-submit {
+  background: #36b37e; // Vert comme dans l'image
+  color: white;
+
+  &:hover:not(:disabled) {
+    background: #00875a;
+    transform: translateY(-1px);
+  }
+}
+
+// Responsive
+@media (max-width: 1200px) {
+  .form-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+
+  .form-container {
+    padding: 15px;
+  }
+
+  .derogation-form {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+
+    &.form-grid-split {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  // Bouton confirmer en mobile
+  .input-with-button {
+    .btn-confirm-inside {
+      position: static;
+      transform: none;
+      margin-top: 10px;
+      min-width: auto;
+      width: 100%;
+      height: auto;
+      padding: 10px 16px;
+    }
+
+    input {
+      padding-right: 16px; // Padding normal en mobile
+    }
+  }
+
+  .form-actions {
+    flex-direction: column;
+
+    button {
+      width: 100%;
+      min-width: auto;
+    }
+  }
+
+  .form-container {
+    padding: 10px;
+    background: #f8f9fa; // Arrière-plan plus clair en mobile
+  }
+}
