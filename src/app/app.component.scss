@@ -1,0 +1,48 @@
+.app-container {
+  min-height: 100vh;
+  background-color: #f4f5f7;
+}
+
+.app-header {
+  background: #0052cc;
+  color: white;
+  padding: 0;
+  box-shadow: 0 2px 4px rgba(9, 30, 66, 0.25);
+  border-bottom: 1px solid #0747a6;
+
+  .header-content {
+    max-width: 100%;
+    margin: 0;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+      color: #deebff;
+    }
+
+    nav a {
+      color: #deebff;
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: 3px;
+      transition: background-color 0.2s;
+      font-size: 14px;
+      font-weight: 500;
+
+      &:hover,
+      &.active {
+        background-color: rgba(255,255,255,0.1);
+        color: white;
+      }
+    }
+  }
+}
+
+.app-main {
+  min-height: calc(100vh - 49px);
+}

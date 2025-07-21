@@ -1,0 +1,353 @@
+.dashboard-container {
+  padding: 0;
+  max-width: 100%;
+  margin: 0;
+  background-color: #ffffff;
+  min-height: calc(100vh - 60px);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.section-header {
+  margin-bottom: 0;
+  padding: 16px;
+  
+  h2 {
+    color: #172b4d;
+    font-weight: 600;
+    margin: 0;
+    font-size: 24px;
+  }
+}
+
+// Section de workflow
+.workflow-section {
+  background: #ffffff;
+  border: none;
+  border-radius: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+}
+
+// Titre de section avec icône - alignement parfait
+.section-title {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e1e5e9;
+  
+  .status-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 8px;
+    
+    .checkmark {
+      color: white;
+      font-size: 10px;
+      font-weight: bold;
+    }
+    
+    &.status-to-process,
+    &.status-pending,
+    &.status-processed {
+      background-color: #36b37e;
+    }
+  }
+  
+  h3 {
+    color: #36b37e;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    flex: 1;
+  }
+  
+  .item-count {
+    color: #6b778c;
+    font-size: 12px;
+    margin-left: auto;
+  }
+}
+
+// Tableau avec largeurs fixes pour alignement parfait
+.requests-table {
+  overflow-x: auto;
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+    table-layout: fixed; // Force les largeurs définies
+    
+    th {
+      background-color: #fafbfc;
+      color: #36b37e;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 12px 8px;
+      text-align: left;
+      border-bottom: 1px solid #e1e5e9;
+      border-right: 1px solid #e1e5e9;
+      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      
+      &:last-child {
+        border-right: none;
+      }
+      
+      // Première colonne pour les icônes
+      &:first-child {
+        padding-left: 16px;
+      }
+    }
+    
+    td {
+      padding: 12px 8px;
+      border-bottom: 1px solid #e1e5e9;
+      border-right: 1px solid #e1e5e9;
+      font-size: 12px;
+      color: #172b4d;
+      vertical-align: middle;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      
+      &:last-child {
+        border-right: none;
+      }
+      
+      // Première colonne avec les icônes vertes
+      &:first-child {
+        padding-left: 16px;
+        min-width: 120px;
+      }
+      
+      // Cellule d'actions - centrage parfait
+      &.actions-cell {
+        text-align: center;
+        padding: 4px;
+      }
+    }
+    
+    tbody tr:hover {
+      background-color: #f4f5f7;
+    }
+  }
+}
+
+// ID de demande avec alignement parfait - CORRECTION ICÔNES
+.request-id {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  
+  .request-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: #36b37e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 8px;
+    flex-shrink: 0;
+    
+    .checkmark {
+      color: white;
+      font-size: 9px;
+      font-weight: bold;
+      line-height: 1;
+    }
+    
+    &.processed {
+      background-color: #00875a;
+    }
+  }
+  
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-size: 12px;
+  color: #172b4d;
+  font-weight: 500;
+}
+
+// Informations utilisateur - alignement parfait
+.client-info, .responsable-info, .owner-info {
+  display: flex;
+  align-items: center;
+  
+  .user-icon {
+    width: 12px;
+    height: 12px;
+    background-color: #0052cc;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 6px;
+    font-size: 6px;
+    color: white;
+    flex-shrink: 0;
+  }
+  
+  font-size: 12px;
+  color: #172b4d;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// Badges de statut - centrés parfaitement
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: none;
+  min-width: 60px;
+  
+  .status-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    margin-right: 4px;
+  }
+  
+  &.status-processing {
+    background-color: #36b37e;
+    color: white;
+    
+    .status-dot {
+      background-color: white;
+    }
+  }
+  
+  &.status-waiting {
+    background-color: #ffab00;
+    color: white;
+    
+    .status-dot {
+      background-color: white;
+    }
+  }
+  
+  &.status-done {
+    background-color: #36b37e;
+    color: white;
+    
+    .status-dot {
+      background-color: white;
+    }
+  }
+}
+
+// Boutons - alignement et taille parfaits
+.btn-primary, .btn-secondary {
+  border: none;
+  border-radius: 12px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.3px;
+  min-width: 60px;
+  text-align: center;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.btn-primary {
+  background-color: #36b37e;
+  color: white;
+  
+  &:hover {
+    background-color: #00875a;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(54, 179, 126, 0.3);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.btn-secondary {
+  background-color: #6b778c;
+  color: white;
+  
+  &:hover {
+    background-color: #5e6c84;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(107, 119, 140, 0.3);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+// Compteur de jours - centré
+.days-count {
+  background-color: #ffab00;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: none;
+  min-width: 40px;
+  text-align: center;
+  display: inline-block;
+}
+
+// Message vide
+.no-requests {
+  padding: 40px;
+  text-align: center;
+  color: #6b778c;
+  font-style: italic;
+  font-size: 14px;
+}
+
+// Responsive
+@media (max-width: 1400px) {
+  .requests-table table {
+    th, td {
+      padding: 6px 8px;
+      font-size: 11px;
+    }
+  }
+}
+
+@media (max-width: 1200px) {
+  .dashboard-container {
+    padding: 0 8px;
+  }
+  
+  .requests-table table {
+    th, td {
+      padding: 4px 6px;
+      font-size: 10px;
+    }
+  }
+  
+  .btn-primary, .btn-secondary {
+    font-size: 8px;
+    padding: 3px 8px;
+    min-width: 50px;
+    height: 20px;
+  }
+}
