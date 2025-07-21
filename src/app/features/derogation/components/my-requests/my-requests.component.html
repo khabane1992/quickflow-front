@@ -1,0 +1,72 @@
+<div class="my-requests-container">
+  <div class="header-section">
+    <h1 class="page-title">Mes demandes</h1>
+    <button class="new-request-btn" routerLink="/nouvelle-demande">
+      ➕ Nouvelle demande
+    </button>
+  </div>
+
+  <div class="filters-section">
+    <div class="filter-group">
+      <label>Statut:</label>
+      <select [(ngModel)]="selectedStatus" (change)="filterRequests()" class="filter-select">
+        <option value="">Tous</option>
+        <option value="pending">En cours</option>
+        <option value="approved">Approuvées</option>
+        <option value="rejected">Refusées</option>
+        <option value="draft">Brouillons</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Période:</label>
+      <select [(ngModel)]="selectedPeriod" (change)="filterRequests()" class="filter-select">
+        <option value="">Toutes</option>
+        <option value="week">Cette semaine</option>
+        <option value="month">Ce mois</option>
+        <option value="quarter">Ce trimestre</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="requests-table">
+    <div class="table-header">
+      <div class="header-cell">ID</div>
+      <div class="header-cell">Client</div>
+      <div class="header-cell">Type</div>
+      <div class="header-cell">Date</div>
+      <div class="header-cell">Montant</div>
+      <div class="header-cell">Statut</div>
+      <div class="header-cell">Actions</div>
+    </div>
+
+    <div class="table-body">
+      <div *ngFor="let request of filteredRequests" class="table-row">
+        <div class="table-cell">{{request.id}}</div>
+        <div class="table-cell">{{request.clientName}}</div>
+        <div class="table-cell">{{request.requestType}}</div>
+        <div class="table-cell">{{request.submissionDate | date:'dd/MM/yyyy'}}</div>
+        <div class="table-cell">
+          <span *ngIf="request.amount">{{request.amount | currency:request.currency:'symbol':'1.2-2'}}</span>
+          <span *ngIf="!request.amount">-</span>
+        </div>
+        <div class="table-cell">
+          <span class="status-badge" [ngClass]="request.status">
+            {{getStatusLabel(request.status)}}
+          </span>
+        </div>
+        <div class="table-cell">
+          <button class="action-btn view" (click)="viewRequest(request.id)">👁️</button>
+          <button class="action-btn edit" (click)="editRequest(request.id)" *ngIf="request.status === 'draft'">✏️</button>
+          <button class="action-btn delete" (click)="deleteRequest(request.id)" *ngIf="request.status === 'draft'">🗑️</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pagination">
+    <button class="page-btn" [disabled]="currentPage === 1" (click)="changePage(currentPage - 1)">Précédent</button>
+    <span class="page-info">Page {{currentPage}} sur {{totalPages}}</span>
+    <button class="page-btn" [disabled]="currentPage === totalPages" (click)="changePage(currentPage + 1)">Suivant</button>
+  </div>
+</div>

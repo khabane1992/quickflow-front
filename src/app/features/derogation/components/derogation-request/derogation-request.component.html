@@ -1,0 +1,250 @@
+<!-- derogation-request.component.html -->
+<div class="derogation-container">
+  <h1 class="page-title">Nouvelle demande</h1>
+
+  <form [formGroup]="derogationForm" (ngSubmit)="onSubmit()" class="derogation-form">
+    <!-- First Row -->
+    <div class="form-row">
+      <div class="form-group">
+        <label for="idSab">ID SAB</label>
+        <div class="input-with-button">
+          <input
+            type="text"
+            id="idSab"
+            formControlName="idSab"
+            placeholder="Zone de text"
+            class="form-control">
+          <button type="button" class="confirm-btn" (click)="onConfirmId()">CONFIRMER</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="numeroCompte">Numéro de compte</label>
+        <input
+          type="text"
+          id="numeroCompte"
+          formControlName="numeroCompte"
+          placeholder="Zone de text"
+          class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label for="nom">Nom</label>
+        <input
+          type="text"
+          id="nom"
+          formControlName="nom"
+          placeholder="Zone de text"
+          class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label for="prenom">Prénom</label>
+        <input
+          type="text"
+          id="prenom"
+          formControlName="prenom"
+          placeholder="Zone de text"
+          class="form-control">
+      </div>
+    </div>
+
+    <!-- Second Row -->
+    <div class="form-row">
+      <div class="form-group">
+        <label for="businessLine">Business Line</label>
+        <select id="businessLine" formControlName="businessLine" class="form-control">
+          <option value="">Dropdown</option>
+          <option *ngFor="let option of businessLineOptions" [value]="option">{{ option }}</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="segment">Segment</label>
+        <select id="segment" formControlName="segment" class="form-control">
+          <option value="">Dropdown</option>
+          <option *ngFor="let option of segmentOptions" [value]="option">{{ option }}</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="typeDerogation">Type de dérogation</label>
+        <select id="typeDerogation" formControlName="typeDerogation" class="form-control">
+          <option value="">Dropdown</option>
+          <option *ngFor="let option of derogationTypeOptions" [value]="option">{{ option }}</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="codeCommission">Code commission</label>
+        <input
+          type="text"
+          id="codeCommission"
+          formControlName="codeCommission"
+          placeholder="Zone de text"
+          class="form-control">
+      </div>
+    </div>
+
+    <!-- Third Row -->
+    <div class="form-row">
+      <div class="form-group">
+        <label for="tarificationStandard">Tarification standard</label>
+        <input
+          type="text"
+          id="tarificationStandard"
+          formControlName="tarificationStandard"
+          placeholder="Zone de text"
+          class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label for="devise">Devise</label>
+        <select id="devise" formControlName="devise" class="form-control">
+          <option value="">Dropdown</option>
+          <option *ngFor="let option of deviseOptions" [value]="option">{{ option }}</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="dateEffet">Date d'effet</label>
+        <input
+          type="date"
+          id="dateEffet"
+          formControlName="dateEffet"
+          class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label for="dateFin">Date de fin</label>
+        <input
+          type="date"
+          id="dateFin"
+          formControlName="dateFin"
+          class="form-control">
+      </div>
+    </div>
+
+    <!-- Fourth Row -->
+    <div class="form-row">
+      <div class="form-group">
+        <label for="tauxMontant">Taux / Montant de la dérogation</label>
+        <input
+          type="text"
+          id="tauxMontant"
+          formControlName="tauxMontant"
+          placeholder="Zone de text"
+          class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label for="taux">Taux</label>
+        <input
+          type="text"
+          id="taux"
+          formControlName="taux"
+          placeholder="Zone de text"
+          class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label for="convention">Convention</label>
+        <input
+          type="text"
+          id="convention"
+          formControlName="convention"
+          placeholder="Zone de text"
+          class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label for="employeur">Employeur</label>
+        <input
+          type="text"
+          id="employeur"
+          formControlName="employeur"
+          placeholder="Zone de text"
+          class="form-control">
+      </div>
+    </div>
+
+    <!-- Fifth Row -->
+    <div class="form-row">
+      <div class="form-group">
+        <label for="salaire">Salaire</label>
+        <input
+          type="text"
+          id="salaire"
+          formControlName="salaire"
+          placeholder="Zone de text"
+          class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label for="pnb">PNB</label>
+        <input
+          type="text"
+          id="pnb"
+          formControlName="pnb"
+          placeholder="Zone de text"
+          class="form-control">
+      </div>
+    </div>
+
+    <!-- Comments and Documents Row -->
+    <div class="form-row full-width">
+      <div class="form-group">
+        <label for="commentaire">Commentaire</label>
+        <textarea
+          id="commentaire"
+          formControlName="commentaire"
+          placeholder="Zone de text"
+          rows="6"
+          class="form-control"></textarea>
+      </div>
+
+      <!-- Documents Section -->
+      <div class="form-group">
+        <label>Document(s)</label>
+        <div class="document-upload">
+          <div class="uploaded-files">
+            <div *ngFor="let file of uploadedFiles; let i = index" class="file-tag">
+              <span>{{ file.name }}</span>
+              <button type="button" class="remove-file" (click)="removeFile(i)">×</button>
+            </div>
+            <div class="file-tag" *ngIf="uploadedFiles.length === 0">
+              <span>CIN.PDF</span>
+              <button type="button" class="remove-file">×</button>
+            </div>
+          </div>
+        </div>
+        <!-- Upload button outside the box -->
+        <div class="upload-section-external">
+          <input
+            type="file"
+            #fileUpload
+            (change)="onFileSelected($event)"
+            multiple
+            style="display: none;">
+          <button
+            type="button"
+            class="upload-btn"
+            (click)="fileUpload.click()">
+            ⬆ AJOUTER UN DOCUMENT
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="form-actions">
+      <div class="button-left">
+        <button type="button" class="btn btn-secondary" (click)="onReturn()">RETOUR</button>
+      </div>
+      <div class="button-right">
+        <button type="button" class="btn btn-warning" (click)="onSaveAndExit()">ENREGISTRER ET QUITTER</button>
+        <button type="submit" class="btn btn-primary">SOUMETTRE</button>
+      </div>
+    </div>
+  </form>
+</div>
