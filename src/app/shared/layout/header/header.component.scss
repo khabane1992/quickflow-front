@@ -1,0 +1,134 @@
+/* Header Styles */
+.header {
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+}
+
+.breadcrumb {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.breadcrumb-text {
+  color: #999;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #4CAF50;
+}
+
+.page-title-header {
+  flex: 2;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: #4CAF50;
+}
+
+.user-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  background: #e0e0e0;
+}
+
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-avatar-fallback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.user-name {
+  font-weight: 500;
+  font-size: 14px;
+  color: #333;
+}
+
+.user-status {
+  display: flex;
+  align-items: center;
+  background: #4CAF50;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background: white;
+  border-radius: 50%;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .header-content {
+    padding: 15px 20px;
+  }
+
+  .page-title-header {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .breadcrumb,
+  .page-title-header,
+  .user-section {
+    flex: none;
+    width: 100%;
+  }
+
+  .user-section {
+    justify-content: flex-start;
+  }
+}

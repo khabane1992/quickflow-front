@@ -1,18 +1,16 @@
+<!-- app.component.html -->
 <div class="app-container">
-  
-  <header class="app-header">
-    <div class="header-content">
-      <h1>QuickFlow</h1>
-      <nav>
-        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
-          Accueil
-        </a>
-      </nav>
+  <!-- Side Menu Component -->
+  <app-side-menu></app-side-menu>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Header Component -->
+    <app-header></app-header>
+
+    <!-- Page Content -->
+    <div class="page-content">
+      <router-outlet></router-outlet>
     </div>
-  </header>
-
-  <main class="app-main">
-    <router-outlet></router-outlet>
   </main>
-
 </div>
