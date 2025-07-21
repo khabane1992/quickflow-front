@@ -1,12 +1,12 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { DashboardRequestDTO, DerogationStatus, DerogationType, DemandsType } from '../../features/derogation/models/dashboard/request.interface';
+import { DashboardRequestDTO, DerogationStatus, DerogationType, DemandsType } from '../../models/dashboard/request.interface';
 
 @Injectable({
   providedIn: 'root'
 })
-export class RequestService {
+export class DashboardService {
 
   private apiUrl = '/api';
 
@@ -21,7 +21,7 @@ export class RequestService {
     return this.http.get<DashboardRequestDTO[]>(`${this.apiUrl}/demands`, { params });
   }
 
-  // Méthodes de convenance pour les sections du dashboard
+  // Méthodes de convenance
   getDemandsToProcess(userId: string): Observable<DashboardRequestDTO[]> {
     return this.getDemands(userId, DemandsType.TO_PROCESS);
   }

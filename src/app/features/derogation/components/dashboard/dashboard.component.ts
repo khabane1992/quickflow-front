@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { DashboardRequestDTO, DerogationStatus } from '../models/request.interface';
-import { RequestService } from '../core/services/request.service';
+import { DashboardRequestDTO, DerogationStatus } from '../../models/dashboard/request.interface';
+import { RequestService } from '../../../../core/services/request.service';
 
 @Component({
   selector: 'app-dashboard',
