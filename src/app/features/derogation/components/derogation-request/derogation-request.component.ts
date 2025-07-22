@@ -1,5 +1,5 @@
-import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import {Component, OnInit, ViewChild, ElementRef} from '@angular/core';
+import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 
 @Component({
   selector: 'app-derogation-request',
@@ -9,6 +9,8 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 export class DerogationRequestComponent implements OnInit {
   derogationForm: FormGroup;
   uploadedFiles: File[] = [];
+
+  @ViewChild('richTextEditor', {static: false}) richTextEditor!: ElementRef;
 
   businessLineOptions = [
     'Option 1',
@@ -54,11 +56,149 @@ export class DerogationRequestComponent implements OnInit {
       employeur: [''],
       salaire: [''],
       pnb: [''],
-      commentaire: ['']
+      commentaire: [''] // This will contain rich text with markdown-style formatting
     });
   }
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+  }
+
+  // Rich Text Editor Methods - Add formatting markers
+  execCommand(command: string, value?: string) {
+    if (!this.richTextEditor) return;
+
+    const textarea = this.richTextEditor.nativeElement;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+
+    if (selectedText) {
+      let wrappedText = '';
+
+      switch (command) {
+        case 'bold':
+          wrappedText = `**${selectedText}**`;
+          break;
+        case 'italic':
+          wrappedText = `*${selectedText}*`;
+          break;
+        case 'underline':
+          wrappedText = `_${selectedText}_`;
+          break;
+        case 'removeFormat':
+          // Remove all formatting markers
+          wrappedText = selectedText
+            .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove bold
+            .replace(/\*(.*?)\*/g, '$1')      // Remove italic
+            .replace(/_(.*?)_/g, '$1')        // Remove underline
+            .replace(/\[.*?\](.*?)\[\/.*?\]/g, '$1'); // Remove color/size markers
+          break;
+        default:
+          wrappedText = selectedText;
+      }
+
+      const newValue = textarea.value.substring(0, start) + wrappedText + textarea.value.substring(end);
+
+      // Update the form control value
+      this.derogationForm.patchValue({commentaire: newValue});
+
+      // Restore cursor position
+      setTimeout(() => {
+        const newCursorPos = start + wrappedText.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+        textarea.focus();
+      });
+    } else {
+      textarea.focus();
+    }
+  }
+
+  // Color picker - Add color markers around selected text
+  changeColor(color: string) {
+    if (!this.richTextEditor) return;
+
+    const textarea = this.richTextEditor.nativeElement;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+
+    if (selectedText) {
+      const colorName = this.getColorName(color);
+      const wrappedText = `[${colorName}]${selectedText}[/${colorName}]`;
+
+      const newValue = textarea.value.substring(0, start) + wrappedText + textarea.value.substring(end);
+
+      // Update the form control value
+      this.derogationForm.patchValue({commentaire: newValue});
+
+      setTimeout(() => {
+        const newCursorPos = start + wrappedText.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+        textarea.focus();
+      });
+    } else {
+      textarea.focus();
+    }
+  }
+
+  getColorName(color: string): string {
+    switch (color) {
+      case '#000000':
+        return 'noir';
+      case '#ff0000':
+        return 'rouge';
+      case '#4CAF50':
+        return 'vert';
+      case '#2196F3':
+        return 'bleu';
+      default:
+        return 'couleur';
+    }
+  }
+
+  // Font size - Add size markers around selected text
+  changeFontSize(size: string) {
+    if (!this.richTextEditor) return;
+
+    const textarea = this.richTextEditor.nativeElement;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+
+    if (selectedText) {
+      let sizeText = '';
+      switch (size) {
+        case '2':
+          sizeText = 'petit';
+          break;
+        case '3':
+          sizeText = 'normal';
+          break;
+        case '4':
+          sizeText = 'grand';
+          break;
+        default:
+          return; // Don't do anything for empty selection
+      }
+
+      const wrappedText = `[${sizeText}]${selectedText}[/${sizeText}]`;
+
+      const newValue = textarea.value.substring(0, start) + wrappedText + textarea.value.substring(end);
+
+      // Update the form control value
+      this.derogationForm.patchValue({commentaire: newValue});
+
+      setTimeout(() => {
+        const newCursorPos = start + wrappedText.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+        textarea.focus();
+      });
+    } else {
+      textarea.focus();
+    }
+  }
+
+  // No need for onEditorInput since formControlName handles it automatically
 
   onConfirmId() {
     // Logic to confirm SAB ID
@@ -81,7 +221,8 @@ export class DerogationRequestComponent implements OnInit {
   onSubmit() {
     if (this.derogationForm.valid) {
       console.log('Form submitted:', this.derogationForm.value);
-      // Submit logic here
+      // The commentaire field will contain text with formatting markers
+      console.log('Rich text comment:', this.derogationForm.get('commentaire')?.value);
     } else {
       console.log('Form is invalid');
       this.markFormGroupTouched();

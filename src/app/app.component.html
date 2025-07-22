@@ -1,12 +1,15 @@
 <!-- app.component.html -->
 <div class="app-container">
   <!-- Side Menu Component -->
-  <app-side-menu></app-side-menu>
+  <app-side-menu [class.open]="sidebarOpen"></app-side-menu>
+
+  <!-- Mobile overlay -->
+  <div class="mobile-overlay" [class.active]="sidebarOpen" (click)="closeSidebar()"></div>
 
   <!-- Main Content -->
   <main class="main-content">
     <!-- Header Component -->
-    <app-header></app-header>
+    <app-header (sidebarToggle)="toggleSidebar()"></app-header>
 
     <!-- Page Content -->
     <div class="page-content">

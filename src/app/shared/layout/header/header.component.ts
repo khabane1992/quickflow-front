@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, EventEmitter, Output } from '@angular/core';
 import { Router } from '@angular/router';
 
 @Component({
@@ -7,8 +7,13 @@ import { Router } from '@angular/router';
   styleUrls: ['./header.component.scss']
 })
 export class HeaderComponent {
+  @Output() sidebarToggle = new EventEmitter<void>();
 
   constructor(protected router: Router) {}
+
+  toggleSidebar() {
+    this.sidebarToggle.emit();
+  }
 
   getCurrentPageTitle(): string {
     const route = this.router.url;

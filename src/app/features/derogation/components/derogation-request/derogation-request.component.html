@@ -6,7 +6,7 @@
     <!-- First Row -->
     <div class="form-row">
       <div class="form-group">
-        <label for="idSab">ID SAB</label>
+        <label for="idSab">Id Sab</label>
         <div class="input-with-button">
           <input
             type="text"
@@ -195,12 +195,56 @@
     <div class="form-row full-width">
       <div class="form-group">
         <label for="commentaire">Commentaire</label>
+
+        <!-- Rich Text Editor Toolbar -->
+        <div class="rich-editor-toolbar">
+          <!-- Font formatting -->
+          <div class="toolbar-group">
+            <button type="button" class="toolbar-btn" (click)="execCommand('bold')" title="Gras">
+              <strong>B</strong>
+            </button>
+            <button type="button" class="toolbar-btn" (click)="execCommand('italic')" title="Italique">
+              <em>I</em>
+            </button>
+            <button type="button" class="toolbar-btn" (click)="execCommand('underline')" title="Souligné">
+              <u>U</u>
+            </button>
+          </div>
+
+          <!-- Font size -->
+          <div class="toolbar-group">
+            <select class="toolbar-select" (change)="changeFontSize($any($event.target).value)" title="Taille">
+              <option value="">Taille</option>
+              <option value="2">Petit</option>
+              <option value="3">Normal</option>
+              <option value="4">Grand</option>
+            </select>
+          </div>
+
+          <!-- Quick colors -->
+          <div class="toolbar-group quick-colors">
+            <button type="button" class="color-btn black" (click)="changeColor('#000000')" title="Noir"></button>
+            <button type="button" class="color-btn red" (click)="changeColor('#ff0000')" title="Rouge"></button>
+            <button type="button" class="color-btn green" (click)="changeColor('#4CAF50')" title="Vert"></button>
+            <button type="button" class="color-btn blue" (click)="changeColor('#2196F3')" title="Bleu"></button>
+          </div>
+
+          <!-- Clear formatting -->
+          <div class="toolbar-group">
+            <button type="button" class="toolbar-btn clear-btn" (click)="execCommand('removeFormat')"
+                    title="Supprimer le formatage">
+              Effacer
+            </button>
+          </div>
+        </div>
+
+        <!-- Rich Text Editor Content -->
         <textarea
-          id="commentaire"
+          #richTextEditor
+          class="rich-text-content"
           formControlName="commentaire"
-          placeholder="Zone de text"
-          rows="6"
-          class="form-control"></textarea>
+          placeholder="Saisissez votre commentaire...">
+        </textarea>
       </div>
 
       <!-- Documents Section -->
