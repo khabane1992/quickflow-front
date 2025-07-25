@@ -9,6 +9,7 @@ import {
   DashboardRequestDTO,
   DerogationRequest, PageResponse
 } from "../../shared/interfaces/derogation-mangement.interface";
+import { ApiConfigService } from './api-config.service';
 
 
 @Injectable({
@@ -16,9 +17,14 @@ import {
 })
 export class DarogationManagementService {
 
-  private readonly baseUrl = '/api/dashboard'; // Ajustez selon votre configuration
+  private readonly baseUrl: string;
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private apiConfig: ApiConfigService
+  ) {
+    this.baseUrl = this.apiConfig.buildApiUrl('dashboard');
+  }
 
   /**
    * Récupère les demandes à traiter
@@ -26,16 +32,20 @@ export class DarogationManagementService {
   getDemandsToProcess(userId: string): Observable<DerogationRequest[]> {
     const params = new HttpParams().set('userId', userId);
 
+    this.apiConfig.logMock('Récupération des demandes à traiter', { userId });
+
     return this.http.get<ApiResponse<DashboardRequestDTO[]>>(`${this.baseUrl}/demands-to-process`, { params })
       .pipe(
         retry(2), // Retry 2 fois en cas d'erreur réseau
         map(response => {
           if (response.success && response.data) {
-            return response.data.map(dto => DashboardMapper.mapToDerogationRequest(dto));
+            const mappedData = response.data.map(dto => DashboardMapper.mapToDerogationRequest(dto));
+            this.apiConfig.logMock('Demandes à traiter récupérées', { count: mappedData.length });
+            return mappedData;
           }
           throw new Error(response.message || 'Erreur lors de la récupération des demandes à traiter');
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       );
   }
 
@@ -45,16 +55,20 @@ export class DarogationManagementService {
   getDemandsPendingValidation(userId: string): Observable<DerogationRequest[]> {
     const params = new HttpParams().set('userId', userId);
 
+    this.apiConfig.logMock('Récupération des demandes en attente', { userId });
+
     return this.http.get<ApiResponse<DashboardRequestDTO[]>>(`${this.baseUrl}/demands-pending-validation`, { params })
       .pipe(
         retry(2),
         map(response => {
           if (response.success && response.data) {
-            return response.data.map(dto => DashboardMapper.mapToDerogationRequest(dto));
+            const mappedData = response.data.map(dto => DashboardMapper.mapToDerogationRequest(dto));
+            this.apiConfig.logMock('Demandes en attente récupérées', { count: mappedData.length });
+            return mappedData;
           }
           throw new Error(response.message || 'Erreur lors de la récupération des demandes en attente');
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       );
   }
 
@@ -64,16 +78,20 @@ export class DarogationManagementService {
   getDemandsProcessed(userId: string): Observable<DerogationRequest[]> {
     const params = new HttpParams().set('userId', userId);
 
+    this.apiConfig.logMock('Récupération des demandes traitées', { userId });
+
     return this.http.get<ApiResponse<DashboardRequestDTO[]>>(`${this.baseUrl}/demands-processed`, { params })
       .pipe(
         retry(2),
         map(response => {
           if (response.success && response.data) {
-            return response.data.map(dto => DashboardMapper.mapToDerogationRequest(dto));
+            const mappedData = response.data.map(dto => DashboardMapper.mapToDerogationRequest(dto));
+            this.apiConfig.logMock('Demandes traitées récupérées', { count: mappedData.length });
+            return mappedData;
           }
           throw new Error(response.message || 'Erreur lors de la récupération des demandes traitées');
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       );
   }
 
@@ -86,20 +104,27 @@ export class DarogationManagementService {
       .set('page', page.toString())
       .set('size', size.toString());
 
+    this.apiConfig.logMock('Récupération des demandes traitées paginées', { userId, page, size });
+
     return this.http.get<ApiResponse<PageResponse<DashboardRequestDTO>>>(`${this.baseUrl}/demands-processed`, { params })
       .pipe(
         retry(2),
         map(response => {
           if (response.success && response.data) {
             const pageData = response.data;
+            const mappedContent = pageData.content.map(dto => DashboardMapper.mapToDerogationRequest(dto));
+            this.apiConfig.logMock('Demandes traitées paginées récupérées', {
+              page: pageData.number,
+              totalElements: pageData.totalElements
+            });
             return {
               ...pageData,
-              content: pageData.content.map(dto => DashboardMapper.mapToDerogationRequest(dto))
+              content: mappedContent
             };
           }
           throw new Error(response.message || 'Erreur lors de la récupération des demandes traitées');
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       );
   }
 
@@ -111,16 +136,20 @@ export class DarogationManagementService {
       .set('userId', userId)
       .set('status', status);
 
+    this.apiConfig.logMock('Récupération des demandes par statut', { userId, status });
+
     return this.http.get<ApiResponse<DashboardRequestDTO[]>>(`${this.baseUrl}/demands-by-status`, { params })
       .pipe(
         retry(2),
         map(response => {
           if (response.success && response.data) {
-            return response.data.map(dto => DashboardMapper.mapToDerogationRequest(dto));
+            const mappedData = response.data.map(dto => DashboardMapper.mapToDerogationRequest(dto));
+            this.apiConfig.logMock('Demandes par statut récupérées', { status, count: mappedData.length });
+            return mappedData;
           }
           throw new Error(response.message || 'Erreur lors de la récupération des demandes');
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       );
   }
 
@@ -128,16 +157,19 @@ export class DarogationManagementService {
    * Récupère une demande spécifique par ID
    */
   getDemandById(demandId: string): Observable<DashboardRequestDTO> {
+    this.apiConfig.logMock('Récupération de la demande par ID', { demandId });
+
     return this.http.get<ApiResponse<DashboardRequestDTO>>(`${this.baseUrl}/demands/${demandId}`)
       .pipe(
         retry(2),
         map(response => {
           if (response.success && response.data) {
+            this.apiConfig.logMock('Demande récupérée par ID', { id: response.data.id });
             return response.data;
           }
           throw new Error(response.message || 'Erreur lors de la récupération de la demande');
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       );
   }
 
@@ -150,10 +182,15 @@ export class DarogationManagementService {
       comments: comments
     };
 
+    this.apiConfig.logMock('Mise à jour du statut de la demande', { demandId, newStatus, comments });
+
     return this.http.put<ApiResponse<any>>(`${this.baseUrl}/demands/${demandId}/status`, body)
       .pipe(
-        map(response => response.success),
-        catchError(this.handleError)
+        map(response => {
+          this.apiConfig.logMock('Statut mis à jour', { demandId, success: response.success });
+          return response.success;
+        }),
+        catchError(this.handleError.bind(this))
       );
   }
 
@@ -161,6 +198,7 @@ export class DarogationManagementService {
    * Approuve une demande
    */
   approveDemand(demandId: string, comments?: string): Observable<boolean> {
+    this.apiConfig.logMock('Approbation de la demande', { demandId, comments });
     return this.updateDemandStatus(demandId, 'APPROVED', comments);
   }
 
@@ -168,6 +206,7 @@ export class DarogationManagementService {
    * Rejette une demande
    */
   rejectDemand(demandId: string, comments?: string): Observable<boolean> {
+    this.apiConfig.logMock('Rejet de la demande', { demandId, comments });
     return this.updateDemandStatus(demandId, 'REJECTED', comments);
   }
 
@@ -175,6 +214,7 @@ export class DarogationManagementService {
    * Traite une demande (passage au statut en cours de traitement)
    */
   processDemand(demandId: string): Observable<boolean> {
+    this.apiConfig.logMock('Traitement de la demande', { demandId });
     return this.updateDemandStatus(demandId, 'IN_REVIEW');
   }
 
@@ -184,16 +224,19 @@ export class DarogationManagementService {
   getDashboardStats(userId: string): Observable<any> {
     const params = new HttpParams().set('userId', userId);
 
+    this.apiConfig.logMock('Récupération des statistiques', { userId });
+
     return this.http.get<ApiResponse<any>>(`${this.baseUrl}/stats`, { params })
       .pipe(
         retry(2),
         map(response => {
           if (response.success && response.data) {
+            this.apiConfig.logMock('Statistiques récupérées', response.data);
             return response.data;
           }
           throw new Error(response.message || 'Erreur lors de la récupération des statistiques');
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       );
   }
 
@@ -213,16 +256,20 @@ export class DarogationManagementService {
       });
     }
 
+    this.apiConfig.logMock('Recherche de demandes', { userId, searchTerm, filters });
+
     return this.http.get<ApiResponse<DashboardRequestDTO[]>>(`${this.baseUrl}/demands/search`, { params })
       .pipe(
         retry(2),
         map(response => {
           if (response.success && response.data) {
-            return response.data.map(dto => DashboardMapper.mapToDerogationRequest(dto));
+            const mappedData = response.data.map(dto => DashboardMapper.mapToDerogationRequest(dto));
+            this.apiConfig.logMock('Résultats de recherche', { count: mappedData.length });
+            return mappedData;
           }
           throw new Error(response.message || 'Erreur lors de la recherche');
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       );
   }
 
@@ -262,7 +309,25 @@ export class DarogationManagementService {
       }
     }
 
-    console.error('Erreur API Dashboard:', errorMessage, error);
+    const apiMode = this.apiConfig.isMockEnabled() ? 'MOCK' : 'REAL';
+    console.error(`Erreur API Dashboard (${apiMode}):`, errorMessage, error);
+    this.apiConfig.logMock('Erreur API', { error: errorMessage, mode: apiMode });
+
     return throwError(() => new Error(errorMessage));
+  }
+
+  /**
+   * Méthodes utilitaires pour le debugging
+   */
+  getApiMode(): string {
+    return this.apiConfig.isMockEnabled() ? 'MOCK' : 'REAL';
+  }
+
+  getApiBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  toggleApiMode(): void {
+    this.apiConfig.toggleMockApi();
   }
 }

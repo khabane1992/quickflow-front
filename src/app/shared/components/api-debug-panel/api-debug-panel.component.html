@@ -1,0 +1,168 @@
+<!-- api-debug-panel.component.html -->
+
+<div class="api-debug-panel" *ngIf="isVisible">
+  <div class="debug-header">
+    <h4>🔧 API Debug Panel</h4>
+    <button class="close-btn" (click)="togglePanelVisibility()">×</button>
+  </div>
+
+  <div class="debug-content">
+
+    <!-- Mode API actuel -->
+    <div class="debug-section">
+      <div class="status-indicator">
+        <span class="status-dot"
+              [style.background-color]="configInfo.useMockApi ? '#ff9800' : '#4caf50'">
+        </span>
+        <strong>Mode: {{ configInfo.useMockApi ? 'MOCK API' : 'REAL API' }}</strong>
+      </div>
+    </div>
+
+    <!-- URL de l'API -->
+    <div class="debug-section">
+      <label>URL API:</label>
+      <code class="api-url">{{ configInfo.apiUrl }}</code>
+    </div>
+
+    <!-- Contrôles -->
+    <div class="debug-section">
+      <div class="control-buttons">
+        <button
+          class="debug-btn mock-btn"
+          [class.active]="configInfo.useMockApi"
+          (click)="enableMockApi()">
+          🔀 Mock API
+        </button>
+
+        <button
+          class="debug-btn real-btn"
+          [class.active]="!configInfo.useMockApi"
+          (click)="disableMockApi()">
+          🌐 Real API
+        </button>
+
+        <button
+          class="debug-btn toggle-btn"
+          (click)="toggleMockApi()">
+          ⚡ Toggle
+        </button>
+      </div>
+    </div>
+
+    <!-- Statut du backend -->
+    <div class="debug-section">
+      <div class="backend-status">
+        <label>Backend Status:</label>
+        <div class="status-container">
+          <span class="status-indicator-small"
+                [style.background-color]="getStatusColor()">
+          </span>
+          <span>{{ getStatusText() }}</span>
+          <button class="check-btn" (click)="checkBackendStatus()">
+            🔍 Check
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions rapides -->
+    <div class="debug-section">
+      <div class="quick-actions">
+        <button class="debug-btn action-btn" (click)="autoSwitchToMock()">
+          🔄 Auto Switch
+        </button>
+        <button class="debug-btn action-btn" (click)="copyConfigToClipboard()">
+          📋 Copy Config
+        </button>
+        <button class="debug-btn action-btn" (click)="clearAllNotifications()">
+          🗑️ Clear Notif
+        </button>
+      </div>
+    </div>
+
+    <!-- Tests de notifications -->
+    <div class="debug-section">
+      <details class="test-notifications">
+        <summary>Test Notifications</summary>
+        <div class="test-buttons">
+          <button class="test-btn success" (click)="testSuccessNotification()">✅ Success</button>
+          <button class="test-btn error" (click)="testErrorNotification()">❌ Error</button>
+          <button class="test-btn warning" (click)="testWarningNotification()">⚠️ Warning</button>
+          <button class="test-btn info" (click)="testInfoNotification()">ℹ️ Info</button>
+          <button class="test-btn action" (click)="testActionNotification()">🎯 Action</button>
+        </div>
+      </details>
+    </div>
+
+    <!-- Informations de configuration -->
+    <div class="debug-section" *ngIf="configInfo">
+      <details class="config-details">
+        <summary>Configuration détaillée</summary>
+        <div class="config-info">
+          <div class="config-item">
+            <strong>Production:</strong>
+            <span [class]="configInfo.production ? 'prod-mode' : 'dev-mode'">
+              {{ configInfo.production ? 'OUI' : 'NON' }}
+            </span>
+          </div>
+
+          <div class="config-item">
+            <strong>Mock Logs:</strong>
+            <span [class]="configInfo.enableMockLogs ? 'enabled' : 'disabled'">
+              {{ configInfo.enableMockLogs ? 'Activés' : 'Désactivés' }}
+            </span>
+          </div>
+
+          <div class="config-item">
+            <strong>Mock Error Rate:</strong>
+            <span>{{ configInfo.mockErrorRate }}%</span>
+          </div>
+
+          <div class="config-item" *ngIf="configInfo.mockApiDelays">
+            <strong>Délais simulés:</strong>
+            <ul class="delays-list">
+              <li>Court: {{ configInfo.mockApiDelays.short }}ms</li>
+              <li>Moyen: {{ configInfo.mockApiDelays.medium }}ms</li>
+              <li>Long: {{ configInfo.mockApiDelays.long }}ms</li>
+            </ul>
+          </div>
+
+          <div class="config-item" *ngIf="configInfo.features">
+            <strong>Fonctionnalités:</strong>
+            <ul class="features-list">
+              <li *ngFor="let feature of configInfo.features | keyvalue">
+                {{ feature.key }}:
+                <span [class]="feature.value ? 'enabled' : 'disabled'">
+                  {{ feature.value ? '✅' : '❌' }}
+                </span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Instructions -->
+    <div class="debug-section">
+      <details class="instructions">
+        <summary>Instructions</summary>
+        <div class="instructions-content">
+          <p><strong>Mock API:</strong> Utilise des données simulées pour le développement</p>
+          <p><strong>Real API:</strong> Se connecte au vrai backend</p>
+          <p><strong>Auto Switch:</strong> Bascule automatiquement vers le mock si le backend n'est pas disponible</p>
+          <p><strong>Check:</strong> Vérifie la disponibilité du backend</p>
+        </div>
+      </details>
+    </div>
+
+  </div>
+</div>
+
+<!-- Bouton flottant pour réafficher le panel -->
+<button
+  class="debug-toggle-btn"
+  *ngIf="!isVisible && !configInfo.production"
+  (click)="togglePanelVisibility()"
+  title="Afficher le panneau de debug API">
+  🔧
+</button>

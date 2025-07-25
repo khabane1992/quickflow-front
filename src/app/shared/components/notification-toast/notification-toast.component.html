@@ -1,0 +1,47 @@
+<!-- notification-toast.component.html -->
+
+<div class="notification-container">
+  <div 
+    *ngFor="let notification of notifications$ | async; trackBy: trackByNotificationId" 
+    class="notification-toast"
+    [ngClass]="getNotificationClass(notification.type)"
+    [@slideInOut]>
+    
+    <div class="notification-content">
+      <!-- Icône -->
+      <div class="notification-icon">
+        {{ getNotificationIcon(notification.type) }}
+      </div>
+      
+      <!-- Contenu principal -->
+      <div class="notification-body">
+        <div class="notification-title">{{ notification.title }}</div>
+        <div class="notification-message">{{ notification.message }}</div>
+        
+        <!-- Action button si présent -->
+        <div class="notification-actions" *ngIf="notification.action">
+          <button 
+            class="action-btn"
+            (click)="executeAction(notification)">
+            {{ notification.action.label }}
+          </button>
+        </div>
+      </div>
+      
+      <!-- Bouton de fermeture -->
+      <button 
+        class="close-btn"
+        (click)="closeNotification(notification.id)"
+        title="Fermer">
+        ×
+      </button>
+    </div>
+    
+    <!-- Barre de progression pour les notifications temporaires -->
+    <div 
+      *ngIf="notification.duration && notification.duration > 0 && !notification.persistent"
+      class="progress-bar"
+      [style.animation-duration.ms]="notification.duration">
+    </div>
+  </div>
+</div>

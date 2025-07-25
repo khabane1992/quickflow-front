@@ -2,21 +2,29 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { DashboardRequestDTO, DerogationStatus, DerogationType, DemandsType } from '../../features/derogation/models/dashboard/request.interface';
+import { ApiConfigService } from './api-config.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class RequestService {
 
-  private apiUrl = '/api';
+  private apiUrl: string;
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private apiConfig: ApiConfigService
+  ) {
+    this.apiUrl = this.apiConfig.buildApiUrl('');
+  }
 
   // Méthode principale qui appelle votre endpoint
   getDemands(userId: string, type: DemandsType): Observable<DashboardRequestDTO[]> {
     let params = new HttpParams()
       .set('userId', userId)
       .set('type', type);
+
+    this.apiConfig.logMock('RequestService: Récupération des demandes', { userId, type });
 
     return this.http.get<DashboardRequestDTO[]>(`${this.apiUrl}/demands`, { params });
   }
@@ -34,7 +42,7 @@ export class RequestService {
     return this.getDemands(userId, DemandsType.PROCESSED);
   }
 
-  // Données mockées pour les tests
+  // Données mockées pour les tests (fallback si le mock API n'est pas configuré)
   getMockData(): Observable<DashboardRequestDTO[]> {
     const mockData: DashboardRequestDTO[] = [
       {
@@ -93,6 +101,23 @@ export class RequestService {
       }
     ];
 
+    this.apiConfig.logMock('RequestService: Données mock utilisées', { count: mockData.length });
+
     return of(mockData);
+  }
+
+  /**
+   * Méthodes utilitaires pour la configuration
+   */
+  getApiMode(): string {
+    return this.apiConfig.isMockEnabled() ? 'MOCK' : 'REAL';
+  }
+
+  toggleApiMode(): void {
+    this.apiConfig.toggleMockApi();
+  }
+
+  getApiUrl(): string {
+    return this.apiUrl;
   }
 }
