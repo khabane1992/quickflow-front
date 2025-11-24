@@ -528,3 +528,417 @@ $text-muted: #999999;
   outline: 2px solid $primary-color;
   outline-offset: 2px;
 }
+
+
+
+* ============================================
+   STYLES DU MODAL DE RÉAFFECTATION
+   ============================================ */
+
+/* Overlay du modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+
+  @media (max-width: 768px) {
+    padding: 10px;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Container du modal */
+.modal-container {
+  background: $white;
+  border-radius: 20px;
+  max-width: 1400px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+
+  @media (max-width: 768px) {
+    max-height: 95vh;
+    border-radius: 12px;
+  }
+
+  /* Scrollbar personnalisée */
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: $primary-color;
+    border-radius: 10px;
+
+    &:hover {
+      background: $primary-dark;
+    }
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Bouton de fermeture */
+.modal-close-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: #f5f5f5;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 10;
+
+  @media (max-width: 768px) {
+    top: 10px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+  }
+
+  svg {
+    color: #666;
+    transition: color 0.3s ease;
+  }
+
+  &:hover {
+    background: #e0e0e0;
+    transform: rotate(90deg);
+
+    svg {
+      color: #333;
+    }
+  }
+}
+
+/* Contenu du modal */
+.modal-content {
+  padding: 50px 40px 40px;
+
+  @media (max-width: 768px) {
+    padding: 50px 20px 30px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 45px 15px 25px;
+  }
+}
+
+/* Sections du modal */
+.modal-section {
+  margin-bottom: 40px;
+
+  @media (max-width: 768px) {
+    margin-bottom: 30px;
+  }
+
+  &:last-of-type {
+    margin-bottom: 20px;
+  }
+}
+
+.modal-section-title {
+  color: #059669;
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 25px;
+
+  @media (max-width: 768px) {
+    font-size: 22px;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+}
+
+/* Wrapper du tableau modal */
+.modal-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+  }
+}
+
+/* Tableau du modal */
+.modal-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  thead th {
+    color: #059669;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 15px 10px;
+    text-align: left;
+    border-bottom: 2px solid #e5e7eb;
+    white-space: nowrap;
+
+    @media (max-width: 768px) {
+      font-size: 12px;
+      padding: 12px 8px;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 11px;
+      padding: 10px 6px;
+    }
+  }
+
+  tbody td {
+    padding: 20px 10px;
+    font-size: 15px;
+    color: #1f2937;
+    border-bottom: 1px solid #e5e7eb;
+    white-space: nowrap;
+
+    @media (max-width: 768px) {
+      font-size: 13px;
+      padding: 15px 8px;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 12px;
+      padding: 12px 6px;
+    }
+  }
+}
+
+/* Type de demande dans le modal */
+.modal-type-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    gap: 5px;
+  }
+}
+
+.modal-icon-circle {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #059669;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  @media (max-width: 480px) {
+    width: 24px;
+    height: 24px;
+    border-width: 2px;
+  }
+}
+
+/* Propriétaire dans le modal */
+.modal-owner-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    gap: 5px;
+  }
+}
+
+.modal-owner-icon {
+  width: 32px;
+  height: 32px;
+  background-color: #93c5fd;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  @media (max-width: 480px) {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* Propriétaire réaffecté */
+.modal-owner-reassigned {
+  border: 2px solid #059669;
+  padding: 8px 16px;
+  border-radius: 25px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #f0fdf4;
+
+  @media (max-width: 480px) {
+    padding: 6px 12px;
+    gap: 8px;
+  }
+
+  .modal-owner-icon {
+    width: 28px;
+    height: 28px;
+
+    @media (max-width: 480px) {
+      width: 24px;
+      height: 24px;
+    }
+  }
+}
+
+.modal-checkmark {
+  color: #059669;
+  font-size: 20px;
+  font-weight: bold;
+
+  @media (max-width: 480px) {
+    font-size: 18px;
+  }
+}
+
+/* Statut dans le modal */
+.modal-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    gap: 5px;
+  }
+}
+
+.modal-status-dot {
+  width: 16px;
+  height: 16px;
+  background-color: #f59e0b;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  @media (max-width: 480px) {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* Container du bouton */
+.modal-button-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+
+  @media (max-width: 768px) {
+    margin-top: 30px;
+  }
+}
+
+/* Bouton de confirmation */
+.modal-confirm-button {
+  background-color: #059669;
+  color: white;
+  border: none;
+  padding: 18px 50px;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+
+  @media (max-width: 768px) {
+    padding: 15px 40px;
+    font-size: 14px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 12px 30px;
+    font-size: 13px;
+    gap: 10px;
+  }
+
+  &:hover {
+    background-color: #047857;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(5, 150, 105, 0.4);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.modal-arrow {
+  font-size: 24px;
+  font-weight: bold;
+
+  @media (max-width: 480px) {
+    font-size: 20px;
+  }
+}
+
+/* Responsive pour très petits écrans */
+@media (max-width: 480px) {
+  .modal-table {
+    font-size: 11px;
+
+    thead th {
+      padding: 8px 4px;
+    }
+
+    tbody td {
+      padding: 10px 4px;
+    }
+  }
+}
+
