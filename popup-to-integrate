@@ -644,3 +644,128 @@ Le TypeScript est NÉCESSAIRE pour :
 SANS LE TYPESCRIPT, LE MODAL NE FONCTIONNERA PAS !
 Le HTML fait référence à ces fonctions et variables TypeScript.
 */
+
+
+
+
+
+
+<td>
+  <div class="modal-owner-select-container">
+    <select class="modal-owner-select" [(ngModel)]="selectedNewOwner">
+      <option value="">-- Sélectionner un propriétaire --</option>
+      <option value="user1">Touria HAFSI</option>
+      <option value="user2">Mohammed BENNANI</option>
+      <option value="user3">Fatima ALAOUI</option>
+      <option value="user4">Youssef IDRISSI</option>
+      <option value="user5">Samira KADIRI</option>
+    </select>
+    <svg class="modal-select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M7,10L12,15L17,10H7Z"/>
+    </svg>
+  </div>
+</td>
+
+
+
+
+* Container du select pour le propriétaire */
+.modal-owner-select-container {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  max-width: 300px;
+
+  @media (max-width: 768px) {
+    max-width: 100%;
+  }
+}
+
+/* Style du select (liste déroulante) */
+.modal-owner-select {
+  width: 100%;
+  padding: 10px 35px 10px 15px;
+  border: 2px solid #059669;
+  border-radius: 25px;
+  background-color: #f0fdf4;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  outline: none;
+  transition: all 0.3s ease;
+
+  @media (max-width: 768px) {
+    font-size: 13px;
+    padding: 8px 30px 8px 12px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 12px;
+    padding: 7px 28px 7px 10px;
+  }
+
+  /* État hover */
+  &:hover {
+    border-color: #047857;
+    background-color: #dcfce7;
+  }
+
+  /* État focus */
+  &:focus {
+    border-color: #047857;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+  }
+
+  /* Option par défaut (placeholder) */
+  option[value=""] {
+    color: #9ca3af;
+  }
+
+  /* Options normales */
+  option {
+    color: #1f2937;
+    background-color: #ffffff;
+    padding: 10px;
+  }
+}
+
+/* Icône flèche du select */
+.modal-select-arrow {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #059669;
+  transition: transform 0.3s ease;
+
+  @media (max-width: 480px) {
+    right: 8px;
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* Animation de la flèche quand le select est ouvert */
+.modal-owner-select:focus + .modal-select-arrow {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+/* Style quand une option est sélectionnée */
+.modal-owner-select:not([value=""]) {
+  background-color: #dcfce7;
+  font-weight: 700;
+}
+
+/* Style pour navigateurs Firefox */
+@-moz-document url-prefix() {
+  .modal-owner-select {
+    padding-right: 30px;
+  }
+}
+
