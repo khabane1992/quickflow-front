@@ -1,386 +1,646 @@
-<div class="popup-overlay">
-  <div class="popup-container">
-    <div class="popup-header">
-      <h2>Demandes à traiter</h2>
-      <button class="close-btn" (click)="closePopup()">×</button>
-    </div>
+<!-- ============================================
+     AJOUTER CE CODE À LA FIN DE VOTRE HTML
+     (Juste avant la balise </div> finale)
+     ============================================ -->
 
-    <div class="popup-content">
-      <!-- Situation actuelle -->
-      <section class="section">
-        <h3 class="section-title">Situation actuelle</h3>
-        <div class="info-grid">
-          <div class="info-row">
-            <span class="label">Date de réception</span>
-            <span class="value">07/07/2025</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Type de demande(s)</span>
-            <div class="badge-container">
-              <span class="badge badge-derogation">Dérogation tarifaire</span>
-            </div>
-          </div>
-          <div class="info-row">
-            <span class="label">Nom & prénom client(s)</span>
-            <span class="value">Amine TALBI</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Identifiant SAB</span>
-            <span class="value">8939782</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Propriétaire de la demande</span>
-            <div class="user-info">
-              <div class="avatar">G</div>
-              <span>Ghita ALAMI</span>
-            </div>
-          </div>
-          <div class="info-row">
-            <span class="label">Entité propriétaire</span>
-            <span class="value">Agence MED V Casablanca</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Statut</span>
-            <div class="status-container">
-              <span class="status-badge status-pending">En attente</span>
-            </div>
-          </div>
+<!-- MODAL DE RÉAFFECTATION -->
+<div class="modal-overlay" *ngIf="isModalOpen" (click)="closeReassignmentModal()">
+  <div class="modal-container" (click)="$event.stopPropagation()">
+    
+    <!-- Bouton de fermeture -->
+    <button class="modal-close-btn" (click)="closeReassignmentModal()">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
+      </svg>
+    </button>
+
+    <div class="modal-content">
+      
+      <!-- Section 1: Situation actuelle -->
+      <div class="modal-section">
+        <h2 class="modal-section-title">Situation actuelle</h2>
+        <div class="modal-table-wrapper">
+          <table class="modal-table">
+            <thead>
+              <tr>
+                <th>Date de réception</th>
+                <th>Type de demande(s)</th>
+                <th>Nom & prénom client(s)</th>
+                <th>Identifiant SAB</th>
+                <th>Propriétaire de la demande</th>
+                <th>Entité propriétaire</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>07/07/2025</strong></td>
+                <td>
+                  <div class="modal-type-cell">
+                    <div class="modal-icon-circle"></div>
+                    <span><strong>Dérogation tarifaire</strong></span>
+                  </div>
+                </td>
+                <td><strong>Amine TALBI</strong></td>
+                <td><strong>8939782</strong></td>
+                <td>
+                  <div class="modal-owner-cell">
+                    <div class="modal-owner-icon"></div>
+                    <span><strong>Ghita ALAMI</strong></span>
+                  </div>
+                </td>
+                <td><strong>Agence MED V</strong></td>
+                <td>
+                  <div class="modal-status">
+                    <div class="modal-status-dot"></div>
+                    <span><strong>En attente</strong></span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </section>
+      </div>
 
-      <!-- Réaffectation -->
-      <section class="section">
-        <h3 class="section-title">Réaffectation</h3>
-        <div class="info-grid">
-          <div class="info-row">
-            <span class="label">Date de réception</span>
-            <span class="value">07/07/2025</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Type de demande(s)</span>
-            <div class="badge-container">
-              <span class="badge badge-derogation">Dérogation tarifaire</span>
-            </div>
-          </div>
-          <div class="info-row">
-            <span class="label">Nom & prénom client(s)</span>
-            <span class="value">Amine TALBI</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Identifiant SAB</span>
-            <span class="value">8939782</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Propriétaire de la demande</span>
-            <div class="select-wrapper">
-              <select class="custom-select">
-                <option value="">Touria HAFSI</option>
-                <option value="1">Ghita ALAMI</option>
-                <option value="2">Mohammed BENNANI</option>
-              </select>
-            </div>
-          </div>
-          <div class="info-row">
-            <span class="label">Entité propriétaire</span>
-            <span class="value">Agence MED V Casablanca</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Statut</span>
-            <div class="status-container">
-              <span class="status-badge status-pending">En attente</span>
-            </div>
-          </div>
+      <!-- Section 2: Réaffectation -->
+      <div class="modal-section">
+        <h2 class="modal-section-title">Réaffectation</h2>
+        <div class="modal-table-wrapper">
+          <table class="modal-table">
+            <thead>
+              <tr>
+                <th>Date de réception</th>
+                <th>Type de demande(s)</th>
+                <th>Nom & prénom client(s)</th>
+                <th>Identifiant SAB</th>
+                <th>Propriétaire de la demande</th>
+                <th>Entité propriétaire</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>07/07/2025</strong></td>
+                <td>
+                  <div class="modal-type-cell">
+                    <div class="modal-icon-circle"></div>
+                    <span><strong>Dérogation tarifaire</strong></span>
+                  </div>
+                </td>
+                <td><strong>Amine TALBI</strong></td>
+                <td><strong>8939782</strong></td>
+                <td>
+                  <div class="modal-owner-reassigned">
+                    <div class="modal-owner-icon"></div>
+                    <span><strong>Touria HAFSI</strong></span>
+                    <span class="modal-checkmark">✓</span>
+                  </div>
+                </td>
+                <td><strong>Agence MED V</strong></td>
+                <td>
+                  <div class="modal-status">
+                    <div class="modal-status-dot"></div>
+                    <span><strong>En attente</strong></span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </section>
+      </div>
 
-      <!-- Action Button -->
-      <div class="action-container">
-        <button class="btn-confirm" (click)="confirmerReaffectation()">
-          <span class="arrow">→</span>
+      <!-- Bouton de confirmation -->
+      <div class="modal-button-container">
+        <button class="modal-confirm-button" (click)="confirmReassignment()">
+          <span class="modal-arrow">→</span>
           CONFIRMER LA RÉAFFECTATION
         </button>
       </div>
+
     </div>
   </div>
 </div>
 
-.popup-overlay {
+
+/* ============================================
+   AJOUTER CE CODE À LA FIN DE VOTRE SCSS
+   ============================================ */
+
+/* ============================================
+   STYLES DU MODAL DE RÉAFFECTATION
+   ============================================ */
+
+/* Overlay du modal */
+.modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.6);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 9999;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+
+  @media (max-width: 768px) {
+    padding: 10px;
+  }
 }
 
-.popup-container {
-  background: white;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 1100px;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Container du modal */
+.modal-container {
+  background: #ffffff;
+  border-radius: 20px;
+  max-width: 1400px;
+  width: 100%;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-}
-
-.popup-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px 32px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.popup-header h2 {
-  margin: 0;
-  font-size: 24px;
-  color: #2d3748;
-  font-weight: 600;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 32px;
-  color: #718096;
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.2s;
-}
-
-.close-btn:hover {
-  color: #2d3748;
-}
-
-.popup-content {
-  padding: 32px;
-}
-
-.section {
-  background: #f8fcfc;
-  border: 2px solid #5fb8a7;
-  border-radius: 8px;
-  padding: 24px;
-  margin-bottom: 24px;
-}
-
-.section-title {
-  color: #5fb8a7;
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0 0 20px 0;
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.info-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.label {
-  font-size: 13px;
-  color: #718096;
-  font-weight: 500;
-}
-
-.value {
-  font-size: 15px;
-  color: #2d3748;
-  font-weight: 500;
-}
-
-.badge-container {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.badge-derogation {
-  background: #e8f5f3;
-  color: #5fb8a7;
-}
-
-.badge-derogation::before {
-  content: '⚡';
-  font-size: 14px;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #5fb8a7;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.status-container {
-  display: flex;
-  gap: 8px;
-}
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.status-pending {
-  background: #fef3e2;
-  color: #d97706;
-}
-
-.status-pending::before {
-  content: '⏱';
-  font-size: 14px;
-}
-
-.select-wrapper {
   position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+
+  @media (max-width: 768px) {
+    max-height: 95vh;
+    border-radius: 12px;
+  }
+
+  /* Scrollbar personnalisée */
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #4CAF50;
+    border-radius: 10px;
+
+    &:hover {
+      background: #45a049;
+    }
+  }
 }
 
-.custom-select {
-  width: 100%;
-  padding: 10px 36px 10px 40px;
-  border: 1px solid #cbd5e0;
-  border-radius: 6px;
-  font-size: 15px;
-  color: #2d3748;
-  background: white;
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23718096' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
-.custom-select::before {
-  content: '👤';
+/* Bouton de fermeture */
+.modal-close-btn {
   position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.action-container {
-  display: flex;
-  justify-content: center;
-  margin-top: 32px;
-}
-
-.btn-confirm {
-  background: #5fb8a7;
-  color: white;
+  top: 20px;
+  right: 20px;
+  background: #f5f5f5;
   border: none;
-  padding: 14px 32px;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 600;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 10;
+
+  @media (max-width: 768px) {
+    top: 10px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+  }
+
+  svg {
+    color: #666;
+    transition: color 0.3s ease;
+  }
+
+  &:hover {
+    background: #e0e0e0;
+    transform: rotate(90deg);
+
+    svg {
+      color: #333;
+    }
+  }
+}
+
+/* Contenu du modal */
+.modal-content {
+  padding: 50px 40px 40px;
+
+  @media (max-width: 768px) {
+    padding: 50px 20px 30px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 45px 15px 25px;
+  }
+}
+
+/* Sections du modal */
+.modal-section {
+  margin-bottom: 40px;
+
+  @media (max-width: 768px) {
+    margin-bottom: 30px;
+  }
+
+  &:last-of-type {
+    margin-bottom: 20px;
+  }
+}
+
+.modal-section-title {
+  color: #059669;
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 25px;
+
+  @media (max-width: 768px) {
+    font-size: 22px;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+}
+
+/* Wrapper du tableau modal */
+.modal-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+  }
+}
+
+/* Tableau du modal */
+.modal-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  thead th {
+    color: #059669;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 15px 10px;
+    text-align: left;
+    border-bottom: 2px solid #e5e7eb;
+    white-space: nowrap;
+
+    @media (max-width: 768px) {
+      font-size: 12px;
+      padding: 12px 8px;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 11px;
+      padding: 10px 6px;
+    }
+  }
+
+  tbody td {
+    padding: 20px 10px;
+    font-size: 15px;
+    color: #1f2937;
+    border-bottom: 1px solid #e5e7eb;
+    white-space: nowrap;
+
+    @media (max-width: 768px) {
+      font-size: 13px;
+      padding: 15px 8px;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 12px;
+      padding: 12px 6px;
+    }
+  }
+}
+
+/* Type de demande dans le modal */
+.modal-type-cell {
   display: flex;
   align-items: center;
   gap: 10px;
-  transition: background 0.2s;
-  box-shadow: 0 2px 8px rgba(95, 184, 167, 0.3);
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    gap: 5px;
+  }
 }
 
-.btn-confirm:hover {
-  background: #4da593;
+.modal-icon-circle {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #059669;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  @media (max-width: 480px) {
+    width: 24px;
+    height: 24px;
+    border-width: 2px;
+  }
 }
 
-.btn-confirm .arrow {
+/* Propriétaire dans le modal */
+.modal-owner-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    gap: 5px;
+  }
+}
+
+.modal-owner-icon {
+  width: 32px;
+  height: 32px;
+  background-color: #93c5fd;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  @media (max-width: 480px) {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* Propriétaire réaffecté */
+.modal-owner-reassigned {
+  border: 2px solid #059669;
+  padding: 8px 16px;
+  border-radius: 25px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #f0fdf4;
+
+  @media (max-width: 480px) {
+    padding: 6px 12px;
+    gap: 8px;
+  }
+
+  .modal-owner-icon {
+    width: 28px;
+    height: 28px;
+
+    @media (max-width: 480px) {
+      width: 24px;
+      height: 24px;
+    }
+  }
+}
+
+.modal-checkmark {
+  color: #059669;
   font-size: 20px;
   font-weight: bold;
-}
 
-/* Responsive */
-@media (max-width: 768px) {
-  .info-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .popup-container {
-    width: 95%;
-    margin: 20px;
-  }
-  
-  .popup-content {
-    padding: 20px;
+  @media (max-width: 480px) {
+    font-size: 18px;
   }
 }
 
-import { Component } from '@angular/core';
+/* Statut dans le modal */
+.modal-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 
-@Component({
-  selector: 'app-demande-popup',
-  templateUrl: './demande-popup.component.html',
-  styleUrls: ['./demande-popup.component.css']
-})
-export class DemandePopupComponent {
-  
-  closePopup(): void {
-    console.log('Fermer le popup');
-    // Logique pour fermer le popup
-  }
-
-  confirmerReaffectation(): void {
-    console.log('Réaffectation confirmée');
-    // Logique pour confirmer la réaffectation
+  @media (max-width: 480px) {
+    flex-direction: column;
+    gap: 5px;
   }
 }
 
-import { NgModule } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { DemandePopupComponent } from './demande-popup.component';
+.modal-status-dot {
+  width: 16px;
+  height: 16px;
+  background-color: #f59e0b;
+  border-radius: 50%;
+  flex-shrink: 0;
 
-@NgModule({
-  declarations: [
-    DemandePopupComponent
-  ],
-  imports: [
-    CommonModule
-  ],
-  exports: [
-    DemandePopupComponent
-  ]
-})
-export class DemandePopupModule { }
+  @media (max-width: 480px) {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* Container du bouton */
+.modal-button-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+
+  @media (max-width: 768px) {
+    margin-top: 30px;
+  }
+}
+
+/* Bouton de confirmation */
+.modal-confirm-button {
+  background-color: #059669;
+  color: white;
+  border: none;
+  padding: 18px 50px;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+
+  @media (max-width: 768px) {
+    padding: 15px 40px;
+    font-size: 14px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 12px 30px;
+    font-size: 13px;
+    gap: 10px;
+  }
+
+  &:hover {
+    background-color: #047857;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(5, 150, 105, 0.4);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.modal-arrow {
+  font-size: 24px;
+  font-weight: bold;
+
+  @media (max-width: 480px) {
+    font-size: 20px;
+  }
+}
+
+/* Responsive pour très petits écrans */
+@media (max-width: 480px) {
+  .modal-table {
+    font-size: 11px;
+
+    thead th {
+      padding: 8px 4px;
+    }
+
+    tbody td {
+      padding: 10px 4px;
+    }
+  }
+}
+
+// ============================================
+// CODE À AJOUTER DANS VOTRE .TS
+// ============================================
+
+// 1️⃣ AJOUTER CES PROPRIÉTÉS dans la classe (après les propriétés existantes)
+// ============================================
+
+  // Gestion du modal de réaffectation
+  isModalOpen = false;
+  selectedRequest: DerogationRequest | null = null;
+
+
+// 2️⃣ AJOUTER CES MÉTHODES dans la classe (après les méthodes existantes)
+// ============================================
+
+  /**
+   * Ouvre le modal de réaffectation
+   */
+  openReassignmentModal(request: DerogationRequest): void {
+    this.selectedRequest = request;
+    this.isModalOpen = true;
+    // Empêcher le scroll du body quand le modal est ouvert
+    document.body.style.overflow = 'hidden';
+  }
+
+  /**
+   * Ferme le modal de réaffectation
+   */
+  closeReassignmentModal(): void {
+    this.isModalOpen = false;
+    this.selectedRequest = null;
+    // Restaurer le scroll du body
+    document.body.style.overflow = 'auto';
+  }
+
+  /**
+   * Confirme la réaffectation
+   */
+  confirmReassignment(): void {
+    if (!this.selectedRequest || !this.selectedRequest.id) {
+      console.error('Aucune demande sélectionnée');
+      return;
+    }
+
+    console.log('Confirmation de la réaffectation pour:', this.selectedRequest);
+    
+    // TODO: Appeler votre service pour effectuer la réaffectation
+    // Exemple:
+    // this.dashboardService.reassignDemand(this.selectedRequest.id, newOwnerId)
+    //   .subscribe({
+    //     next: () => {
+    //       this.closeReassignmentModal();
+    //       this.loadAllData();
+    //     }
+    //   });
+
+    // Pour l'instant, juste fermer le modal
+    this.closeReassignmentModal();
+    alert('Réaffectation confirmée (version statique)');
+  }
+
+
+// 3️⃣ MODIFIER LA MÉTHODE processRequest existante
+// ============================================
+// Remplacer votre méthode processRequest actuelle par celle-ci:
+
+  processRequest(request: DerogationRequest): void {
+    // Ouvre le modal au lieu de traiter directement
+    this.openReassignmentModal(request);
+  }
+
+
+// ============================================
+// POURQUOI ON A BESOIN DU TYPESCRIPT ?
+// ============================================
+
+/*
+Le TypeScript est NÉCESSAIRE pour :
+
+1. isModalOpen : 
+   - Variable qui contrôle l'affichage du modal
+   - Dans le HTML : *ngIf="isModalOpen"
+   - Sans cette variable, le modal ne s'affichera JAMAIS
+
+2. selectedRequest :
+   - Stocke la demande sur laquelle on a cliqué
+   - Permet d'afficher ses données dans le modal
+   - Utile pour envoyer les bonnes données à l'API
+
+3. openReassignmentModal() :
+   - Fonction appelée quand on clique sur "TRAITER"
+   - Met isModalOpen = true pour afficher le modal
+   - Bloque le scroll de la page (document.body.style.overflow)
+
+4. closeReassignmentModal() :
+   - Fonction appelée pour fermer le modal
+   - Met isModalOpen = false pour cacher le modal
+   - Restaure le scroll de la page
+
+5. confirmReassignment() :
+   - Fonction appelée quand on clique sur "CONFIRMER"
+   - C'est ici que vous appellerez votre API plus tard
+   - Pour l'instant, elle ferme juste le modal
+
+SANS LE TYPESCRIPT, LE MODAL NE FONCTIONNERA PAS !
+Le HTML fait référence à ces fonctions et variables TypeScript.
+*/
