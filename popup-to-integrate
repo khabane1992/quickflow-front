@@ -769,3 +769,136 @@ Le HTML fait référence à ces fonctions et variables TypeScript.
   }
 }
 
+
+
+
+
+
+
+// ============================================
+// CODE À AJOUTER/MODIFIER DANS VOTRE .TS
+// ============================================
+
+// 1️⃣ AJOUTER CETTE PROPRIÉTÉ (avec les autres propriétés du modal)
+// ============================================
+
+  // Gestion du modal de réaffectation
+  isModalOpen = false;
+  selectedRequest: DerogationRequest | null = null;
+  selectedNewOwner: string = ''; // 👈 NOUVELLE PROPRIÉTÉ pour le dropdown
+
+
+// 2️⃣ MODIFIER LA MÉTHODE openReassignmentModal
+// ============================================
+
+  openReassignmentModal(request: DerogationRequest): void {
+    this.selectedRequest = request;
+    this.selectedNewOwner = ''; // Réinitialiser le select à chaque ouverture
+    this.isModalOpen = true;
+    document.body.style.overflow = 'hidden';
+  }
+
+
+// 3️⃣ MODIFIER LA MÉTHODE confirmReassignment
+// ============================================
+
+  confirmReassignment(): void {
+    if (!this.selectedRequest || !this.selectedRequest.id) {
+      console.error('Aucune demande sélectionnée');
+      return;
+    }
+
+    // Vérifier qu'un nouveau propriétaire a été sélectionné
+    if (!this.selectedNewOwner) {
+      alert('Veuillez sélectionner un nouveau propriétaire');
+      return;
+    }
+
+    console.log('Réaffectation de la demande:', this.selectedRequest.id);
+    console.log('Nouveau propriétaire:', this.selectedNewOwner);
+    
+    // TODO: Appeler votre service pour effectuer la réaffectation
+    // Exemple:
+    // this.dashboardService.reassignDemand(
+    //   this.selectedRequest.id, 
+    //   this.selectedNewOwner
+    // ).subscribe({
+    //   next: () => {
+    //     this.closeReassignmentModal();
+    //     this.loadAllData();
+    //     alert('Réaffectation effectuée avec succès');
+    //   },
+    //   error: (error) => {
+    //     console.error('Erreur:', error);
+    //     alert('Erreur lors de la réaffectation');
+    //   }
+    // });
+
+    // Pour l'instant (version statique)
+    this.closeReassignmentModal();
+    alert(`Réaffectation confirmée vers: ${this.selectedNewOwner}`);
+  }
+
+
+// ============================================
+// OPTIONNEL : Liste des propriétaires depuis l'API
+// ============================================
+
+// Si vous voulez charger la liste des propriétaires depuis une API:
+
+  // Propriété pour stocker la liste
+  availableOwners: any[] = [];
+
+  // Méthode pour charger la liste
+  loadAvailableOwners(): void {
+    // TODO: Appeler votre service
+    // this.dashboardService.getAvailableOwners().subscribe({
+    //   next: (owners) => {
+    //     this.availableOwners = owners;
+    //   }
+    // });
+
+    // Pour l'instant, données statiques
+    this.availableOwners = [
+      { id: 'user1', name: 'Touria HAFSI' },
+      { id: 'user2', name: 'Mohammed BENNANI' },
+      { id: 'user3', name: 'Fatima ALAOUI' },
+      { id: 'user4', name: 'Youssef IDRISSI' },
+      { id: 'user5', name: 'Samira KADIRI' }
+    ];
+  }
+
+  // Appeler dans ngOnInit
+  ngOnInit(): void {
+    this.loadAllData();
+    this.loadAvailableOwners(); // 👈 Charger la liste des propriétaires
+  }
+
+// Puis dans le HTML, utiliser *ngFor:
+// <option *ngFor="let owner of availableOwners" [value]="owner.id">
+//   {{ owner.name }}
+// </option>
+
+
+// ============================================
+// IMPORTANT : Ajouter FormsModule dans votre module
+// ============================================
+
+/*
+Dans votre module Angular (probablement derogation.module.ts ou app.module.ts),
+vous devez importer FormsModule pour que [(ngModel)] fonctionne:
+
+import { FormsModule } from '@angular/forms';
+
+@NgModule({
+  imports: [
+    CommonModule,
+    FormsModule,  // 👈 AJOUTER CECI
+    // ... autres imports
+  ],
+  // ...
+})
+export class DerogationModule { }
+
+SI VOUS NE FAITES PAS ÇA, Angular affichera une erreur !
+*/
