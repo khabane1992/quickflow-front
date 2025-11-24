@@ -654,7 +654,7 @@ Le HTML fait référence à ces fonctions et variables TypeScript.
   <div class="modal-owner-select-container">
     <select class="modal-owner-select" [(ngModel)]="selectedNewOwner">
       <option value="">-- Sélectionner un propriétaire --</option>
-      <option value="user1">Touria HAFSI</option>
+      <option value="user1"> 👤 Touria HAFSI</option>
       <option value="user2">Mohammed BENNANI</option>
       <option value="user3">Fatima ALAOUI</option>
       <option value="user4">Youssef IDRISSI</option>
