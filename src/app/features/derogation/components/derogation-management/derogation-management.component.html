@@ -222,5 +222,62 @@
       </table>
     </div>
   </div>
+<!-- Section 2: Réaffectation -->
+      <div class="modal-section">
+        <h2 class="modal-section-title">Réaffectation</h2>
+        <div class="modal-table-wrapper">
+          <table class="modal-table">
+            <thead>
+              <tr>
+                <th>Date de réception</th>
+                <th>Type de demande(s)</th>
+                <th>Nom & prénom client(s)</th>
+                <th>Identifiant SAB</th>
+                <th>Propriétaire de la demande</th>
+                <th>Entité propriétaire</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>07/07/2025</strong></td>
+                <td>
+                  <div class="modal-type-cell">
+                    <div class="modal-icon-circle"></div>
+                    <span><strong>Dérogation tarifaire</strong></span>
+                  </div>
+                </td>
+                <td><strong>Amine TALBI</strong></td>
+                <td><strong>8939782</strong></td>
+                <td>
+                  <div class="modal-owner-reassigned">
+                    <div class="modal-owner-icon"></div>
+                    <span><strong>Touria HAFSI</strong></span>
+                    <span class="modal-checkmark">✓</span>
+                  </div>
+                </td>
+                <td><strong>Agence MED V</strong></td>
+                <td>
+                  <div class="modal-status">
+                    <div class="modal-status-dot"></div>
+                    <span><strong>En attente</strong></span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Bouton de confirmation -->
+      <div class="modal-button-container">
+        <button class="modal-confirm-button" (click)="confirmReassignment()">
+          <span class="modal-arrow">→</span>
+          CONFIRMER LA RÉAFFECTATION
+        </button>
+      </div>
+
+    </div>
+  </div>
 
 </div>
