@@ -1,6 +1,18 @@
+// Variables
+$primary-green: #1e7e5c;
+$primary-green-dark: #166b4d;
+$orange: #e8a04c;
+$orange-dark: #d4923e;
+$gray-light: #e8e8e8;
+$gray-medium: #b0b0b0;
+$gray-dark: #666;
+$text-dark: #333;
+$white: #fff;
+$background: #f8f8f8;
+
 .users-page {
-  padding: 20px 40px;
-  background-color: #f5f5f5;
+  padding: 30px 40px;
+  background-color: $background;
   min-height: 100vh;
 }
 
@@ -8,69 +20,76 @@
   margin-bottom: 24px;
 
   .page-title {
-    font-size: 36px;
-    color: #2e7d5a;
+    font-size: 38px;
+    color: $primary-green;
     font-weight: 400;
     margin: 0 0 4px 0;
+    font-style: italic;
   }
 
   .page-subtitle {
-    font-size: 18px;
-    color: #666;
+    font-size: 16px;
+    color: $gray-dark;
     margin: 0;
-    font-weight: 300;
+    font-weight: 400;
   }
 }
 
+.main-container {
+  display: inline-block;
+  min-width: 1050px;
+}
+
 .tabs-container {
-  display: flex;
-  margin-bottom: 20px;
-  background-color: #e0e0e0;
+  display: inline-flex;
+  background-color: $gray-light;
   border-radius: 8px 8px 0 0;
-  width: fit-content;
   overflow: hidden;
 
   .tab-button {
-    padding: 12px 32px;
+    padding: 12px 24px;
     border: none;
     background-color: transparent;
-    font-size: 14px;
-    font-weight: 600;
-    color: #666;
+    font-size: 13px;
+    font-weight: 700;
+    color: $gray-dark;
     cursor: pointer;
     transition: all 0.3s ease;
+    letter-spacing: 0.5px;
 
     &.active {
-      background-color: #2e7d5a;
-      color: white;
+      background-color: $primary-green;
+      color: $white;
     }
 
     &:hover:not(.active) {
-      background-color: #d0d0d0;
+      background-color: darken($gray-light, 5%);
     }
   }
 }
 
 .content-card {
-  background: white;
-  border-radius: 20px;
-  padding: 30px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: $white;
+  border-radius: 0 16px 16px 16px;
+  padding: 24px 28px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.table-wrapper {
+  width: 100%;
 }
 
 .card-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-  gap: 16px;
+  margin-bottom: 16px;
 
   .card-title {
-    font-size: 20px;
-    font-weight: 600;
-    color: #333;
+    font-size: 18px;
+    font-weight: 700;
+    color: $text-dark;
     margin: 0;
+    margin-right: auto;
   }
 
   .header-actions {
@@ -83,30 +102,31 @@
 .search-box {
   display: flex;
   align-items: center;
-  background-color: #fff;
+  background-color: $white;
   border: 1px solid #ddd;
-  border-radius: 25px;
-  padding: 8px 16px;
-  width: 200px;
+  border-radius: 20px;
+  padding: 8px 14px;
+  min-width: 140px;
 
   .search-icon {
-    width: 18px;
-    height: 18px;
-    color: #999;
+    width: 16px;
+    height: 16px;
+    color: $gray-medium;
     margin-right: 8px;
+    flex-shrink: 0;
   }
 
   .search-input {
     border: none;
     outline: none;
-    font-size: 12px;
-    color: #666;
+    font-size: 11px;
+    color: $gray-medium;
     width: 100%;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
+    font-weight: 500;
 
     &::placeholder {
-      color: #999;
+      color: $gray-medium;
     }
   }
 }
@@ -114,24 +134,27 @@
 .add-button {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background-color: #e8a04c;
-  color: white;
+  gap: 6px;
+  background-color: $orange;
+  color: $white;
   border: none;
-  border-radius: 25px;
-  padding: 10px 20px;
-  font-size: 12px;
-  font-weight: 600;
+  border-radius: 20px;
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 700;
   cursor: pointer;
   transition: background-color 0.3s ease;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
 
   .plus-icon {
-    font-size: 16px;
-    font-weight: bold;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
   }
 
   &:hover {
-    background-color: #d4923e;
+    background-color: $orange-dark;
   }
 }
 
@@ -144,24 +167,37 @@
   border-collapse: collapse;
 
   th, td {
-    padding: 16px 12px;
+    padding: 14px 16px;
     text-align: left;
+    white-space: nowrap;
+  }
+
+  thead tr {
     border-bottom: 1px solid #eee;
   }
 
   th {
     font-size: 13px;
     font-weight: 600;
-    color: #2e7d5a;
-    white-space: nowrap;
+    color: $primary-green;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+
+    &:last-child {
+      border-bottom: none;
+    }
   }
 
   td {
     font-size: 14px;
-    color: #333;
+    color: $text-dark;
+    vertical-align: middle;
   }
 }
 
+// Toggle Switch
 .toggle-switch {
   position: relative;
   display: inline-block;
@@ -181,7 +217,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #ccc;
+    background-color: $gray-medium;
     border-radius: 24px;
     transition: 0.3s;
 
@@ -192,85 +228,132 @@
       width: 18px;
       left: 3px;
       bottom: 3px;
-      background-color: white;
+      background-color: $white;
       border-radius: 50%;
       transition: 0.3s;
     }
+  }
 
-    &.active {
-      background-color: #2e7d5a;
+  &.console-mode .toggle-slider.active {
+    background-color: $primary-green;
 
-      &::before {
-        transform: translateX(20px);
-      }
+    &::before {
+      transform: translateX(20px);
+    }
+  }
+
+  &:not(.console-mode) .toggle-slider {
+    background-color: $gray-medium;
+
+    &.active::before {
+      transform: translateX(20px);
     }
   }
 }
 
+// Actions Cell
 .actions-cell {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
 
-  .action-button {
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border: none;
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  letter-spacing: 0.3px;
 
-    &.edit {
-      background-color: #e0e0e0;
-      color: #999;
+  .btn-circle {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
 
-      &.active {
-        background-color: #2e7d5a;
-        color: white;
-      }
+  // Mode QLICKFLOW (gris)
+  &.edit {
+    background-color: $gray-light;
+    border: 2px solid $gray-medium;
+    color: $gray-medium;
+
+    .btn-circle {
+      background-color: rgba($gray-medium, 0.4);
     }
+  }
 
-    &.delete {
-      background-color: #e0e0e0;
-      color: #999;
+  &.delete {
+    background-color: $gray-light;
+    border: 2px solid $gray-medium;
+    color: $gray-medium;
 
-      &.active {
-        background-color: #e8a04c;
-        color: white;
-      }
+    .btn-circle {
+      background-color: rgba($gray-medium, 0.4);
+    }
+  }
+
+  // Mode CONSOLE (vert)
+  &.edit.console-mode {
+    background-color: #e8f5f0;
+    border: 2px solid $primary-green;
+    color: $primary-green;
+
+    .btn-circle {
+      background-color: rgba($primary-green, 0.25);
     }
 
     &:hover {
-      opacity: 0.85;
+      background-color: #d9efe8;
+    }
+  }
+
+  &.delete.console-mode {
+    background-color: $primary-green;
+    border: 2px solid $primary-green;
+    color: $white;
+
+    .btn-circle {
+      background-color: rgba($white, 0.5);
+    }
+
+    &:hover {
+      background-color: $primary-green-dark;
+      border-color: $primary-green-dark;
     }
   }
 }
 
+// Pagination
 .pagination {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 24px;
+  gap: 5px;
+  margin-top: 20px;
 
   .page-button {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border-radius: 4px;
     border: none;
-    background-color: #e0e0e0;
-    color: #666;
-    font-size: 14px;
-    font-weight: 500;
+    background-color: $gray-medium;
+    color: $white;
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
 
     &.active {
-      background-color: #2e7d5a;
-      color: white;
+      background-color: $primary-green;
     }
 
     &:hover:not(.active) {
-      background-color: #d0d0d0;
+      background-color: darken($gray-medium, 10%);
     }
   }
 }
@@ -281,22 +364,21 @@
     padding: 16px;
   }
 
+  .page-header .page-title {
+    font-size: 28px;
+  }
+
+  .content-card {
+    padding: 16px;
+  }
+
   .card-header {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
 
     .header-actions {
-      flex-direction: column;
       width: 100%;
-
-      .search-box {
-        width: 100%;
-      }
-
-      .add-button {
-        width: 100%;
-        justify-content: center;
-      }
+      justify-content: flex-end;
     }
   }
 
