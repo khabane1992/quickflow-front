@@ -1,0 +1,105 @@
+<div class="users-page">
+  <div class="page-header">
+    <h1 class="page-title">Utilisateurs</h1>
+    <p class="page-subtitle">Administration des utilisateurs</p>
+  </div>
+
+  <div class="tabs-container">
+    <button
+      class="tab-button"
+      [class.active]="activeTab === 'qlickflow'"
+      (click)="setActiveTab('qlickflow')">
+      QLICKFLOW
+    </button>
+    <button
+      class="tab-button"
+      [class.active]="activeTab === 'console'"
+      (click)="setActiveTab('console')">
+      CONSOLE
+    </button>
+  </div>
+
+  <div class="content-card">
+    <div class="card-header">
+      <h2 class="card-title">Liste des utilisateurs</h2>
+      <div class="header-actions">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <input
+            type="text"
+            placeholder="RECHERCHER"
+            class="search-input"
+            (input)="onSearch($event)"
+            [value]="searchTerm">
+        </div>
+        <button class="add-button" (click)="addUser()">
+          <span class="plus-icon">+</span>
+          AJOUTER UN UTILISATEUR
+        </button>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>Prenom</th>
+            <th>Nom</th>
+            <th>UID</th>
+            <th>Profil</th>
+            <th>Profile Backup</th>
+            <th>Affectation</th>
+            <th>Actif</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let user of paginatedUsers; trackBy: trackByUserId">
+            <td>{{ user.prenom }}</td>
+            <td>{{ user.nom }}</td>
+            <td>{{ user.uid }}</td>
+            <td>{{ user.profil }}</td>
+            <td>{{ user.profileBackup }}</td>
+            <td>{{ user.affectation }}</td>
+            <td>
+              <label class="toggle-switch">
+                <input
+                  type="checkbox"
+                  [checked]="user.actif"
+                  (change)="toggleUserStatus(user)">
+                <span class="toggle-slider" [class.active]="user.actif"></span>
+              </label>
+            </td>
+            <td class="actions-cell">
+              <button
+                class="action-button edit"
+                [class.active]="activeTab === 'console'"
+                (click)="editUser(user)">
+                EDITER
+              </button>
+              <button
+                class="action-button delete"
+                [class.active]="activeTab === 'console'"
+                (click)="deleteUser(user)">
+                SUPPRIMER
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination">
+      <button
+        *ngFor="let page of pageNumbers"
+        class="page-button"
+        [class.active]="page === currentPage"
+        (click)="goToPage(page)">
+        {{ page }}
+      </button>
+    </div>
+  </div>
+</div>

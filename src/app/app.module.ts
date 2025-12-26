@@ -11,6 +11,7 @@ import {
 } from "./features/derogation/components/derogation-request/derogation-request.component";
 import {MyRequestsComponent} from "./features/derogation/components/my-requests/my-requests.component";
 import {DerogationManagementComponent} from "./features/derogation/components/derogation-management/derogation-management.component";
+import {UsersManagementComponent} from "./features/users/components/users-management/users-management.component";
 
 // Layout Components
 import { SideMenuComponent, HeaderComponent } from './shared/layout';
@@ -32,6 +33,7 @@ import { NotificationService } from './core/services/notification.service';
     DerogationRequestComponent,
     MyRequestsComponent,
     DerogationManagementComponent,
+    UsersManagementComponent,
     // Layout Components
     SideMenuComponent,
     HeaderComponent,

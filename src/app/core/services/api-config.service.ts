@@ -90,7 +90,7 @@ export class ApiConfigService {
    * Vérifie si une fonctionnalité est activée
    */
   isFeatureEnabled(featureName: string): boolean {
-    return environment.features?.[featureName] === true;
+    return (environment.features as Record<string, boolean>)?.[featureName] === true;
   }
 
   /**

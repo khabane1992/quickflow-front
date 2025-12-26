@@ -5,12 +5,14 @@ import {
   DerogationRequestComponent
 } from "./features/derogation/components/derogation-request/derogation-request.component";
 import {DerogationManagementComponent} from "./features/derogation/components/derogation-management/derogation-management.component";
+import {UsersManagementComponent} from "./features/users/components/users-management/users-management.component";
 
 const routes: Routes = [
   { path: '', redirectTo: '/mes-demandes', pathMatch: 'full' },
   { path: 'mes-demandes', component: MyRequestsComponent },
   { path: 'demande-derogation', component: DerogationManagementComponent },
   { path: 'nouvelle-demande', component: DerogationRequestComponent },
+  { path: 'utilisateurs', component: UsersManagementComponent },
   { path: '**', redirectTo: '/mes-demandes' }
 ];
 
