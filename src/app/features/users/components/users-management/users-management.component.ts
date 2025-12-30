@@ -5,10 +5,16 @@ interface User {
   prenom: string;
   nom: string;
   uid: string;
+  email?: string;
   profil: string;
   profileBackup: string;
   affectation: string;
   actif: boolean;
+}
+
+interface Profile {
+  id: string;
+  name: string;
 }
 
 @Component({
@@ -26,6 +32,18 @@ export class UsersManagementComponent implements OnInit {
   currentPage: number = 1;
   itemsPerPage: number = 4;
   totalPages: number = 1;
+
+  // Modal d'ajout d'utilisateur
+  isAddUserModalOpen: boolean = false;
+  selectedProfile: string = '';
+  newUser: Partial<User> = {};
+
+  availableProfiles: Profile[] = [
+    { id: 'SA', name: 'Super Admin (SA)' },
+    { id: 'ADM', name: 'Administrateur (ADM)' },
+    { id: 'JUR', name: 'Juridique (JUR)' },
+    { id: 'USR', name: 'Utilisateur (USR)' }
+  ];
 
   ngOnInit(): void {
     this.loadMockData();
@@ -86,7 +104,61 @@ export class UsersManagementComponent implements OnInit {
   }
 
   addUser(): void {
-    console.log('Ajouter un nouvel utilisateur');
+    this.openAddUserModal();
+  }
+
+  openAddUserModal(): void {
+    this.selectedProfile = '';
+    this.newUser = {};
+    this.isAddUserModalOpen = true;
+    document.body.style.overflow = 'hidden';
+  }
+
+  closeAddUserModal(): void {
+    this.isAddUserModalOpen = false;
+    this.selectedProfile = '';
+    this.newUser = {};
+    document.body.style.overflow = 'auto';
+  }
+
+  selectProfile(profileId: string): void {
+    this.selectedProfile = profileId;
+  }
+
+  getSelectedProfileName(): string {
+    if (!this.selectedProfile) {
+      return 'Choisir';
+    }
+    const profile = this.availableProfiles.find(p => p.id === this.selectedProfile);
+    return profile ? profile.name : 'Choisir';
+  }
+
+  saveNewUser(): void {
+    if (!this.selectedProfile) {
+      alert('Veuillez sélectionner un profil');
+      return;
+    }
+
+    if (!this.newUser.uid || !this.newUser.prenom || !this.newUser.nom) {
+      alert('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    const newId = Math.max(...this.users.map(u => u.id)) + 1;
+    const user: User = {
+      id: newId,
+      prenom: this.newUser.prenom || '',
+      nom: this.newUser.nom || '',
+      uid: this.newUser.uid || '',
+      profil: this.selectedProfile,
+      profileBackup: 'P.B',
+      affectation: 'Agence',
+      actif: true
+    };
+
+    this.users.push(user);
+    this.applyFilter();
+    this.closeAddUserModal();
   }
 
   get paginatedUsers(): User[] {

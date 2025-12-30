@@ -111,3 +111,88 @@
     </div>
   </div>
 </div>
+
+<!-- Modal Ajouter un utilisateur -->
+<div class="modal-overlay" *ngIf="isAddUserModalOpen" (click)="closeAddUserModal()">
+  <div class="add-user-modal" (click)="$event.stopPropagation()">
+    <button class="modal-close-btn" (click)="closeAddUserModal()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
+      </svg>
+    </button>
+
+    <div class="modal-header">
+      <h2 class="modal-title">Ajouter un utilisateur</h2>
+      <p class="modal-subtitle">Sélectionner le profil à créer parmi la liste</p>
+    </div>
+
+    <div class="modal-body">
+      <!-- Sélection du profil -->
+      <div class="profile-select-container">
+        <div class="profile-dropdown" [class.has-selection]="selectedProfile">
+          <span class="dropdown-label">{{ getSelectedProfileName() }}</span>
+          <svg class="dropdown-check" *ngIf="selectedProfile" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z"/>
+          </svg>
+        </div>
+
+        <div class="profile-options">
+          <div
+            *ngFor="let profile of availableProfiles"
+            class="profile-option"
+            [class.selected]="selectedProfile === profile.id"
+            (click)="selectProfile(profile.id)">
+            {{ profile.name }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Champs du formulaire -->
+      <div class="form-fields">
+        <div class="form-field">
+          <input
+            type="text"
+            placeholder="UID"
+            [(ngModel)]="newUser.uid"
+            class="form-input">
+        </div>
+        <div class="form-field">
+          <input
+            type="text"
+            placeholder="Prénom"
+            [(ngModel)]="newUser.prenom"
+            class="form-input">
+        </div>
+        <div class="form-field">
+          <input
+            type="email"
+            placeholder="Email"
+            [(ngModel)]="newUser.email"
+            class="form-input">
+        </div>
+        <div class="form-field">
+          <input
+            type="text"
+            placeholder="Nom"
+            [(ngModel)]="newUser.nom"
+            class="form-input">
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-retour" (click)="closeAddUserModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.77,3.77L16,2L6,12L16,22L17.77,20.23L9.54,12L17.77,3.77Z"/>
+        </svg>
+        RETOUR
+      </button>
+      <button class="btn-terminer" (click)="saveNewUser()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z"/>
+        </svg>
+        TERMINER
+      </button>
+    </div>
+  </div>
+</div>
