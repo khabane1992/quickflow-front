@@ -129,21 +129,22 @@
     <div class="modal-body">
       <!-- Sélection du profil -->
       <div class="profile-select-container">
-        <div class="profile-dropdown" [class.has-selection]="selectedProfile">
-          <span class="dropdown-label">{{ getSelectedProfileName() }}</span>
-          <svg class="dropdown-check" *ngIf="selectedProfile" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <div class="select-wrapper">
+          <select
+            class="profile-select"
+            [(ngModel)]="selectedProfile"
+            [class.has-selection]="selectedProfile">
+            <option value="">Choisir</option>
+            <option *ngFor="let profile of availableProfiles" [value]="profile.id">
+              {{ profile.name }}
+            </option>
+          </select>
+          <svg *ngIf="!selectedProfile" class="select-arrow" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M7,10L12,15L17,10H7Z"/>
+          </svg>
+          <svg *ngIf="selectedProfile" class="select-check" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z"/>
           </svg>
-        </div>
-
-        <div class="profile-options">
-          <div
-            *ngFor="let profile of availableProfiles"
-            class="profile-option"
-            [class.selected]="selectedProfile === profile.id"
-            (click)="selectProfile(profile.id)">
-            {{ profile.name }}
-          </div>
         </div>
       </div>
 
