@@ -148,6 +148,77 @@
         </div>
       </div>
 
+      <div *ngIf="isOrganisationSelectable()" class="profile-select-container">
+        <div class="select-wrapper">
+          <!-- Input de recherche qui remplace le select -->
+          <input
+            type="text"
+            class="profile-select"
+            [(ngModel)]="organisationSearchTerm"
+            (input)="applyOrganisationFilter()"
+            (focus)="isDropdownOpen = true"
+            [placeholder]="selectedOrganisationName || 'Organisation'"
+            [class.has-selection]="selectedOrganisation">
+
+          <!-- Liste déroulante custom -->
+          <ul *ngIf="isDropdownOpen && filteredOrganisations.length > 0" class="dropdown-list">
+            <li *ngFor="let org of filteredOrganisations"
+                (click)="selectOrganisation(org)">
+              {{ org.nom }}
+            </li>
+          </ul>
+
+          <img *ngIf="!selectedOrganisation"
+               src="assets/icons/ep_arrow-down-bold.svg"
+               alt="flèche"
+               height="20"
+               style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">
+        </div>
+      </div>
+
+      isDropdownOpen = false;
+      selectedOrganisationName = '';
+
+      selectOrganisation(org: any): void {
+      this.selectedOrganisation = org.id;
+      this.selectedOrganisationName = org.nom;
+      this.organisationSearchTerm = org.nom; // Affiche le nom sélectionné
+      this.isDropdownOpen = false;
+      }
+
+      // Pour fermer le dropdown en cliquant ailleurs
+      @HostListener('document:click', ['$event'])
+      onClickOutside(event: Event): void {
+      if (!this.elementRef.nativeElement.contains(event.target)) {
+      this.isDropdownOpen = false;
+      }
+      }
+
+      .dropdown-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      max-height: 200px;
+      overflow-y: auto;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      z-index: 100;
+      }
+
+      .dropdown-list li {
+      padding: 10px;
+      cursor: pointer;
+      }
+
+      .dropdown-list li:hover {
+      background: #f0f0f0;
+      }
+
       <!-- Champs du formulaire -->
       <div class="form-fields">
         <div class="form-field">
