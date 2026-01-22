@@ -180,3 +180,103 @@ export class UsersManagementComponent implements OnInit {
     return user.id;
   }
 }
+
+
+
+<div class="pagination">
+  <button 
+    class="nav-btn" 
+    (click)="goToPage(currentPage - 1)" 
+    [disabled]="currentPage === 1">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15,18 9,12 15,6"></polyline>
+    </svg>
+  </button>
+
+  <div class="page-numbers">
+    <ng-container *ngFor="let page of pageNumbers">
+      <button 
+        class="page-btn" 
+        [class.active]="page === currentPage"
+        (click)="goToPage(page)">
+        {{ page }}
+      </button>
+    </ng-container>
+  </div>
+
+  <button 
+    class="nav-btn" 
+    (click)="goToPage(currentPage + 1)" 
+    [disabled]="currentPage === totalPages">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="9,18 15,12 9,6"></polyline>
+    </svg>
+  </button>
+</div>
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.page-numbers {
+  display: flex;
+  gap: 4px;
+}
+
+.nav-btn,
+.page-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nav-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00965E 0%, #00c47d 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 150, 94, 0.3);
+}
+
+.nav-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 150, 94, 0.4);
+}
+
+.nav-btn:disabled {
+  background: #e0e0e0;
+  color: #999;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.page-btn {
+  min-width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #f5f5f5;
+  color: #333;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.page-btn:hover:not(.active) {
+  background: #e8f5e9;
+  color: #00965E;
+}
+
+.page-btn.active {
+  background: linear-gradient(135deg, #00965E 0%, #00c47d 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 150, 94, 0.3);
+  transform: scale(1.05);
+}
+      
