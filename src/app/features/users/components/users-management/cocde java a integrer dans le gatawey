@@ -1,0 +1,153 @@
+package com.bnpparibas.irb.qlickflow.gateway.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+
+@Configuration
+@EnableWebFluxSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+        return http
+            .csrf(ServerHttpSecurity.CsrfSpec::disable)
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+            .authorizeExchange(ex -> ex
+                .pathMatchers("/actuator/health", "/actuator/info").permitAll()
+                .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .pathMatchers(
+                    "/api/v1/derog-tarif/auth/register",
+                    "/api/v1/derog-tarif/auth/login",
+                    "/api/v1/derog-tarif/auth/token",
+                    "/api/v1/derog-tarif/auth/token-by-uid"
+                ).permitAll()
+                .anyExchange().authenticated()
+            )
+            .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))
+            .build();
+    }
+}
+
+package com.bnpparibas.irb.qlickflow.gateway.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtGrantedAuthoritiesConverterAdapter;
+
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+
+@Configuration
+public class JwtConfig {
+
+    @Value("${jwt.secret}")
+    private String secret;
+
+    @Bean
+    public ReactiveJwtDecoder jwtDecoder() {
+        SecretKeySpec secretKey = new SecretKeySpec(
+            secret.getBytes(StandardCharsets.UTF_8),
+            "HmacSHA256"
+        );
+        return NimbusReactiveJwtDecoder
+            .withSecretKey(secretKey)
+            .macAlgorithm(MacAlgorithm.HS256)
+            .build();
+    }
+
+    @Bean
+    public ReactiveJwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter =
+            new JwtGrantedAuthoritiesConverter();
+        grantedAuthoritiesConverter.setAuthoritiesClaimName("roles");
+        grantedAuthoritiesConverter.setAuthorityPrefix("ROLE_");
+
+        ReactiveJwtAuthenticationConverter converter = new ReactiveJwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(
+            new ReactiveJwtGrantedAuthoritiesConverterAdapter(grantedAuthoritiesConverter)
+        );
+        return converter;
+    }
+}
+
+package com.bnpparibas.irb.qlickflow.gateway.filter;
+
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.core.Ordered;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.stereotype.Component;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+
+@Component
+public class JwtClaimsGatewayFilter implements GlobalFilter, Ordered {
+
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        return ReactiveSecurityContextHolder.getContext()
+            .map(ctx -> ctx.getAuthentication())
+            .filter(auth -> auth instanceof JwtAuthenticationToken)
+            .cast(JwtAuthenticationToken.class)
+            .map(JwtAuthenticationToken::getToken)
+            .flatMap(jwt -> {
+                ServerWebExchange mutatedExchange = exchange.mutate()
+                    .request(r -> r.headers(headers -> {
+                        addHeaderIfPresent(headers, "X-User-Id",           jwt, "sub");
+                        addHeaderIfPresent(headers, "X-User-Uid",          jwt, "uid");
+                        addHeaderIfPresent(headers, "X-User-Username",     jwt, "username");
+                        addHeaderIfPresent(headers, "X-User-FirstName",    jwt, "firstName");
+                        addHeaderIfPresent(headers, "X-User-LastName",     jwt, "lastName");
+                        addHeaderIfPresent(headers, "X-User-Profile-Code", jwt, "profileCode");
+                        addHeaderIfPresent(headers, "X-User-Profile-Name", jwt, "profileName");
+                        addHeaderIfPresent(headers, "X-User-Agency",       jwt, "agency");
+                        addHeaderIfPresent(headers, "X-User-Actif",        jwt, "actif");
+                    }))
+                    .build();
+                return chain.filter(mutatedExchange);
+            })
+            .switchIfEmpty(chain.filter(exchange));
+    }
+
+    private void addHeaderIfPresent(HttpHeaders headers, String headerName,
+                                     Jwt jwt, String claimName) {
+        Object claim = jwt.getClaim(claimName);
+        if (claim != null) {
+            headers.set(headerName, claim.toString());
+        }
+    }
+
+    @Override
+    public int getOrder() {
+        return -1;
+    }
+}
+```
+
+**Résumé de la structure :**
+```
+gateway/
+└── src/main/java/.../gateway/
+    ├── config/
+    │   ├── SecurityConfig.java   ← filtrage des routes
+    │   └── JwtConfig.java        ← décodage JWT HS256
+    └── filter/
+        └── JwtClaimsGatewayFilter.java  ← propagation des claims
+
+jwt:
+  secret: votre-secret-identique-au-microservice
