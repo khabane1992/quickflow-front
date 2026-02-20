@@ -180,5 +180,3 @@ export class UsersManagementComponent implements OnInit {
     return user.id;
   }
 }
-
-
