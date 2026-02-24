@@ -1309,6 +1309,72 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
+package com.bnpparibas.irb.qlickflow.config;
+
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
+public class SecurityConfig {
+
+    @Value("${security.jwt.secret}")
+    private String jwtSecret;
+
+    // Nécessaire pour encoder les passwords dans AuthServiceImpl
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    // Nécessaire pour GÉNÉRER les tokens JWT dans AuthServiceImpl
+    @Bean
+    public JwtEncoder jwtEncoder() {
+        SecretKeySpec secretKey = new SecretKeySpec(
+            jwtSecret.getBytes(StandardCharsets.UTF_8),
+            "HmacSHA256"
+        );
+        return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey));
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        return http
+            .csrf(AbstractHttpConfigurer::disable)
+            .httpBasic(AbstractHttpConfigurer::disable)
+            .formLogin(AbstractHttpConfigurer::disable)
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(
+                    "/v3/api-docs/**",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/h2-console/**"
+                ).permitAll()
+                // Gateway a déjà validé le JWT → tout est permis
+                .anyRequest().permitAll()
+            )
+            .build();
+    }
+}
 
 package com.bnpparibas.irb.qlickflow.gateway.config;
 
@@ -1338,16 +1404,21 @@ public class SecurityConfig {
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .authorizeExchange(ex -> ex
+                // Actuator public
                 .pathMatchers("/actuator/health", "/actuator/info").permitAll()
+                // CORS preflight
                 .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // Endpoints auth publics → pas de JWT requis
                 .pathMatchers(
                     "/api/v1/derog-tarif/auth/register",
                     "/api/v1/derog-tarif/auth/login",
                     "/api/v1/derog-tarif/auth/token",
                     "/api/v1/derog-tarif/auth/token-by-uid"
                 ).permitAll()
+                // Tout le reste → JWT obligatoire
                 .anyExchange().authenticated()
             )
+            // Gateway valide les JWT ici
             .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))
             .build();
     }
@@ -1356,7 +1427,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // Origins autorisées (remplacer par vos URLs frontend)
+        // Origins autorisées
         config.setAllowedOrigins(List.of(
             "http://localhost:4200",   // Angular dev
             "http://localhost:3000",   // React dev
@@ -1389,35 +1460,5 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
-    }
-}
-
-package com.bnpparibas.irb.qlickflow.config;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.SecurityFilterChain;
-
-@Configuration
-@EnableWebSecurity
-public class SecurityConfig {
-
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http
-            .csrf(AbstractHttpConfigurer::disable)
-            .httpBasic(AbstractHttpConfigurer::disable)
-            .formLogin(AbstractHttpConfigurer::disable)
-            .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
-            .authorizeHttpRequests(auth -> auth
-                .anyRequest().permitAll()
-            )
-            .build();
     }
 }
