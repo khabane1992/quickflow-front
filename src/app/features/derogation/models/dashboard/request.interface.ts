@@ -1308,188 +1308,91 @@ INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, create
 SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d310338-72fa-9af5-bb90-66c3876e4618', NULL, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
+package com.bnpparibas.irb.qlickflow.gateway.config;
 
-package com.bnpparibas.irb.qlickflow.config;
-
-import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverter;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import reactor.core.publisher.Flux;
 
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @Configuration
-@EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)
-public class SecurityConfig {
+public class JwtConfig {
 
-    @Value("${security.jwt.secret}")
-    private String jwtSecret;
+    @Value("${jwt.secret}")
+    private String secret;
 
-    // Nécessaire pour encoder les passwords dans AuthServiceImpl
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    // Nécessaire pour GÉNÉRER les tokens JWT dans AuthServiceImpl
-    @Bean
-    public JwtEncoder jwtEncoder() {
+    public ReactiveJwtDecoder jwtDecoder() {
         SecretKeySpec secretKey = new SecretKeySpec(
-            jwtSecret.getBytes(StandardCharsets.UTF_8),
+            secret.getBytes(StandardCharsets.UTF_8),
             "HmacSHA256"
         );
-        return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey));
-    }
-
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http
-            .csrf(AbstractHttpConfigurer::disable)
-            .httpBasic(AbstractHttpConfigurer::disable)
-            .formLogin(AbstractHttpConfigurer::disable)
-            .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/v3/api-docs/**",
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/h2-console/**"
-                ).permitAll()
-                // Gateway a déjà validé le JWT → tout est permis
-                .anyRequest().permitAll()
-            )
-            .build();
-    }
-}
-
-package com.bnpparibas.irb.qlickflow.gateway.config;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
-import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.reactive.CorsConfigurationSource;
-import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
-import java.util.List;
-
-@Configuration
-@EnableWebFluxSecurity
-public class SecurityConfig {
-
-    @Bean
-    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-        return http
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-            .authorizeExchange(ex -> ex
-                // Actuator public
-                .pathMatchers("/actuator/health", "/actuator/info").permitAll()
-                // CORS preflight
-                .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // Endpoints auth publics → pas de JWT requis
-                .pathMatchers(
-                    "/api/v1/derog-tarif/auth/register",
-                    "/api/v1/derog-tarif/auth/login",
-                    "/api/v1/derog-tarif/auth/token",
-                    "/api/v1/derog-tarif/auth/token-by-uid"
-                ).permitAll()
-                // Tout le reste → JWT obligatoire
-                .anyExchange().authenticated()
-            )
-            // Gateway valide les JWT ici
-            .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))
+        return NimbusReactiveJwtDecoder
+            .withSecretKey(secretKey)
+            .macAlgorithm(MacAlgorithm.HS256)
             .build();
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
+    public ReactiveJwtAuthenticationConverter jwtAuthenticationConverter() {
+        ReactiveJwtAuthenticationConverter converter = new ReactiveJwtAuthenticationConverter();
 
-        // Origins autorisées
-        config.setAllowedOrigins(List.of(
-            "http://localhost:4200",   // Angular dev
-            "http://localhost:3000",   // React dev
-            "https://votre-frontend.bnpparibas.com"
-        ));
+        // ✅ Converter custom qui gère les roles comme objets complexes
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> 
+            Flux.fromIterable(extractAuthorities(jwt))
+        );
 
-        // Méthodes autorisées
-        config.setAllowedMethods(Arrays.asList(
-            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
-        ));
+        return converter;
+    }
 
-        // Headers autorisés
-        config.setAllowedHeaders(Arrays.asList(
-            "Authorization",
-            "Content-Type",
-            "Accept",
-            "X-Requested-With",
-            "Origin"
-        ));
+    private List<GrantedAuthority> extractAuthorities(Jwt jwt) {
+        List<GrantedAuthority> authorities = new ArrayList<>();
 
-        // Headers exposés au frontend
-        config.setExposedHeaders(Arrays.asList(
-            "Authorization",
-            "Content-Disposition"
-        ));
+        // Récupérer le claim "roles" qui est une List<Map<String, Object>>
+        Object rolesClaim = jwt.getClaim("roles");
 
-        config.setAllowCredentials(true);
-        config.setMaxAge(3600L);
+        if (rolesClaim instanceof List<?> rolesList) {
+            for (Object roleObj : rolesList) {
+                if (roleObj instanceof Map<?, ?> roleMap) {
+                    // Extraire le nom du rôle
+                    Object roleName = roleMap.get("roleName");
+                    if (roleName != null) {
+                        authorities.add(
+                            new SimpleGrantedAuthority("ROLE_" + roleName.toString())
+                        );
+                    }
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
+                    // Extraire les permissions du rôle
+                    Object permissionsObj = roleMap.get("permissions");
+                    if (permissionsObj instanceof List<?> permissionsList) {
+                        for (Object permObj : permissionsList) {
+                            if (permObj instanceof Map<?, ?> permMap) {
+                                Object permName = permMap.get("permissionName");
+                                if (permName != null) {
+                                    authorities.add(
+                                        new SimpleGrantedAuthority(permName.toString())
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return authorities;
     }
 }
-
-export const authConfig: AuthConfig = {
-    issuer: environment.ssoIssuer,
-    redirectUri: window.location.origin + '/callback',
-    postLogoutRedirectUri: window.location.origin + '/qlickflow/',
-    clientId: environment.ssoClientId,
-    dummyClientSecret: environment.ssoDummyClientSecret,
-    responseType: 'code',
-    scope: 'openid profile email read write user',
-    requireHttps: false,
-    showDebugInformation: true,
-    // ✅ Ces deux lignes doivent être true
-    skipIssuerCheck: true,
-    strictDiscoveryDocumentValidation: false,
-    // ✅ Ajouter ces lignes pour ne pas chercher le discovery document
-    skipSubjectCheck: true,
-    clearHashAfterLogin: true,
-    sessionChecksEnabled: false,
-    // ✅ Pointer directement les endpoints
-    tokenEndpoint: environment.apiUrl + '/api/v1/derog-tarif/auth/token',
-    userinfoEndpoint: environment.apiUrl + '/api/v1/derog-tarif/retail/auth/token-by-uid',
-    loginUrl: '/oauth2/authorize',
-    logoutUrl: environment.ssoCallback,
-    oidc: true,
-    useHttpBasicAuth: false,
-    requestAccessToken: true,
-    timeoutFactor: 0.75,
-    customQueryParams: {
-        'prompt': 'login'
-    }
-};
