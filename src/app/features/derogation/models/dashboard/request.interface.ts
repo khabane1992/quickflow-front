@@ -1462,3 +1462,34 @@ public class SecurityConfig {
         return source;
     }
 }
+
+export const authConfig: AuthConfig = {
+    issuer: environment.ssoIssuer,
+    redirectUri: window.location.origin + '/callback',
+    postLogoutRedirectUri: window.location.origin + '/qlickflow/',
+    clientId: environment.ssoClientId,
+    dummyClientSecret: environment.ssoDummyClientSecret,
+    responseType: 'code',
+    scope: 'openid profile email read write user',
+    requireHttps: false,
+    showDebugInformation: true,
+    // ✅ Ces deux lignes doivent être true
+    skipIssuerCheck: true,
+    strictDiscoveryDocumentValidation: false,
+    // ✅ Ajouter ces lignes pour ne pas chercher le discovery document
+    skipSubjectCheck: true,
+    clearHashAfterLogin: true,
+    sessionChecksEnabled: false,
+    // ✅ Pointer directement les endpoints
+    tokenEndpoint: environment.apiUrl + '/api/v1/derog-tarif/auth/token',
+    userinfoEndpoint: environment.apiUrl + '/api/v1/derog-tarif/retail/auth/token-by-uid',
+    loginUrl: '/oauth2/authorize',
+    logoutUrl: environment.ssoCallback,
+    oidc: true,
+    useHttpBasicAuth: false,
+    requestAccessToken: true,
+    timeoutFactor: 0.75,
+    customQueryParams: {
+        'prompt': 'login'
+    }
+};
