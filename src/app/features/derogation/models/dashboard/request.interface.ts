@@ -1308,91 +1308,241 @@ INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, create
 SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d310338-72fa-9af5-bb90-66c3876e4618', NULL, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
-package com.bnpparibas.irb.qlickflow.gateway.config;
 
-import org.springframework.beans.factory.annotation.Value;
+package com.bnpparibas.irb.qlickflow.apigateway.config;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
-import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverter;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import reactor.core.publisher.Flux;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 @Configuration
-public class JwtConfig {
-
-    @Value("${jwt.secret}")
-    private String secret;
+@EnableWebFluxSecurity
+public class SecurityConfig {
 
     @Bean
-    public ReactiveJwtDecoder jwtDecoder() {
-        SecretKeySpec secretKey = new SecretKeySpec(
-            secret.getBytes(StandardCharsets.UTF_8),
-            "HmacSHA256"
-        );
-        return NimbusReactiveJwtDecoder
-            .withSecretKey(secretKey)
-            .macAlgorithm(MacAlgorithm.HS256)
+    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+        return http
+            .csrf(ServerHttpSecurity.CsrfSpec::disable)
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+            .authorizeExchange(ex -> ex
+                // Actuator public
+                .pathMatchers("/actuator/health", "/actuator/info").permitAll()
+                // CORS preflight
+                .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // OpenID discovery (frontend angular-oauth2-oidc)
+                .pathMatchers("/.well-known/**").permitAll()
+                // ✅ Auth publics → qf-users (8200)
+                .pathMatchers(
+                    "/api/v1/auth/register",
+                    "/api/v1/auth/login",
+                    "/api/v1/auth/token",
+                    "/api/v1/auth/token-by-uid"
+                ).permitAll()
+                // ✅ Auth publics → dérogation (8100) si nécessaire
+                .pathMatchers(
+                    "/api/v1/derog-tarif/auth/register",
+                    "/api/v1/derog-tarif/auth/login",
+                    "/api/v1/derog-tarif/auth/token",
+                    "/api/v1/derog-tarif/auth/token-by-uid"
+                ).permitAll()
+                // Tout le reste → JWT obligatoire
+                .anyExchange().authenticated()
+            )
+            .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))
             .build();
     }
 
     @Bean
-    public ReactiveJwtAuthenticationConverter jwtAuthenticationConverter() {
-        ReactiveJwtAuthenticationConverter converter = new ReactiveJwtAuthenticationConverter();
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
 
-        // ✅ Converter custom qui gère les roles comme objets complexes
-        converter.setJwtGrantedAuthoritiesConverter(jwt -> 
-            Flux.fromIterable(extractAuthorities(jwt))
-        );
+        config.setAllowedOrigins(List.of(
+            "http://localhost:4200",
+            "http://localhost:3000",
+            "https://votre-frontend.bnpparibas.com"
+        ));
 
-        return converter;
-    }
+        config.setAllowedMethods(Arrays.asList(
+            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
+        ));
 
-    private List<GrantedAuthority> extractAuthorities(Jwt jwt) {
-        List<GrantedAuthority> authorities = new ArrayList<>();
+        config.setAllowedHeaders(Arrays.asList(
+            "Authorization",
+            "Content-Type",
+            "Accept",
+            "X-Requested-With",
+            "Origin"
+        ));
 
-        // Récupérer le claim "roles" qui est une List<Map<String, Object>>
-        Object rolesClaim = jwt.getClaim("roles");
+        config.setExposedHeaders(Arrays.asList(
+            "Authorization",
+            "Content-Disposition"
+        ));
 
-        if (rolesClaim instanceof List<?> rolesList) {
-            for (Object roleObj : rolesList) {
-                if (roleObj instanceof Map<?, ?> roleMap) {
-                    // Extraire le nom du rôle
-                    Object roleName = roleMap.get("roleName");
-                    if (roleName != null) {
-                        authorities.add(
-                            new SimpleGrantedAuthority("ROLE_" + roleName.toString())
-                        );
-                    }
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
 
-                    // Extraire les permissions du rôle
-                    Object permissionsObj = roleMap.get("permissions");
-                    if (permissionsObj instanceof List<?> permissionsList) {
-                        for (Object permObj : permissionsList) {
-                            if (permObj instanceof Map<?, ?> permMap) {
-                                Object permName = permMap.get("permissionName");
-                                if (permName != null) {
-                                    authorities.add(
-                                        new SimpleGrantedAuthority(permName.toString())
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return authorities;
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 }
+
+import { Injectable } from '@angular/core';
+import { Router } from '@angular/router';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
+import { AuthResponse, Permission, Role, UidRequestDTO, UserInfo } from '../shared/i';
+import { jwtDecode } from 'jwt-decode';
+import { ApiConfigService } from '../core/services/api-config.service';
+import { OAuthService } from 'angular-oauth2-oidc';
+
+@Injectable({
+    providedIn: 'root'
+})
+export class AuthService {
+
+    private isAuthenticatedSubject$ = new BehaviorSubject<boolean>(false);
+    public isAuthenticated$ = this.isAuthenticatedSubject$.asObservable();
+
+    private userInfoSubject$ = new BehaviorSubject<UserInfo | null>(null);
+    public userInfo$ = this.userInfoSubject$.asObservable();
+
+    // ✅ URL correcte → /api/v1/auth/token-by-uid → gateway route vers qf-users (8200)
+    private readonly baseUrl: string;
+
+    constructor(
+        private oauthService: OAuthService,
+        private router: Router,
+        private http: HttpClient,
+        private apiConfig: ApiConfigService
+    ) {
+        // ✅ Utiliser /api/v1/auth/ et non /api/v1/derog-tarif/
+        this.baseUrl = `${this.apiConfig.getApiUrl()}/api/v1/auth/token-by-uid`;
+
+        this.configureOAuth();
+    }
+
+    private configureOAuth() {
+        this.oauthService.configure({
+            issuer: environment.apiUrl,
+            redirectUri: window.location.origin + '/callback',
+            scope: 'openid profile email',
+            responseType: 'code'
+        });
+
+        // ✅ Supprimer loadDiscoveryDocument() — pas de serveur OpenID
+        // this.oauthService.loadDiscoveryDocument().then(() => {
+        //     this.oauthService.tryLogin();
+        // }).catch(error => {
+        //     console.error('Erreur lors du chargement du document de découverte :', error);
+        // });
+
+        // ✅ Garder seulement les events
+        this.oauthService.events.subscribe((event: any) => {
+            console.log('Événement OAuth reçu:', event);
+            if (event.type === 'token_received') {
+                console.log('Token reçu, chargement des informations utilisateur...');
+                this.loadUserInfo();
+            }
+        });
+    }
+
+    // ✅ Appel vers /api/v1/auth/token-by-uid → gateway → qf-users (8200)
+    async generateTokenByUid(uid: string): Promise<void> {
+        try {
+            const requestBody: UidRequestDTO = { uid };
+            const response = await this.http.post<AuthResponse>(
+                this.baseUrl,
+                requestBody
+            ).toPromise();
+
+            if (response && response.data.token) {
+                localStorage.setItem('access_token', response.data.token);
+                console.log('Token stocké:', response.data.token);
+                this.loadUserInfo();
+                this.isAuthenticatedSubject$.next(true);
+            } else {
+                throw new Error('Token not received');
+            }
+        } catch (error) {
+            console.error('Erreur lors de la génération du token :', error);
+            throw error;
+        }
+    }
+
+    loadUserInfo(): void {
+        const token = localStorage.getItem('access_token');
+        console.log('Token au démarrage:', token);
+
+        if (token) {
+            // Décodez le token pour obtenir les claims
+            const claims = jwtDecode(token) as any;
+
+            if (claims) {
+                const roles: Role[] = claims['roles'] || [];
+                const permissions: Permission[] = [];
+
+                roles.forEach(role => {
+                    if (role.permissions) {
+                        permissions.push(...role.permissions);
+                    }
+                });
+
+                console.log('Permissions chargées:', permissions);
+
+                const userInfo: UserInfo = {
+                    uid: claims['uid'],
+                    username: claims['sub'],
+                    email: claims['email'],
+                    firstName: claims['firstName'],
+                    lastName: claims['lastName'],
+                    profileName: claims['profileName'],
+                    profileId: claims['profileId'],
+                    profileActif: claims['profileActif'],
+                    profileDescription: claims['profileDescription'],
+                    profileCode: claims['profileCode'],
+                    agency: claims['agency'],
+                    roles: roles,
+                    permissions: permissions,
+                };
+
+                this.userInfoSubject$.next(userInfo);
+                this.isAuthenticatedSubject$.next(true);
+            } else {
+                console.error('Les claims sont vides.');
+            }
+        } else {
+            console.error('Aucun token trouvé.');
+        }
+    }
+
+    isLoggedIn(): boolean {
+        return this.oauthService.hasValidAccessToken();
+    }
+
+    getUserInfo(): UserInfo | null {
+        return this.userInfoSubject$.getValue();
+    }
+
+    logout(): void {
+        localStorage.removeItem('access_token');
+        this.isAuthenticatedSubject$.next(false);
+        this.userInfoSubject$.next(null);
+        this.router.navigate(['/login']);
+    }
+}
+
