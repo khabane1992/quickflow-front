@@ -1309,240 +1309,535 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
-package com.bnpparibas.irb.qlickflow.apigateway.config;
+Voici tous les fichiers complets et exacts :
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
-import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.reactive.CorsConfigurationSource;
-import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+1. UserContextDTO.java
+javapackage com.bnpparibas.irb.qlickflow.context;
 
-import java.util.Arrays;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.Set;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserContextDTO {
+
+    private String uid;
+    private String username;
+    private String firstName;
+    private String lastName;
+    private String profileCode;
+    private String profileName;
+    private Boolean actif;
+
+    private UserInfo nPlusOne;
+    private UserInfo camundaUser;
+    private Set<UserInfo> usersEligibleForUnassignment;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UserInfo {
+        private UUID id;
+        private String uid;
+        private String username;
+        private String firstName;
+        private String lastName;
+        private String email;
+        private String profileCode;
+        private String profileName;
+        private Boolean actif;
+
+        public String getFullName() {
+            return (firstName != null ? firstName : "") 
+                + " " 
+                + (lastName != null ? lastName : "");
+        }
+    }
+}
+
+2. UserContextHolder.java
+javapackage com.bnpparibas.irb.qlickflow.context;
+
+import org.springframework.stereotype.Component;
+import org.springframework.web.context.annotation.RequestScope;
+
+@Component
+@RequestScope
+public class UserContextHolder {
+
+    private UserContextDTO userContext;
+
+    public UserContextDTO get() {
+        return userContext;
+    }
+
+    public void set(UserContextDTO userContext) {
+        this.userContext = userContext;
+    }
+
+    public boolean isLoaded() {
+        return userContext != null;
+    }
+}
+
+3. UserModel.java
+javapackage com.bnpparibas.irb.qlickflow.model;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserModel {
+
+    private UUID id;
+    private String uid;
+    private String username;
+    private String email;
+    private String firstName;
+    private String lastName;
+    private String profileCode;
+    private String profileName;
+    private Boolean actif;
+
+    private AgenceModel agence;
+    private GroupeModel groupe;
+    private ZoneModel zone;
+
+    public String getFullName() {
+        return (firstName != null ? firstName : "") 
+            + " " 
+            + (lastName != null ? lastName : "");
+    }
+
+    // ✅ Compatibilité avec getProfile().getCode()
+    public ProfileModel getProfile() {
+        if (profileCode == null) return null;
+        return new ProfileModel(profileCode, profileName);
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ProfileModel {
+        private String code;
+        private String name;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AgenceModel {
+        private UUID id;
+        private String nom;
+        private String code;
+        private UserModel directoryAgency;
+        private GroupeModel groupe;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class GroupeModel {
+        private UUID id;
+        private String nom;
+        private UserModel directorGroup;
+        private ZoneModel zone;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ZoneModel {
+        private UUID id;
+        private String nom;
+        private UserModel directorZone;
+    }
+}
+
+4. UserService.java
+javapackage com.bnpparibas.irb.qlickflow.service;
+
+import com.bnpparibas.irb.qlickflow.model.UserModel;
+
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+public interface UserService {
+
+    Optional<UserModel> findById(UUID id);
+
+    UserModel getCurrentUser();
+
+    UserModel getNPlusOne(String uid);
+
+    Optional<UserModel> findByUid(String uid);
+
+    Set<UserModel> getUsersEligibleForUnassignment();
+}
+
+5. UserClient.java
+javapackage com.bnpparibas.irb.qlickflow.client;
+
+import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
+import com.bnpparibas.irb.qlickflow.response.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
-@Configuration
-@EnableWebFluxSecurity
-public class SecurityConfig {
+@Slf4j
+@Component
+public class UserClient {
 
-    @Bean
-    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-        return http
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-            .authorizeExchange(ex -> ex
-                // Actuator public
-                .pathMatchers("/actuator/health", "/actuator/info").permitAll()
-                // CORS preflight
-                .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // OpenID discovery (frontend angular-oauth2-oidc)
-                .pathMatchers("/.well-known/**").permitAll()
-                // ✅ Auth publics → qf-users (8200)
-                .pathMatchers(
-                    "/api/v1/auth/register",
-                    "/api/v1/auth/login",
-                    "/api/v1/auth/token",
-                    "/api/v1/auth/token-by-uid"
-                ).permitAll()
-                // ✅ Auth publics → dérogation (8100) si nécessaire
-                .pathMatchers(
-                    "/api/v1/derog-tarif/auth/register",
-                    "/api/v1/derog-tarif/auth/login",
-                    "/api/v1/derog-tarif/auth/token",
-                    "/api/v1/derog-tarif/auth/token-by-uid"
-                ).permitAll()
-                // Tout le reste → JWT obligatoire
-                .anyExchange().authenticated()
-            )
-            .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))
+    private final WebClient webClient;
+
+    public UserClient(@Value("${services.qf-users.url}") String qfUsersUrl) {
+        this.webClient = WebClient.builder()
+            .baseUrl(qfUsersUrl)
             .build();
     }
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-
-        config.setAllowedOrigins(List.of(
-            "http://localhost:4200",
-            "http://localhost:3000",
-            "https://votre-frontend.bnpparibas.com"
-        ));
-
-        config.setAllowedMethods(Arrays.asList(
-            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
-        ));
-
-        config.setAllowedHeaders(Arrays.asList(
-            "Authorization",
-            "Content-Type",
-            "Accept",
-            "X-Requested-With",
-            "Origin"
-        ));
-
-        config.setExposedHeaders(Arrays.asList(
-            "Authorization",
-            "Content-Disposition"
-        ));
-
-        config.setAllowCredentials(true);
-        config.setMaxAge(3600L);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
-    }
-}
-
-import { Injectable } from '@angular/core';
-import { Router } from '@angular/router';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { environment } from '../../environments/environment';
-import { AuthResponse, Permission, Role, UidRequestDTO, UserInfo } from '../shared/i';
-import { jwtDecode } from 'jwt-decode';
-import { ApiConfigService } from '../core/services/api-config.service';
-import { OAuthService } from 'angular-oauth2-oidc';
-
-@Injectable({
-    providedIn: 'root'
-})
-export class AuthService {
-
-    private isAuthenticatedSubject$ = new BehaviorSubject<boolean>(false);
-    public isAuthenticated$ = this.isAuthenticatedSubject$.asObservable();
-
-    private userInfoSubject$ = new BehaviorSubject<UserInfo | null>(null);
-    public userInfo$ = this.userInfoSubject$.asObservable();
-
-    // ✅ URL correcte → /api/v1/auth/token-by-uid → gateway route vers qf-users (8200)
-    private readonly baseUrl: string;
-
-    constructor(
-        private oauthService: OAuthService,
-        private router: Router,
-        private http: HttpClient,
-        private apiConfig: ApiConfigService
-    ) {
-        // ✅ Utiliser /api/v1/auth/ et non /api/v1/derog-tarif/
-        this.baseUrl = `${this.apiConfig.getApiUrl()}/api/v1/auth/token-by-uid`;
-
-        this.configureOAuth();
-    }
-
-    private configureOAuth() {
-        this.oauthService.configure({
-            issuer: environment.apiUrl,
-            redirectUri: window.location.origin + '/callback',
-            scope: 'openid profile email',
-            responseType: 'code'
-        });
-
-        // ✅ Supprimer loadDiscoveryDocument() — pas de serveur OpenID
-        // this.oauthService.loadDiscoveryDocument().then(() => {
-        //     this.oauthService.tryLogin();
-        // }).catch(error => {
-        //     console.error('Erreur lors du chargement du document de découverte :', error);
-        // });
-
-        // ✅ Garder seulement les events
-        this.oauthService.events.subscribe((event: any) => {
-            console.log('Événement OAuth reçu:', event);
-            if (event.type === 'token_received') {
-                console.log('Token reçu, chargement des informations utilisateur...');
-                this.loadUserInfo();
-            }
-        });
-    }
-
-    // ✅ Appel vers /api/v1/auth/token-by-uid → gateway → qf-users (8200)
-    async generateTokenByUid(uid: string): Promise<void> {
+    // ✅ GET /api/v1/users/{id}
+    public Optional<UserContextDTO.UserInfo> findById(UUID id, String bearerToken) {
         try {
-            const requestBody: UidRequestDTO = { uid };
-            const response = await this.http.post<AuthResponse>(
-                this.baseUrl,
-                requestBody
-            ).toPromise();
-
-            if (response && response.data.token) {
-                localStorage.setItem('access_token', response.data.token);
-                console.log('Token stocké:', response.data.token);
-                this.loadUserInfo();
-                this.isAuthenticatedSubject$.next(true);
-            } else {
-                throw new Error('Token not received');
-            }
-        } catch (error) {
-            console.error('Erreur lors de la génération du token :', error);
-            throw error;
+            UserContextDTO.UserInfo user = webClient.get()
+                .uri("/api/v1/users/{id}", id)
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {})
+                .map(ApiResponse::getData)
+                .block();
+            return Optional.ofNullable(user);
+        } catch (WebClientResponseException.NotFound e) {
+            log.warn("User non trouvé avec id: {}", id);
+            return Optional.empty();
+        } catch (Exception e) {
+            log.error("Erreur findById {}: {}", id, e.getMessage());
+            return Optional.empty();
         }
     }
 
-    loadUserInfo(): void {
-        const token = localStorage.getItem('access_token');
-        console.log('Token au démarrage:', token);
-
-        if (token) {
-            // Décodez le token pour obtenir les claims
-            const claims = jwtDecode(token) as any;
-
-            if (claims) {
-                const roles: Role[] = claims['roles'] || [];
-                const permissions: Permission[] = [];
-
-                roles.forEach(role => {
-                    if (role.permissions) {
-                        permissions.push(...role.permissions);
-                    }
-                });
-
-                console.log('Permissions chargées:', permissions);
-
-                const userInfo: UserInfo = {
-                    uid: claims['uid'],
-                    username: claims['sub'],
-                    email: claims['email'],
-                    firstName: claims['firstName'],
-                    lastName: claims['lastName'],
-                    profileName: claims['profileName'],
-                    profileId: claims['profileId'],
-                    profileActif: claims['profileActif'],
-                    profileDescription: claims['profileDescription'],
-                    profileCode: claims['profileCode'],
-                    agency: claims['agency'],
-                    roles: roles,
-                    permissions: permissions,
-                };
-
-                this.userInfoSubject$.next(userInfo);
-                this.isAuthenticatedSubject$.next(true);
-            } else {
-                console.error('Les claims sont vides.');
-            }
-        } else {
-            console.error('Aucun token trouvé.');
+    // ✅ GET /api/v1/users/current
+    public UserContextDTO.UserInfo getCurrentUser(String bearerToken) {
+        try {
+            return webClient.get()
+                .uri("/api/v1/users/current")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {})
+                .map(ApiResponse::getData)
+                .block();
+        } catch (Exception e) {
+            log.error("Erreur getCurrentUser: {}", e.getMessage());
+            return null;
         }
     }
 
-    isLoggedIn(): boolean {
-        return this.oauthService.hasValidAccessToken();
+    // ✅ GET /api/v1/users/{uid}/nplusone
+    public UserContextDTO.UserInfo getNPlusOne(String uid, String bearerToken) {
+        try {
+            return webClient.get()
+                .uri("/api/v1/users/{uid}/nplusone", uid)
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {})
+                .map(ApiResponse::getData)
+                .block();
+        } catch (Exception e) {
+            log.warn("Erreur getNPlusOne pour uid {}: {}", uid, e.getMessage());
+            return null;
+        }
     }
 
-    getUserInfo(): UserInfo | null {
-        return this.userInfoSubject$.getValue();
+    // ✅ GET /api/v1/users/uid/{uid}
+    public Optional<UserContextDTO.UserInfo> findByUid(String uid, String bearerToken) {
+        try {
+            UserContextDTO.UserInfo user = webClient.get()
+                .uri("/api/v1/users/uid/{uid}", uid)
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {})
+                .map(ApiResponse::getData)
+                .block();
+            return Optional.ofNullable(user);
+        } catch (WebClientResponseException.NotFound e) {
+            log.warn("User non trouvé avec uid: {}", uid);
+            return Optional.empty();
+        } catch (Exception e) {
+            log.error("Erreur findByUid {}: {}", uid, e.getMessage());
+            return Optional.empty();
+        }
     }
 
-    logout(): void {
-        localStorage.removeItem('access_token');
-        this.isAuthenticatedSubject$.next(false);
-        this.userInfoSubject$.next(null);
-        this.router.navigate(['/login']);
+    // ✅ GET /api/v1/users/eligible/unassignment
+    public Set<UserContextDTO.UserInfo> getUsersEligibleForUnassignment(String bearerToken) {
+        try {
+            List<UserContextDTO.UserInfo> users = webClient.get()
+                .uri("/api/v1/users/eligible/unassignment")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<ApiResponse<List<UserContextDTO.UserInfo>>>() {})
+                .map(ApiResponse::getData)
+                .block();
+            return users != null 
+                ? users.stream().collect(Collectors.toSet()) 
+                : Set.of();
+        } catch (Exception e) {
+            log.error("Erreur getUsersEligibleForUnassignment: {}", e.getMessage());
+            return Set.of();
+        }
     }
 }
 
+6. UserContextFilter.java
+javapackage com.bnpparibas.irb.qlickflow.filter;
+
+import com.bnpparibas.irb.qlickflow.client.UserClient;
+import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
+import com.bnpparibas.irb.qlickflow.context.UserContextHolder;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.Set;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class UserContextFilter extends OncePerRequestFilter {
+
+    private final UserContextHolder userContextHolder;
+    private final UserClient userClient;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String bearerToken = request.getHeader("Authorization");
+
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            try {
+                // 1. Infos depuis headers propagés par le gateway
+                String uid         = request.getHeader("X-User-Uid");
+                String username    = request.getHeader("X-User-Username");
+                String firstName   = request.getHeader("X-User-FirstName");
+                String lastName    = request.getHeader("X-User-LastName");
+                String profileCode = request.getHeader("X-User-Profile-Code");
+                String profileName = request.getHeader("X-User-Profile-Name");
+                String actifHeader = request.getHeader("X-User-Actif");
+                Boolean actif      = actifHeader != null 
+                    ? Boolean.parseBoolean(actifHeader) : null;
+
+                // 2. N+1 du user courant
+                UserContextDTO.UserInfo nPlusOne = null;
+                if (uid != null) {
+                    nPlusOne = userClient.getNPlusOne(uid, bearerToken);
+                }
+
+                // 3. User technique camunda (fixe)
+                UserContextDTO.UserInfo camundaUser =
+                    userClient.findByUid("camunda", bearerToken)
+                        .orElse(null);
+
+                // 4. Liste users éligibles pour désaffectation
+                Set<UserContextDTO.UserInfo> eligibles =
+                    userClient.getUsersEligibleForUnassignment(bearerToken);
+
+                // 5. Construire et stocker le contexte
+                UserContextDTO context = UserContextDTO.builder()
+                    .uid(uid)
+                    .username(username)
+                    .firstName(firstName)
+                    .lastName(lastName)
+                    .profileCode(profileCode)
+                    .profileName(profileName)
+                    .actif(actif)
+                    .nPlusOne(nPlusOne)
+                    .camundaUser(camundaUser)
+                    .usersEligibleForUnassignment(eligibles)
+                    .build();
+
+                userContextHolder.set(context);
+                log.debug("Contexte chargé — uid: {} profil: {}", uid, profileCode);
+
+            } catch (Exception e) {
+                log.warn("Erreur chargement contexte utilisateur: {}", e.getMessage());
+            }
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.contains("/auth/")
+            || path.contains("/actuator/")
+            || path.contains("/swagger-ui")
+            || path.contains("/v3/api-docs");
+    }
+}
+
+7. UserServiceImpl.java
+javapackage com.bnpparibas.irb.qlickflow.service.impl;
+
+import com.bnpparibas.irb.qlickflow.client.UserClient;
+import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
+import com.bnpparibas.irb.qlickflow.context.UserContextHolder;
+import com.bnpparibas.irb.qlickflow.model.UserModel;
+import com.bnpparibas.irb.qlickflow.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class UserServiceImpl implements UserService {
+
+    private final UserClient userClient;
+    private final UserContextHolder userContextHolder;
+    private final HttpServletRequest request;
+
+    private String getBearerToken() {
+        return request.getHeader("Authorization");
+    }
+
+    @Override
+    public Optional<UserModel> findById(UUID id) {
+        // ❌ Pas cacheable → UUID arbitraire
+        log.debug("findById HTTP: {}", id);
+        return userClient.findById(id, getBearerToken())
+            .map(this::mapToUserModel);
+    }
+
+    @Override
+    public UserModel getCurrentUser() {
+        // ✅ Depuis contexte — 0 appel HTTP
+        log.debug("getCurrentUser depuis contexte");
+        return mapToUserModel(userContextHolder.get());
+    }
+
+    @Override
+    public UserModel getNPlusOne(String uid) {
+        // ✅ Depuis contexte si c'est le user courant
+        if (userContextHolder.isLoaded()
+                && uid != null
+                && uid.equals(userContextHolder.get().getUid())) {
+            log.debug("getNPlusOne depuis contexte pour uid: {}", uid);
+            return mapToUserModel(userContextHolder.get().getNPlusOne());
+        }
+        // Fallback HTTP si uid différent
+        log.debug("getNPlusOne HTTP pour uid: {}", uid);
+        return mapToUserModel(userClient.getNPlusOne(uid, getBearerToken()));
+    }
+
+    @Override
+    public Optional<UserModel> findByUid(String uid) {
+        // ✅ "camunda" depuis contexte
+        if ("camunda".equals(uid) && userContextHolder.isLoaded()) {
+            log.debug("findByUid camunda depuis contexte");
+            return Optional.ofNullable(
+                mapToUserModel(userContextHolder.get().getCamundaUser())
+            );
+        }
+        // Fallback HTTP
+        log.debug("findByUid HTTP: {}", uid);
+        return userClient.findByUid(uid, getBearerToken())
+            .map(this::mapToUserModel);
+    }
+
+    @Override
+    public Set<UserModel> getUsersEligibleForUnassignment() {
+        // ✅ Depuis contexte — 0 appel HTTP
+        log.debug("getUsersEligibleForUnassignment depuis contexte");
+        return userContextHolder.get()
+            .getUsersEligibleForUnassignment()
+            .stream()
+            .map(this::mapToUserModel)
+            .collect(Collectors.toSet());
+    }
+
+    // ===========================
+    // Mapping UserContextDTO → UserModel
+    // ===========================
+
+    private UserModel mapToUserModel(UserContextDTO ctx) {
+        if (ctx == null) return null;
+        return UserModel.builder()
+            .uid(ctx.getUid())
+            .username(ctx.getUsername())
+            .firstName(ctx.getFirstName())
+            .lastName(ctx.getLastName())
+            .profileCode(ctx.getProfileCode())
+            .profileName(ctx.getProfileName())
+            .actif(ctx.getActif())
+            .build();
+    }
+
+    private UserModel mapToUserModel(UserContextDTO.UserInfo info) {
+        if (info == null) return null;
+        return UserModel.builder()
+            .id(info.getId())
+            .uid(info.getUid())
+            .username(info.getUsername())
+            .firstName(info.getFirstName())
+            .lastName(info.getLastName())
+            .email(info.getEmail())
+            .profileCode(info.getProfileCode())
+            .profileName(info.getProfileName())
+            .actif(info.getActif())
+            .build();
+    }
+}
+
+8. application.yml — ajouter dans qf-derog-tarif
+yamlservices:
+  qf-users:
+    url: http://localhost:8200
+
+Résumé des appels HTTP par requête :
+MéthodeSourceHTTPgetCurrentUser()Contexte (headers gateway)0 ✅getNPlusOne(uid courant)Contexte0 ✅getNPlusOne(autre uid)HTTP1findByUid("camunda")Contexte0 ✅findByUid(autre)HTTP1getUsersEligibleForUnassignment()Contexte0 ✅findById(UUID)HTTP1Au démarrage (filter)3 appels HTTP totalnPlusOne + camunda + eligibles
