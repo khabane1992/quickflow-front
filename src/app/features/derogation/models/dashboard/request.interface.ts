@@ -1311,8 +1311,7 @@ WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057c
 
 Voici tous les fichiers complets et exacts :
 
-1. UserContextDTO.java
-javapackage com.bnpparibas.irb.qlickflow.context;
+package com.bnpparibas.irb.qlickflow.context;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -1338,6 +1337,11 @@ public class UserContextDTO {
 
     private UserInfo nPlusOne;
     private UserInfo camundaUser;
+
+    // ✅ Ajout dpac et lmr
+    private UserInfo dpacUser;
+    private UserInfo lmrUser;
+
     private Set<UserInfo> usersEligibleForUnassignment;
 
     @Data
@@ -1354,12 +1358,43 @@ public class UserContextDTO {
         private String profileCode;
         private String profileName;
         private Boolean actif;
+        private AgenceInfo agence;
+        private GroupeInfo groupe;
+        private ZoneInfo zone;
 
         public String getFullName() {
-            return (firstName != null ? firstName : "") 
-                + " " 
+            return (firstName != null ? firstName : "")
+                + " "
                 + (lastName != null ? lastName : "");
         }
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AgenceInfo {
+        private UUID id;
+        private String nom;
+        private String code;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class GroupeInfo {
+        private UUID id;
+        private String nom;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ZoneInfo {
+        private UUID id;
+        private String nom;
     }
 }
 
@@ -1476,6 +1511,8 @@ public class UserModel {
 4. UserService.java
 javapackage com.bnpparibas.irb.qlickflow.service;
 
+package com.bnpparibas.irb.qlickflow.service;
+
 import com.bnpparibas.irb.qlickflow.model.UserModel;
 
 import java.util.Optional;
@@ -1485,18 +1522,17 @@ import java.util.UUID;
 public interface UserService {
 
     Optional<UserModel> findById(UUID id);
-
     UserModel getCurrentUser();
-
     UserModel getNPlusOne(String uid);
-
     Optional<UserModel> findByUid(String uid);
-
     Set<UserModel> getUsersEligibleForUnassignment();
+
+    // ✅ Ajout des méthodes manquantes
+    UserModel getDpacUser();
+    UserModel getLmrUser();
 }
 
-5. UserClient.java
-javapackage com.bnpparibas.irb.qlickflow.client;
+package com.bnpparibas.irb.qlickflow.client;
 
 import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
 import com.bnpparibas.irb.qlickflow.response.ApiResponse;
@@ -1526,7 +1562,6 @@ public class UserClient {
             .build();
     }
 
-    // ✅ GET /api/v1/users/{id}
     public Optional<UserContextDTO.UserInfo> findById(UUID id, String bearerToken) {
         try {
             UserContextDTO.UserInfo user = webClient.get()
@@ -1538,7 +1573,6 @@ public class UserClient {
                 .block();
             return Optional.ofNullable(user);
         } catch (WebClientResponseException.NotFound e) {
-            log.warn("User non trouvé avec id: {}", id);
             return Optional.empty();
         } catch (Exception e) {
             log.error("Erreur findById {}: {}", id, e.getMessage());
@@ -1546,7 +1580,6 @@ public class UserClient {
         }
     }
 
-    // ✅ GET /api/v1/users/current
     public UserContextDTO.UserInfo getCurrentUser(String bearerToken) {
         try {
             return webClient.get()
@@ -1562,7 +1595,6 @@ public class UserClient {
         }
     }
 
-    // ✅ GET /api/v1/users/{uid}/nplusone
     public UserContextDTO.UserInfo getNPlusOne(String uid, String bearerToken) {
         try {
             return webClient.get()
@@ -1573,12 +1605,43 @@ public class UserClient {
                 .map(ApiResponse::getData)
                 .block();
         } catch (Exception e) {
-            log.warn("Erreur getNPlusOne pour uid {}: {}", uid, e.getMessage());
+            log.warn("Erreur getNPlusOne uid {}: {}", uid, e.getMessage());
             return null;
         }
     }
 
-    // ✅ GET /api/v1/users/uid/{uid}
+    // ✅ GET /api/v1/users/dpac
+    public UserContextDTO.UserInfo getDpacUser(String bearerToken) {
+        try {
+            return webClient.get()
+                .uri("/api/v1/users/dpac")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {})
+                .map(ApiResponse::getData)
+                .block();
+        } catch (Exception e) {
+            log.warn("Erreur getDpacUser: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    // ✅ GET /api/v1/users/lmr
+    public UserContextDTO.UserInfo getLmrUser(String bearerToken) {
+        try {
+            return webClient.get()
+                .uri("/api/v1/users/lmr")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {})
+                .map(ApiResponse::getData)
+                .block();
+        } catch (Exception e) {
+            log.warn("Erreur getLmrUser: {}", e.getMessage());
+            return null;
+        }
+    }
+
     public Optional<UserContextDTO.UserInfo> findByUid(String uid, String bearerToken) {
         try {
             UserContextDTO.UserInfo user = webClient.get()
@@ -1590,7 +1653,6 @@ public class UserClient {
                 .block();
             return Optional.ofNullable(user);
         } catch (WebClientResponseException.NotFound e) {
-            log.warn("User non trouvé avec uid: {}", uid);
             return Optional.empty();
         } catch (Exception e) {
             log.error("Erreur findByUid {}: {}", uid, e.getMessage());
@@ -1598,7 +1660,6 @@ public class UserClient {
         }
     }
 
-    // ✅ GET /api/v1/users/eligible/unassignment
     public Set<UserContextDTO.UserInfo> getUsersEligibleForUnassignment(String bearerToken) {
         try {
             List<UserContextDTO.UserInfo> users = webClient.get()
@@ -1608,8 +1669,8 @@ public class UserClient {
                 .bodyToMono(new ParameterizedTypeReference<ApiResponse<List<UserContextDTO.UserInfo>>>() {})
                 .map(ApiResponse::getData)
                 .block();
-            return users != null 
-                ? users.stream().collect(Collectors.toSet()) 
+            return users != null
+                ? users.stream().collect(Collectors.toSet())
                 : Set.of();
         } catch (Exception e) {
             log.error("Erreur getUsersEligibleForUnassignment: {}", e.getMessage());
@@ -1618,8 +1679,28 @@ public class UserClient {
     }
 }
 
+
+
+
 6. UserContextFilter.java
 javapackage com.bnpparibas.irb.qlickflow.filter;
+
+import com.bnpparibas.irb.qlickflow.client.UserClient;
+import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
+import com.bnpparibas.irb.qlickflow.context.UserContextHolder;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.Set;
+
+package com.bnpparibas.irb.qlickflow.filter;
 
 import com.bnpparibas.irb.qlickflow.client.UserClient;
 import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
@@ -1654,7 +1735,7 @@ public class UserContextFilter extends OncePerRequestFilter {
 
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
             try {
-                // 1. Infos depuis headers propagés par le gateway
+                // 1. Headers gateway
                 String uid         = request.getHeader("X-User-Uid");
                 String username    = request.getHeader("X-User-Username");
                 String firstName   = request.getHeader("X-User-FirstName");
@@ -1662,25 +1743,33 @@ public class UserContextFilter extends OncePerRequestFilter {
                 String profileCode = request.getHeader("X-User-Profile-Code");
                 String profileName = request.getHeader("X-User-Profile-Name");
                 String actifHeader = request.getHeader("X-User-Actif");
-                Boolean actif      = actifHeader != null 
+                Boolean actif      = actifHeader != null
                     ? Boolean.parseBoolean(actifHeader) : null;
 
-                // 2. N+1 du user courant
+                // 2. N+1
                 UserContextDTO.UserInfo nPlusOne = null;
                 if (uid != null) {
                     nPlusOne = userClient.getNPlusOne(uid, bearerToken);
                 }
 
-                // 3. User technique camunda (fixe)
+                // 3. User camunda
                 UserContextDTO.UserInfo camundaUser =
                     userClient.findByUid("camunda", bearerToken)
                         .orElse(null);
 
-                // 4. Liste users éligibles pour désaffectation
+                // 4. ✅ DPAC
+                UserContextDTO.UserInfo dpacUser =
+                    userClient.getDpacUser(bearerToken);
+
+                // 5. ✅ LMR
+                UserContextDTO.UserInfo lmrUser =
+                    userClient.getLmrUser(bearerToken);
+
+                // 6. Eligibles
                 Set<UserContextDTO.UserInfo> eligibles =
                     userClient.getUsersEligibleForUnassignment(bearerToken);
 
-                // 5. Construire et stocker le contexte
+                // 7. Construire le contexte
                 UserContextDTO context = UserContextDTO.builder()
                     .uid(uid)
                     .username(username)
@@ -1691,6 +1780,8 @@ public class UserContextFilter extends OncePerRequestFilter {
                     .actif(actif)
                     .nPlusOne(nPlusOne)
                     .camundaUser(camundaUser)
+                    .dpacUser(dpacUser)
+                    .lmrUser(lmrUser)
                     .usersEligibleForUnassignment(eligibles)
                     .build();
 
@@ -1698,7 +1789,7 @@ public class UserContextFilter extends OncePerRequestFilter {
                 log.debug("Contexte chargé — uid: {} profil: {}", uid, profileCode);
 
             } catch (Exception e) {
-                log.warn("Erreur chargement contexte utilisateur: {}", e.getMessage());
+                log.warn("Erreur chargement contexte: {}", e.getMessage());
             }
         }
 
@@ -1715,8 +1806,10 @@ public class UserContextFilter extends OncePerRequestFilter {
     }
 }
 
-7. UserServiceImpl.java
-javapackage com.bnpparibas.irb.qlickflow.service.impl;
+
+
+
+package com.bnpparibas.irb.qlickflow.service.impl;
 
 import com.bnpparibas.irb.qlickflow.client.UserClient;
 import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
@@ -1748,7 +1841,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Optional<UserModel> findById(UUID id) {
-        // ❌ Pas cacheable → UUID arbitraire
         log.debug("findById HTTP: {}", id);
         return userClient.findById(id, getBearerToken())
             .map(this::mapToUserModel);
@@ -1756,35 +1848,30 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserModel getCurrentUser() {
-        // ✅ Depuis contexte — 0 appel HTTP
         log.debug("getCurrentUser depuis contexte");
-        return mapToUserModel(userContextHolder.get());
+        return mapContextToUserModel(userContextHolder.get());
     }
 
     @Override
     public UserModel getNPlusOne(String uid) {
-        // ✅ Depuis contexte si c'est le user courant
         if (userContextHolder.isLoaded()
                 && uid != null
                 && uid.equals(userContextHolder.get().getUid())) {
-            log.debug("getNPlusOne depuis contexte pour uid: {}", uid);
+            log.debug("getNPlusOne depuis contexte");
             return mapToUserModel(userContextHolder.get().getNPlusOne());
         }
-        // Fallback HTTP si uid différent
-        log.debug("getNPlusOne HTTP pour uid: {}", uid);
+        log.debug("getNPlusOne HTTP: {}", uid);
         return mapToUserModel(userClient.getNPlusOne(uid, getBearerToken()));
     }
 
     @Override
     public Optional<UserModel> findByUid(String uid) {
-        // ✅ "camunda" depuis contexte
         if ("camunda".equals(uid) && userContextHolder.isLoaded()) {
             log.debug("findByUid camunda depuis contexte");
             return Optional.ofNullable(
                 mapToUserModel(userContextHolder.get().getCamundaUser())
             );
         }
-        // Fallback HTTP
         log.debug("findByUid HTTP: {}", uid);
         return userClient.findByUid(uid, getBearerToken())
             .map(this::mapToUserModel);
@@ -1792,7 +1879,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Set<UserModel> getUsersEligibleForUnassignment() {
-        // ✅ Depuis contexte — 0 appel HTTP
         log.debug("getUsersEligibleForUnassignment depuis contexte");
         return userContextHolder.get()
             .getUsersEligibleForUnassignment()
@@ -1801,11 +1887,25 @@ public class UserServiceImpl implements UserService {
             .collect(Collectors.toSet());
     }
 
+    @Override
+    public UserModel getDpacUser() {
+        // ✅ Depuis contexte — 0 appel HTTP
+        log.debug("getDpacUser depuis contexte");
+        return mapToUserModel(userContextHolder.get().getDpacUser());
+    }
+
+    @Override
+    public UserModel getLmrUser() {
+        // ✅ Depuis contexte — 0 appel HTTP
+        log.debug("getLmrUser depuis contexte");
+        return mapToUserModel(userContextHolder.get().getLmrUser());
+    }
+
     // ===========================
-    // Mapping UserContextDTO → UserModel
+    // Mapping
     // ===========================
 
-    private UserModel mapToUserModel(UserContextDTO ctx) {
+    private UserModel mapContextToUserModel(UserContextDTO ctx) {
         if (ctx == null) return null;
         return UserModel.builder()
             .uid(ctx.getUid())
@@ -1830,10 +1930,37 @@ public class UserServiceImpl implements UserService {
             .profileCode(info.getProfileCode())
             .profileName(info.getProfileName())
             .actif(info.getActif())
+            .agence(mapAgence(info.getAgence()))
+            .groupe(mapGroupe(info.getGroupe()))
+            .zone(mapZone(info.getZone()))
+            .build();
+    }
+
+    private UserModel.AgenceModel mapAgence(UserContextDTO.AgenceInfo agence) {
+        if (agence == null) return null;
+        return UserModel.AgenceModel.builder()
+            .id(agence.getId())
+            .nom(agence.getNom())
+            .code(agence.getCode())
+            .build();
+    }
+
+    private UserModel.GroupeModel mapGroupe(UserContextDTO.GroupeInfo groupe) {
+        if (groupe == null) return null;
+        return UserModel.GroupeModel.builder()
+            .id(groupe.getId())
+            .nom(groupe.getNom())
+            .build();
+    }
+
+    private UserModel.ZoneModel mapZone(UserContextDTO.ZoneInfo zone) {
+        if (zone == null) return null;
+        return UserModel.ZoneModel.builder()
+            .id(zone.getId())
+            .nom(zone.getNom())
             .build();
     }
 }
-
 8. application.yml — ajouter dans qf-derog-tarif
 yamlservices:
   qf-users:
