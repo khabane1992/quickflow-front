@@ -1841,3 +1841,339 @@ yamlservices:
 
 Résumé des appels HTTP par requête :
 MéthodeSourceHTTPgetCurrentUser()Contexte (headers gateway)0 ✅getNPlusOne(uid courant)Contexte0 ✅getNPlusOne(autre uid)HTTP1findByUid("camunda")Contexte0 ✅findByUid(autre)HTTP1getUsersEligibleForUnassignment()Contexte0 ✅findById(UUID)HTTP1Au démarrage (filter)3 appels HTTP totalnPlusOne + camunda + eligibles
+
+
+
+
+
+
+
+
+
+
+Donc la liste est déjà personnalisée par qf-users selon le JWT. Notre implémentation répond bien au besoin MAIS il faut vérifier que UserModel contient assez d'infos pour mapToWfTaskUser().
+La réponse est OUI — voici pourquoi :
+UserContextFilter
+    └── appel HTTP → GET /api/v1/users/eligible/unassignment
+            ↓ qf-users calcule selon profil courant :
+            ├── DA  → findConseillersByAgence(currentUser.agence)
+            └── DZ  → findDirecteursByZone(currentUser.zone)
+            ↓ résultat stocké dans contexte
+                ↓
+DerogationRequestFacadeImpl.getEligibleUsersForDerogationsProcessing()
+    ├── userService.getCurrentUser()          → contexte ✅ 0 HTTP
+    ├── result.add(currentUser)               → OK
+    ├── result.add(mapToWfTaskUser(current))  → OK
+    └── userService.getUsersEligibleForUnassignment() → contexte ✅ 0 HTTP
+MAIS il faut s'assurer que UserContextDTO.UserInfo contient agence et zone pour que mapToWfTaskUser fonctionne. Voici la correction :
+
+UserContextDTO.java — ajouter agence et zone dans UserInfo
+javapackage com.bnpparibas.irb.qlickflow.context;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.Set;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserContextDTO {
+
+    private String uid;
+    private String username;
+    private String firstName;
+    private String lastName;
+    private String profileCode;
+    private String profileName;
+    private Boolean actif;
+
+    private UserInfo nPlusOne;
+    private UserInfo camundaUser;
+    private Set<UserInfo> usersEligibleForUnassignment;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UserInfo {
+        private UUID id;
+        private String uid;
+        private String username;
+        private String firstName;
+        private String lastName;
+        private String email;
+        private String profileCode;
+        private String profileName;
+        private Boolean actif;
+
+        // ✅ Nécessaire pour mapToWfTaskUser
+        private AgenceInfo agence;
+        private GroupeInfo groupe;
+        private ZoneInfo zone;
+
+        public String getFullName() {
+            return (firstName != null ? firstName : "")
+                + " "
+                + (lastName != null ? lastName : "");
+        }
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AgenceInfo {
+        private UUID id;
+        private String nom;
+        private String code;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class GroupeInfo {
+        private UUID id;
+        private String nom;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ZoneInfo {
+        private UUID id;
+        private String nom;
+    }
+}
+
+UserModel.java — ajouter agence et zone pour mapToWfTaskUser
+javapackage com.bnpparibas.irb.qlickflow.model;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserModel {
+
+    private UUID id;
+    private String uid;
+    private String username;
+    private String email;
+    private String firstName;
+    private String lastName;
+    private String profileCode;
+    private String profileName;
+    private Boolean actif;
+
+    // ✅ Nécessaire pour mapToWfTaskUser dans DerogationRequestFacadeImpl
+    private AgenceModel agence;
+    private GroupeModel groupe;
+    private ZoneModel zone;
+
+    public String getFullName() {
+        return (firstName != null ? firstName : "")
+            + " "
+            + (lastName != null ? lastName : "");
+    }
+
+    // ✅ Compatibilité avec getProfile().getCode()
+    public ProfileModel getProfile() {
+        if (profileCode == null) return null;
+        return new ProfileModel(profileCode, profileName);
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ProfileModel {
+        private String code;
+        private String name;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AgenceModel {
+        private UUID id;
+        private String nom;
+        private String code;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class GroupeModel {
+        private UUID id;
+        private String nom;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ZoneModel {
+        private UUID id;
+        private String nom;
+    }
+}
+
+UserServiceImpl.java — mapping complet avec agence/zone
+javapackage com.bnpparibas.irb.qlickflow.service.impl;
+
+import com.bnpparibas.irb.qlickflow.client.UserClient;
+import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
+import com.bnpparibas.irb.qlickflow.context.UserContextHolder;
+import com.bnpparibas.irb.qlickflow.model.UserModel;
+import com.bnpparibas.irb.qlickflow.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class UserServiceImpl implements UserService {
+
+    private final UserClient userClient;
+    private final UserContextHolder userContextHolder;
+    private final HttpServletRequest request;
+
+    private String getBearerToken() {
+        return request.getHeader("Authorization");
+    }
+
+    @Override
+    public Optional<UserModel> findById(UUID id) {
+        log.debug("findById HTTP: {}", id);
+        return userClient.findById(id, getBearerToken())
+            .map(this::mapToUserModel);
+    }
+
+    @Override
+    public UserModel getCurrentUser() {
+        log.debug("getCurrentUser depuis contexte");
+        return mapContextToUserModel(userContextHolder.get());
+    }
+
+    @Override
+    public UserModel getNPlusOne(String uid) {
+        if (userContextHolder.isLoaded()
+                && uid != null
+                && uid.equals(userContextHolder.get().getUid())) {
+            log.debug("getNPlusOne depuis contexte");
+            return mapToUserModel(userContextHolder.get().getNPlusOne());
+        }
+        log.debug("getNPlusOne HTTP: {}", uid);
+        return mapToUserModel(userClient.getNPlusOne(uid, getBearerToken()));
+    }
+
+    @Override
+    public Optional<UserModel> findByUid(String uid) {
+        if ("camunda".equals(uid) && userContextHolder.isLoaded()) {
+            log.debug("findByUid camunda depuis contexte");
+            return Optional.ofNullable(
+                mapToUserModel(userContextHolder.get().getCamundaUser())
+            );
+        }
+        log.debug("findByUid HTTP: {}", uid);
+        return userClient.findByUid(uid, getBearerToken())
+            .map(this::mapToUserModel);
+    }
+
+    @Override
+    public Set<UserModel> getUsersEligibleForUnassignment() {
+        // ✅ 0 appel HTTP — liste déjà filtrée par qf-users selon profil
+        log.debug("getUsersEligibleForUnassignment depuis contexte");
+        return userContextHolder.get()
+            .getUsersEligibleForUnassignment()
+            .stream()
+            .map(this::mapToUserModel)
+            .collect(Collectors.toSet());
+    }
+
+    // ===========================
+    // Mapping
+    // ===========================
+
+    private UserModel mapContextToUserModel(UserContextDTO ctx) {
+        if (ctx == null) return null;
+        return UserModel.builder()
+            .uid(ctx.getUid())
+            .username(ctx.getUsername())
+            .firstName(ctx.getFirstName())
+            .lastName(ctx.getLastName())
+            .profileCode(ctx.getProfileCode())
+            .profileName(ctx.getProfileName())
+            .actif(ctx.getActif())
+            .build();
+    }
+
+    private UserModel mapToUserModel(UserContextDTO.UserInfo info) {
+        if (info == null) return null;
+        return UserModel.builder()
+            .id(info.getId())
+            .uid(info.getUid())
+            .username(info.getUsername())
+            .firstName(info.getFirstName())
+            .lastName(info.getLastName())
+            .email(info.getEmail())
+            .profileCode(info.getProfileCode())
+            .profileName(info.getProfileName())
+            .actif(info.getActif())
+            // ✅ Mapping agence/groupe/zone
+            .agence(mapAgence(info.getAgence()))
+            .groupe(mapGroupe(info.getGroupe()))
+            .zone(mapZone(info.getZone()))
+            .build();
+    }
+
+    private UserModel.AgenceModel mapAgence(UserContextDTO.AgenceInfo agence) {
+        if (agence == null) return null;
+        return UserModel.AgenceModel.builder()
+            .id(agence.getId())
+            .nom(agence.getNom())
+            .code(agence.getCode())
+            .build();
+    }
+
+    private UserModel.GroupeModel mapGroupe(UserContextDTO.GroupeInfo groupe) {
+        if (groupe == null) return null;
+        return UserModel.GroupeModel.builder()
+            .id(groupe.getId())
+            .nom(groupe.getNom())
+            .build();
+    }
+
+    private UserModel.ZoneModel mapZone(UserContextDTO.ZoneInfo zone) {
+        if (zone == null) return null;
+        return UserModel.ZoneModel.builder()
+            .id(zone.getId())
+            .nom(zone.getNom())
+            .build();
+    }
+}
+
+Résumé final :
+AppelSourceHTTPgetCurrentUser()Contexte0 ✅getUsersEligibleForUnassignment()Contexte (filtrée par qf-users)0 ✅getNPlusOne(uid courant)Contexte0 ✅findByUid("camunda")Contexte0 ✅findById(UUID)HTTP1findByUid(autre)HTTP1Filter au démarrage3 appels HTTPnPlusOne + camunda + eligibles
