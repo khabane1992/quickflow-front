@@ -2177,3 +2177,17 @@ public class UserServiceImpl implements UserService {
 
 Résumé final :
 AppelSourceHTTPgetCurrentUser()Contexte0 ✅getUsersEligibleForUnassignment()Contexte (filtrée par qf-users)0 ✅getNPlusOne(uid courant)Contexte0 ✅findByUid("camunda")Contexte0 ✅findById(UUID)HTTP1findByUid(autre)HTTP1Filter au démarrage3 appels HTTPnPlusOne + camunda + eligibles
+
+
+
+    <!-- ✅ WebClient pour appels inter-microservices -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-webflux</artifactId>
+    </dependency>
+
+    <!-- Reactor Netty (inclus dans webflux, mais explicite si besoin) -->
+    <dependency>
+        <groupId>io.projectreactor.netty</groupId>
+        <artifactId>reactor-netty-http</artifactId>
+    </dependency>
