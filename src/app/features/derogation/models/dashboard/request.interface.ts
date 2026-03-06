@@ -2118,3 +2118,279 @@ public class UserServiceImpl implements UserService {
     }
 }
 
+
+
+@Slf4j
+@Component
+public class UserClient {
+
+    private final WebClient webClient;
+    private final ObjectMapper objectMapper;
+
+    public UserClient(@Value("${services.qf-users.url}") String qfUsersUrl,
+                      ObjectMapper objectMapper) {
+        this.webClient = WebClient.builder()
+                .baseUrl(qfUsersUrl)
+                .build();
+        this.objectMapper = objectMapper;
+    }
+
+    // ----------------------------------------------------------------
+    // Méthode utilitaire commune de désérialisation (évite la duplication)
+    // ----------------------------------------------------------------
+    private UserContextDTO.UserInfo fetchUserInfo(String uri,
+                                                   Object uriVar,
+                                                   String bearerToken,
+                                                   String methodName) {
+        try {
+            var spec = webClient.get()
+                    .uri(uri, uriVar != null ? uriVar : "")
+                    .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference
+                            ApiResponse<UserContextDTO.UserInfo>>() {})
+                    .map(ApiResponse::getData)
+                    .block();
+            return spec;
+        } catch (WebClientResponseException.NotFound e) {
+            log.warn("[{}] Utilisateur non trouvé : {}", methodName, e.getMessage());
+            return null;
+        } catch (Exception e) {
+            log.error("[{}] Erreur : {}", methodName, e.getMessage());
+            return null;
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // CORRIGÉ : findById (par UUID) → /api/v1/users/{id}
+    // ----------------------------------------------------------------
+    public Optional<UserContextDTO.UserInfo> findById(UUID id, String bearerToken) {
+        return Optional.ofNullable(
+                fetchUserInfo("/api/v1/users/{id}", id, bearerToken, "findById")
+        );
+    }
+
+    // ----------------------------------------------------------------
+    // NOUVEAU : findByUid (par uid String) → /api/v1/users/uid/{uid}
+    // ----------------------------------------------------------------
+    public Optional<UserContextDTO.UserInfo> findByUid(String uid, String bearerToken) {
+        return Optional.ofNullable(
+                fetchUserInfo("/api/v1/users/uid/{uid}", uid, bearerToken, "findByUid")
+        );
+    }
+
+    // ----------------------------------------------------------------
+    // CORRIGÉ : getCurrentUser → /api/v1/users/current
+    // ----------------------------------------------------------------
+    public UserContextDTO.UserInfo getCurrentUser(String bearerToken) {
+        return fetchUserInfo("/api/v1/users/current", null, bearerToken, "getCurrentUser");
+    }
+
+    // ----------------------------------------------------------------
+    // CORRIGÉ : getNPlusOne → /api/v1/users/{uid}/nplusone
+    // ----------------------------------------------------------------
+    public UserContextDTO.UserInfo getNPlusOne(String uid, String bearerToken) {
+        return fetchUserInfo("/api/v1/users/{uid}/nplusone", uid, bearerToken, "getNPlusOne");
+    }
+
+    // ----------------------------------------------------------------
+    // CORRIGÉ : getDpacUser → désérialisation unifiée
+    // ----------------------------------------------------------------
+    public UserContextDTO.UserInfo getDpacUser(String bearerToken) {
+        return fetchUserInfo("/api/v1/users/dpac", null, bearerToken, "getDpacUser");
+    }
+
+    // ----------------------------------------------------------------
+    // CORRIGÉ : getLmrUser → désérialisation unifiée
+    // ----------------------------------------------------------------
+    public UserContextDTO.UserInfo getLmrUser(String bearerToken) {
+        return fetchUserInfo("/api/v1/users/lmr", null, bearerToken, "getLmrUser");
+    }
+
+    // ----------------------------------------------------------------
+    // NOUVEAU : getUsersEligibleForUnassignment
+    // ----------------------------------------------------------------
+    public Set<UserContextDTO.UserInfo> getUsersEligibleForUnassignment(String bearerToken) {
+        try {
+            List<UserContextDTO.UserInfo> list = webClient.get()
+                    .uri("/api/v1/users/eligible/unassignment")
+                    .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference
+                            ApiResponse<List<UserContextDTO.UserInfo>>>() {})
+                    .map(ApiResponse::getData)
+                    .block();
+            return list != null ? new HashSet<>(list) : Set.of();
+        } catch (Exception e) {
+            log.warn("[getUsersEligibleForUnassignment] Erreur : {}", e.getMessage());
+            return Set.of();
+        }
+    }
+}
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class UserContextFilter extends OncePerRequestFilter {
+
+    private final UserContextHolder userContextHolder;
+    private final UserClient userClient;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String bearerToken = request.getHeader("Authorization");
+
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            try {
+
+                // ─────────────────────────────────────────────────
+                // 1. Headers propagés par le gateway
+                // ─────────────────────────────────────────────────
+                String uid       = request.getHeader("X-User-Uid");
+                String username  = request.getHeader("X-User-Username");
+                String firstName = request.getHeader("X-User-FirstName");
+                String lastName  = request.getHeader("X-User-LastName");
+                String actifHeader = request.getHeader("X-User-Actif");
+                Boolean actif = actifHeader != null
+                        ? Boolean.parseBoolean(actifHeader) : null;
+
+                // ─────────────────────────────────────────────────
+                // 2. User courant complet depuis qf-users
+                //    (contient profile imbriqué, agence, groupe, zone)
+                // ─────────────────────────────────────────────────
+                UserContextDTO.UserInfo currentUser = null;
+                try {
+                    currentUser = userClient.getCurrentUser(bearerToken);
+                    log.debug("currentUser chargé: uid={} profileCode={}",
+                            currentUser != null ? currentUser.getUid()         : null,
+                            currentUser != null ? currentUser.getProfileCode() : null);
+                } catch (Exception e) {
+                    log.warn("currentUser non disponible: {}", e.getMessage());
+                }
+
+                // ─────────────────────────────────────────────────
+                // 3. N+1 du user courant
+                // ─────────────────────────────────────────────────
+                UserContextDTO.UserInfo nPlusOne = null;
+                try {
+                    // Priorité : uid du header gateway, sinon uid du currentUser
+                    String uidToUse = uid != null ? uid
+                            : (currentUser != null ? currentUser.getUid() : null);
+
+                    if (uidToUse != null) {
+                        nPlusOne = userClient.getNPlusOne(uidToUse, bearerToken);
+                        log.debug("nPlusOne chargé: uid={}",
+                                nPlusOne != null ? nPlusOne.getUid() : null);
+                    }
+                } catch (Exception e) {
+                    log.warn("nPlusOne non disponible: {}", e.getMessage());
+                }
+
+                // ─────────────────────────────────────────────────
+                // 4. User technique Camunda
+                //    CORRIGÉ : findByUid (String) et non findById (UUID)
+                // ─────────────────────────────────────────────────
+                UserContextDTO.UserInfo camundaUser = null;
+                try {
+                    camundaUser = userClient.findByUid("camunda", bearerToken)
+                                            .orElse(null);
+                    log.debug("camundaUser chargé: {}",
+                            camundaUser != null ? camundaUser.getUid() : "null");
+                } catch (Exception e) {
+                    log.warn("camundaUser non disponible: {}", e.getMessage());
+                }
+
+                // ─────────────────────────────────────────────────
+                // 5. DPAC
+                // ─────────────────────────────────────────────────
+                UserContextDTO.UserInfo dpacUser = null;
+                try {
+                    dpacUser = userClient.getDpacUser(bearerToken);
+                    log.debug("dpacUser chargé: {}",
+                            dpacUser != null ? dpacUser.getUid() : "null");
+                } catch (Exception e) {
+                    log.warn("dpacUser non disponible: {}", e.getMessage());
+                }
+
+                // ─────────────────────────────────────────────────
+                // 6. LMR
+                // ─────────────────────────────────────────────────
+                UserContextDTO.UserInfo lmrUser = null;
+                try {
+                    lmrUser = userClient.getLmrUser(bearerToken);
+                    log.debug("lmrUser chargé: {}",
+                            lmrUser != null ? lmrUser.getUid() : "null");
+                } catch (Exception e) {
+                    log.warn("lmrUser non disponible: {}", e.getMessage());
+                }
+
+                // ─────────────────────────────────────────────────
+                // 7. Users éligibles pour désaffectation
+                // ─────────────────────────────────────────────────
+                Set<UserContextDTO.UserInfo> eligibles = Set.of();
+                try {
+                    eligibles = userClient.getUsersEligibleForUnassignment(bearerToken);
+                    log.debug("eligibles chargés: {} users", eligibles.size());
+                } catch (Exception e) {
+                    log.warn("eligibles non disponibles: {}", e.getMessage());
+                }
+
+                // ─────────────────────────────────────────────────
+                // 8. Construction du contexte
+                //    Priorité : headers gateway → sinon currentUser qf-users
+                // ─────────────────────────────────────────────────
+                UserContextDTO context = UserContextDTO.builder()
+                        .uid(uid != null ? uid
+                                : (currentUser != null ? currentUser.getUid() : null))
+                        .username(username != null ? username
+                                : (currentUser != null ? currentUser.getUsername() : null))
+                        .firstName(firstName != null ? firstName
+                                : (currentUser != null ? currentUser.getFirstName() : null))
+                        .lastName(lastName != null ? lastName
+                                : (currentUser != null ? currentUser.getLastName() : null))
+                        .actif(actif != null ? actif
+                                : (currentUser != null ? currentUser.getActif() : null))
+                        // currentUser complet avec profile imbriqué
+                        // getProfileCode() → currentUser.profile.code ✅
+                        .currentUser(currentUser)
+                        .nPlusOne(nPlusOne)
+                        .camundaUser(camundaUser)
+                        .dpacUser(dpacUser)
+                        .lmrUser(lmrUser)
+                        .usersEligibleForUnassignment(eligibles)
+                        .build();
+
+                userContextHolder.set(context);
+
+                log.debug("Contexte complet chargé — uid: {} profil: {} agence: {}",
+                        context.getUid(),
+                        context.getProfileCode(),
+                        context.getAgence() != null
+                                ? context.getAgence().getCode() : "null");
+
+            } catch (Exception e) {
+                log.warn("Erreur chargement contexte utilisateur: {}", e.getMessage());
+            }
+        }
+
+        // Toujours continuer, même si le contexte n'a pas pu être chargé
+        filterChain.doFilter(request, response);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Chemins exclus du filtre (pas de token requis)
+    // ─────────────────────────────────────────────────────────────────
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.contains("/auth/")
+                || path.contains("/actuator/")
+                || path.contains("/swagger-ui")
+                || path.contains("/v3/api-docs");
+    }
+}
+
