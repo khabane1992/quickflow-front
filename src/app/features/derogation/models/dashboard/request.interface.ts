@@ -2211,21 +2211,26 @@ public class UserClient {
     // NOUVEAU : getUsersEligibleForUnassignment
     // ----------------------------------------------------------------
     public Set<UserContextDTO.UserInfo> getUsersEligibleForUnassignment(String bearerToken) {
-        try {
-            List<UserContextDTO.UserInfo> list = webClient.get()
-                    .uri("/api/v1/users/eligible/unassignment")
-                    .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                    .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference
-                            ApiResponse<List<UserContextDTO.UserInfo>>>() {})
-                    .map(ApiResponse::getData)
-                    .block();
-            return list != null ? new HashSet<>(list) : Set.of();
-        } catch (Exception e) {
-            log.warn("[getUsersEligibleForUnassignment] Erreur : {}", e.getMessage());
-            return Set.of();
-        }
+    try {
+        // ✅ Extraire le ParameterizedTypeReference dans une variable séparée
+        ParameterizedTypeReference<ApiResponse<List<UserContextDTO.UserInfo>>> typeRef =
+                new ParameterizedTypeReference<ApiResponse<List<UserContextDTO.UserInfo>>>() {};
+
+        List<UserContextDTO.UserInfo> list = webClient.get()
+                .uri("/api/v1/users/eligible/unassignment")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(typeRef)
+                .map(ApiResponse::getData)
+                .block();
+
+        return list != null ? new HashSet<>(list) : Set.of();
+
+    } catch (Exception e) {
+        log.warn("[getUsersEligibleForUnassignment] Erreur : {}", e.getMessage());
+        return Set.of();
     }
+  }
 }
 
 @Slf4j
