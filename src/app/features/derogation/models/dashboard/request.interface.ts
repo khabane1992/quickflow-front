@@ -2508,3 +2508,119 @@ UserContextDTO.UserInfo {
     
     // getter de compatibilité
     getProfileCode() { return profile.getCode(); }
+
+
+  @Override
+protected void doFilterInternal(HttpServletRequest request,
+                                HttpServletResponse response,
+                                FilterChain filterChain)
+        throws ServletException, IOException {
+
+    String bearerToken = request.getHeader("Authorization");
+
+    if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+        try {
+            String uid         = request.getHeader("X-User-Uid");
+            String username    = request.getHeader("X-User-Username");
+            String firstName   = request.getHeader("X-User-FirstName");
+            String lastName    = request.getHeader("X-User-LastName");
+            String profileCode = request.getHeader("X-User-Profile-Code");
+            String profileName = request.getHeader("X-User-Profile-Name");
+            String actifHeader = request.getHeader("X-User-Actif");
+            Boolean actif      = actifHeader != null 
+                ? Boolean.parseBoolean(actifHeader) : null;
+
+            // ✅ Chaque appel indépendant — ne bloque pas si l'un échoue
+            UserContextDTO.UserInfo nPlusOne = null;
+            try {
+                if (uid != null) nPlusOne = userClient.getNPlusOne(uid, bearerToken);
+            } catch (Exception e) {
+                log.warn("nPlusOne non disponible: {}", e.getMessage());
+            }
+
+            UserContextDTO.UserInfo camundaUser = null;
+            try {
+                camundaUser = userClient.findByUid("camunda", bearerToken).orElse(null);
+            } catch (Exception e) {
+                log.warn("camundaUser non disponible: {}", e.getMessage());
+            }
+
+            UserContextDTO.UserInfo dpacUser = null;
+            try {
+                dpacUser = userClient.getDpacUser(bearerToken);
+            } catch (Exception e) {
+                log.warn("dpacUser non disponible: {}", e.getMessage());
+            }
+
+            UserContextDTO.UserInfo lmrUser = null;
+            try {
+                lmrUser = userClient.getLmrUser(bearerToken);
+            } catch (Exception e) {
+                log.warn("lmrUser non disponible: {}", e.getMessage());
+            }
+
+            Set<UserContextDTO.UserInfo> eligibles = Set.of();
+            try {
+                eligibles = userClient.getUsersEligibleForUnassignment(bearerToken);
+            } catch (Exception e) {
+                log.warn("eligibles non disponible: {}", e.getMessage());
+            }
+
+            UserContextDTO context = UserContextDTO.builder()
+                .uid(uid)
+                .username(username)
+                .firstName(firstName)
+                .lastName(lastName)
+                .profileCode(profileCode)
+                .profileName(profileName)
+                .actif(actif)
+                .nPlusOne(nPlusOne)
+                .camundaUser(camundaUser)
+                .dpacUser(dpacUser)
+                .lmrUser(lmrUser)
+                .usersEligibleForUnassignment(eligibles)
+                .build();
+
+            userContextHolder.set(context);
+            log.debug("Contexte chargé uid: {} profil: {}", uid, profileCode);
+
+        } catch (Exception e) {
+            log.warn("Erreur chargement contexte: {}", e.getMessage());
+        }
+    }
+
+    // ✅ Toujours continuer même si le contexte n'est pas chargé
+    filterChain.doFilter(request, response);
+}
+
+
+
+  public UserContextDTO.UserInfo getNPlusOne(String uid, String bearerToken) {
+    try {
+        return webClient.get()
+            .uri("/api/v1/users/{uid}/nplusone", uid)
+            .header(HttpHeaders.AUTHORIZATION, bearerToken)
+            .retrieve()
+            .bodyToMono(String.class) // ✅ D'abord en String pour débugger
+            .map(json -> {
+                log.debug("getNPlusOne response: {}", json); // ✅ voir le JSON réel
+                try {
+                    ObjectMapper mapper = new ObjectMapper();
+                    ApiResponse<UserContextDTO.UserInfo> response = 
+                        mapper.readValue(json, 
+                            new TypeReference<ApiResponse<UserContextDTO.UserInfo>>() {});
+                    return response.getData();
+                } catch (Exception e) {
+                    log.error("Erreur mapping getNPlusOne: {} | JSON: {}", 
+                        e.getMessage(), json);
+                    return null;
+                }
+            })
+            .block();
+    } catch (Exception e) {
+        log.warn("Erreur getNPlusOne uid {}: {}", uid, e.getMessage());
+        return null;
+    }
+}
+
+
