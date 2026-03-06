@@ -1309,8 +1309,6 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
-Voici tous les fichiers complets et exacts :
-
 package com.bnpparibas.irb.qlickflow.context;
 
 import lombok.AllArgsConstructor;
@@ -1331,18 +1329,39 @@ public class UserContextDTO {
     private String username;
     private String firstName;
     private String lastName;
-    private String profileCode;
-    private String profileName;
     private Boolean actif;
 
+    private UserInfo currentUser;
     private UserInfo nPlusOne;
     private UserInfo camundaUser;
-
-    // ✅ Ajout dpac et lmr
     private UserInfo dpacUser;
     private UserInfo lmrUser;
-
     private Set<UserInfo> usersEligibleForUnassignment;
+
+    // Getters de commodité depuis currentUser
+    public String getProfileCode() {
+        return currentUser != null ? currentUser.getProfileCode() : null;
+    }
+
+    public String getProfileName() {
+        return currentUser != null ? currentUser.getProfileName() : null;
+    }
+
+    public AgenceInfo getAgence() {
+        return currentUser != null ? currentUser.getAgence() : null;
+    }
+
+    public GroupeInfo getGroupe() {
+        return currentUser != null ? currentUser.getGroupe() : null;
+    }
+
+    public ZoneInfo getZone() {
+        return currentUser != null ? currentUser.getZone() : null;
+    }
+
+    // ===========================
+    // Classes imbriquées
+    // ===========================
 
     @Data
     @Builder
@@ -1355,18 +1374,38 @@ public class UserContextDTO {
         private String firstName;
         private String lastName;
         private String email;
-        private String profileCode;
-        private String profileName;
         private Boolean actif;
+
+        // Objet imbriqué comme dans qf-users
+        private ProfileInfo profile;
         private AgenceInfo agence;
         private GroupeInfo groupe;
         private ZoneInfo zone;
+
+        // Getters de compatibilité
+        public String getProfileCode() {
+            return profile != null ? profile.getCode() : null;
+        }
+
+        public String getProfileName() {
+            return profile != null ? profile.getName() : null;
+        }
 
         public String getFullName() {
             return (firstName != null ? firstName : "")
                 + " "
                 + (lastName != null ? lastName : "");
         }
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ProfileInfo {
+        private UUID id;
+        private String code;
+        private String name;
     }
 
     @Data
@@ -1398,8 +1437,7 @@ public class UserContextDTO {
     }
 }
 
-2. UserContextHolder.java
-javapackage com.bnpparibas.irb.qlickflow.context;
+package com.bnpparibas.irb.qlickflow.context;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.annotation.RequestScope;
@@ -1423,8 +1461,7 @@ public class UserContextHolder {
     }
 }
 
-3. UserModel.java
-javapackage com.bnpparibas.irb.qlickflow.model;
+package com.bnpparibas.irb.qlickflow.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -1454,12 +1491,12 @@ public class UserModel {
     private ZoneModel zone;
 
     public String getFullName() {
-        return (firstName != null ? firstName : "") 
-            + " " 
+        return (firstName != null ? firstName : "")
+            + " "
             + (lastName != null ? lastName : "");
     }
 
-    // ✅ Compatibilité avec getProfile().getCode()
+    // Compatibilité avec getProfile().getCode()
     public ProfileModel getProfile() {
         if (profileCode == null) return null;
         return new ProfileModel(profileCode, profileName);
@@ -1482,8 +1519,6 @@ public class UserModel {
         private UUID id;
         private String nom;
         private String code;
-        private UserModel directoryAgency;
-        private GroupeModel groupe;
     }
 
     @Data
@@ -1493,8 +1528,6 @@ public class UserModel {
     public static class GroupeModel {
         private UUID id;
         private String nom;
-        private UserModel directorGroup;
-        private ZoneModel zone;
     }
 
     @Data
@@ -1504,41 +1537,17 @@ public class UserModel {
     public static class ZoneModel {
         private UUID id;
         private String nom;
-        private UserModel directorZone;
     }
-}
-
-4. UserService.java
-javapackage com.bnpparibas.irb.qlickflow.service;
-
-package com.bnpparibas.irb.qlickflow.service;
-
-import com.bnpparibas.irb.qlickflow.model.UserModel;
-
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-
-public interface UserService {
-
-    Optional<UserModel> findById(UUID id);
-    UserModel getCurrentUser();
-    UserModel getNPlusOne(String uid);
-    Optional<UserModel> findByUid(String uid);
-    Set<UserModel> getUsersEligibleForUnassignment();
-
-    // ✅ Ajout des méthodes manquantes
-    UserModel getDpacUser();
-    UserModel getLmrUser();
 }
 
 package com.bnpparibas.irb.qlickflow.client;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
 import com.bnpparibas.irb.qlickflow.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -1555,39 +1564,36 @@ import java.util.stream.Collectors;
 public class UserClient {
 
     private final WebClient webClient;
+    private final ObjectMapper objectMapper;
 
     public UserClient(@Value("${services.qf-users.url}") String qfUsersUrl) {
         this.webClient = WebClient.builder()
             .baseUrl(qfUsersUrl)
             .build();
+        this.objectMapper = new ObjectMapper();
     }
 
-    public Optional<UserContextDTO.UserInfo> findById(UUID id, String bearerToken) {
-        try {
-            UserContextDTO.UserInfo user = webClient.get()
-                .uri("/api/v1/users/{id}", id)
-                .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {})
-                .map(ApiResponse::getData)
-                .block();
-            return Optional.ofNullable(user);
-        } catch (WebClientResponseException.NotFound e) {
-            return Optional.empty();
-        } catch (Exception e) {
-            log.error("Erreur findById {}: {}", id, e.getMessage());
-            return Optional.empty();
-        }
-    }
-
+    // GET /api/v1/users/current
     public UserContextDTO.UserInfo getCurrentUser(String bearerToken) {
         try {
             return webClient.get()
                 .uri("/api/v1/users/current")
                 .header(HttpHeaders.AUTHORIZATION, bearerToken)
                 .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {})
-                .map(ApiResponse::getData)
+                .bodyToMono(String.class)
+                .map(json -> {
+                    log.debug("getCurrentUser JSON: {}", json);
+                    try {
+                        ApiResponse<UserContextDTO.UserInfo> resp =
+                            objectMapper.readValue(json,
+                                new TypeReference<ApiResponse<UserContextDTO.UserInfo>>() {});
+                        return resp.getData();
+                    } catch (Exception e) {
+                        log.error("Mapping getCurrentUser error: {} | json: {}",
+                            e.getMessage(), json);
+                        return null;
+                    }
+                })
                 .block();
         } catch (Exception e) {
             log.error("Erreur getCurrentUser: {}", e.getMessage());
@@ -1595,64 +1601,61 @@ public class UserClient {
         }
     }
 
-    public UserContextDTO.UserInfo getNPlusOne(String uid, String bearerToken) {
+    // GET /api/v1/users/{id}
+    public Optional<UserContextDTO.UserInfo> findById(UUID id, String bearerToken) {
         try {
             return webClient.get()
-                .uri("/api/v1/users/{uid}/nplusone", uid)
+                .uri("/api/v1/users/{id}", id)
                 .header(HttpHeaders.AUTHORIZATION, bearerToken)
                 .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {})
-                .map(ApiResponse::getData)
+                .bodyToMono(String.class)
+                .map(json -> {
+                    log.debug("findById JSON: {}", json);
+                    try {
+                        ApiResponse<UserContextDTO.UserInfo> resp =
+                            objectMapper.readValue(json,
+                                new TypeReference<ApiResponse<UserContextDTO.UserInfo>>() {});
+                        return Optional.ofNullable(resp.getData());
+                    } catch (Exception e) {
+                        log.error("Mapping findById error: {} | json: {}",
+                            e.getMessage(), json);
+                        return Optional.<UserContextDTO.UserInfo>empty();
+                    }
+                })
                 .block();
+        } catch (WebClientResponseException.NotFound e) {
+            log.warn("User non trouvé avec id: {}", id);
+            return Optional.empty();
         } catch (Exception e) {
-            log.warn("Erreur getNPlusOne uid {}: {}", uid, e.getMessage());
-            return null;
+            log.error("Erreur findById {}: {}", id, e.getMessage());
+            return Optional.empty();
         }
     }
 
-    // ✅ GET /api/v1/users/dpac
-    public UserContextDTO.UserInfo getDpacUser(String bearerToken) {
-        try {
-            return webClient.get()
-                .uri("/api/v1/users/dpac")
-                .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {})
-                .map(ApiResponse::getData)
-                .block();
-        } catch (Exception e) {
-            log.warn("Erreur getDpacUser: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    // ✅ GET /api/v1/users/lmr
-    public UserContextDTO.UserInfo getLmrUser(String bearerToken) {
-        try {
-            return webClient.get()
-                .uri("/api/v1/users/lmr")
-                .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {})
-                .map(ApiResponse::getData)
-                .block();
-        } catch (Exception e) {
-            log.warn("Erreur getLmrUser: {}", e.getMessage());
-            return null;
-        }
-    }
-
+    // GET /api/v1/users/uid/{uid}
     public Optional<UserContextDTO.UserInfo> findByUid(String uid, String bearerToken) {
         try {
-            UserContextDTO.UserInfo user = webClient.get()
+            return webClient.get()
                 .uri("/api/v1/users/uid/{uid}", uid)
                 .header(HttpHeaders.AUTHORIZATION, bearerToken)
                 .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {})
-                .map(ApiResponse::getData)
+                .bodyToMono(String.class)
+                .map(json -> {
+                    log.debug("findByUid JSON: {}", json);
+                    try {
+                        ApiResponse<UserContextDTO.UserInfo> resp =
+                            objectMapper.readValue(json,
+                                new TypeReference<ApiResponse<UserContextDTO.UserInfo>>() {});
+                        return Optional.ofNullable(resp.getData());
+                    } catch (Exception e) {
+                        log.error("Mapping findByUid error: {} | json: {}",
+                            e.getMessage(), json);
+                        return Optional.<UserContextDTO.UserInfo>empty();
+                    }
+                })
                 .block();
-            return Optional.ofNullable(user);
         } catch (WebClientResponseException.NotFound e) {
+            log.warn("User non trouvé avec uid: {}", uid);
             return Optional.empty();
         } catch (Exception e) {
             log.error("Erreur findByUid {}: {}", uid, e.getMessage());
@@ -1660,45 +1663,121 @@ public class UserClient {
         }
     }
 
+    // GET /api/v1/users/{uid}/nplusone
+    public UserContextDTO.UserInfo getNPlusOne(String uid, String bearerToken) {
+        try {
+            return webClient.get()
+                .uri("/api/v1/users/{uid}/nplusone", uid)
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(String.class)
+                .map(json -> {
+                    log.debug("getNPlusOne JSON: {}", json);
+                    try {
+                        ApiResponse<UserContextDTO.UserInfo> resp =
+                            objectMapper.readValue(json,
+                                new TypeReference<ApiResponse<UserContextDTO.UserInfo>>() {});
+                        return resp.getData();
+                    } catch (Exception e) {
+                        log.error("Mapping getNPlusOne error: {} | json: {}",
+                            e.getMessage(), json);
+                        return null;
+                    }
+                })
+                .block();
+        } catch (Exception e) {
+            log.warn("Erreur getNPlusOne uid {}: {}", uid, e.getMessage());
+            return null;
+        }
+    }
+
+    // GET /api/v1/users/dpac
+    public UserContextDTO.UserInfo getDpacUser(String bearerToken) {
+        try {
+            return webClient.get()
+                .uri("/api/v1/users/dpac")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(String.class)
+                .map(json -> {
+                    log.debug("getDpacUser JSON: {}", json);
+                    try {
+                        ApiResponse<UserContextDTO.UserInfo> resp =
+                            objectMapper.readValue(json,
+                                new TypeReference<ApiResponse<UserContextDTO.UserInfo>>() {});
+                        return resp.getData();
+                    } catch (Exception e) {
+                        log.error("Mapping getDpacUser error: {} | json: {}",
+                            e.getMessage(), json);
+                        return null;
+                    }
+                })
+                .block();
+        } catch (Exception e) {
+            log.warn("Erreur getDpacUser: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    // GET /api/v1/users/lmr
+    public UserContextDTO.UserInfo getLmrUser(String bearerToken) {
+        try {
+            return webClient.get()
+                .uri("/api/v1/users/lmr")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(String.class)
+                .map(json -> {
+                    log.debug("getLmrUser JSON: {}", json);
+                    try {
+                        ApiResponse<UserContextDTO.UserInfo> resp =
+                            objectMapper.readValue(json,
+                                new TypeReference<ApiResponse<UserContextDTO.UserInfo>>() {});
+                        return resp.getData();
+                    } catch (Exception e) {
+                        log.error("Mapping getLmrUser error: {} | json: {}",
+                            e.getMessage(), json);
+                        return null;
+                    }
+                })
+                .block();
+        } catch (Exception e) {
+            log.warn("Erreur getLmrUser: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    // GET /api/v1/users/eligible/unassignment
     public Set<UserContextDTO.UserInfo> getUsersEligibleForUnassignment(String bearerToken) {
         try {
-            List<UserContextDTO.UserInfo> users = webClient.get()
+            return webClient.get()
                 .uri("/api/v1/users/eligible/unassignment")
                 .header(HttpHeaders.AUTHORIZATION, bearerToken)
                 .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<ApiResponse<List<UserContextDTO.UserInfo>>>() {})
-                .map(ApiResponse::getData)
+                .bodyToMono(String.class)
+                .map(json -> {
+                    log.debug("getUsersEligibleForUnassignment JSON: {}", json);
+                    try {
+                        ApiResponse<List<UserContextDTO.UserInfo>> resp =
+                            objectMapper.readValue(json,
+                                new TypeReference<ApiResponse<List<UserContextDTO.UserInfo>>>() {});
+                        List<UserContextDTO.UserInfo> data = resp.getData();
+                        return data != null
+                            ? data.stream().collect(Collectors.toSet())
+                            : Set.<UserContextDTO.UserInfo>of();
+                    } catch (Exception e) {
+                        log.error("Mapping getUsersEligibleForUnassignment error: {} | json: {}",
+                            e.getMessage(), json);
+                        return Set.<UserContextDTO.UserInfo>of();
+                    }
+                })
                 .block();
-            return users != null
-                ? users.stream().collect(Collectors.toSet())
-                : Set.of();
         } catch (Exception e) {
             log.error("Erreur getUsersEligibleForUnassignment: {}", e.getMessage());
             return Set.of();
         }
     }
 }
-
-
-
-
-6. UserContextFilter.java
-javapackage com.bnpparibas.irb.qlickflow.filter;
-
-import com.bnpparibas.irb.qlickflow.client.UserClient;
-import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
-import com.bnpparibas.irb.qlickflow.context.UserContextHolder;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
-
-import java.io.IOException;
-import java.util.Set;
 
 package com.bnpparibas.irb.qlickflow.filter;
 
@@ -1735,49 +1814,97 @@ public class UserContextFilter extends OncePerRequestFilter {
 
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
             try {
-                // 1. Headers gateway
+                // 1. Headers propagés par le gateway
                 String uid         = request.getHeader("X-User-Uid");
                 String username    = request.getHeader("X-User-Username");
                 String firstName   = request.getHeader("X-User-FirstName");
                 String lastName    = request.getHeader("X-User-LastName");
-                String profileCode = request.getHeader("X-User-Profile-Code");
-                String profileName = request.getHeader("X-User-Profile-Name");
                 String actifHeader = request.getHeader("X-User-Actif");
                 Boolean actif      = actifHeader != null
                     ? Boolean.parseBoolean(actifHeader) : null;
 
-                // 2. N+1
-                UserContextDTO.UserInfo nPlusOne = null;
-                if (uid != null) {
-                    nPlusOne = userClient.getNPlusOne(uid, bearerToken);
+                // 2. User courant complet depuis qf-users
+                // contient profile (imbriqué), agence, groupe, zone
+                UserContextDTO.UserInfo currentUser = null;
+                try {
+                    currentUser = userClient.getCurrentUser(bearerToken);
+                    log.debug("currentUser chargé: uid={} profileCode={}",
+                        currentUser != null ? currentUser.getUid() : null,
+                        currentUser != null ? currentUser.getProfileCode() : null);
+                } catch (Exception e) {
+                    log.warn("currentUser non disponible: {}", e.getMessage());
                 }
 
-                // 3. User camunda
-                UserContextDTO.UserInfo camundaUser =
-                    userClient.findByUid("camunda", bearerToken)
+                // 3. N+1 du user courant
+                UserContextDTO.UserInfo nPlusOne = null;
+                try {
+                    String uidToUse = uid != null ? uid
+                        : (currentUser != null ? currentUser.getUid() : null);
+                    if (uidToUse != null) {
+                        nPlusOne = userClient.getNPlusOne(uidToUse, bearerToken);
+                        log.debug("nPlusOne chargé: uid={}",
+                            nPlusOne != null ? nPlusOne.getUid() : null);
+                    }
+                } catch (Exception e) {
+                    log.warn("nPlusOne non disponible: {}", e.getMessage());
+                }
+
+                // 4. User technique camunda
+                UserContextDTO.UserInfo camundaUser = null;
+                try {
+                    camundaUser = userClient.findByUid("camunda", bearerToken)
                         .orElse(null);
+                    log.debug("camundaUser chargé: {}",
+                        camundaUser != null ? camundaUser.getUid() : "null");
+                } catch (Exception e) {
+                    log.warn("camundaUser non disponible: {}", e.getMessage());
+                }
 
-                // 4. ✅ DPAC
-                UserContextDTO.UserInfo dpacUser =
-                    userClient.getDpacUser(bearerToken);
+                // 5. DPAC
+                UserContextDTO.UserInfo dpacUser = null;
+                try {
+                    dpacUser = userClient.getDpacUser(bearerToken);
+                    log.debug("dpacUser chargé: {}",
+                        dpacUser != null ? dpacUser.getUid() : "null");
+                } catch (Exception e) {
+                    log.warn("dpacUser non disponible: {}", e.getMessage());
+                }
 
-                // 5. ✅ LMR
-                UserContextDTO.UserInfo lmrUser =
-                    userClient.getLmrUser(bearerToken);
+                // 6. LMR
+                UserContextDTO.UserInfo lmrUser = null;
+                try {
+                    lmrUser = userClient.getLmrUser(bearerToken);
+                    log.debug("lmrUser chargé: {}",
+                        lmrUser != null ? lmrUser.getUid() : "null");
+                } catch (Exception e) {
+                    log.warn("lmrUser non disponible: {}", e.getMessage());
+                }
 
-                // 6. Eligibles
-                Set<UserContextDTO.UserInfo> eligibles =
-                    userClient.getUsersEligibleForUnassignment(bearerToken);
+                // 7. Users éligibles pour désaffectation
+                Set<UserContextDTO.UserInfo> eligibles = Set.of();
+                try {
+                    eligibles = userClient.getUsersEligibleForUnassignment(bearerToken);
+                    log.debug("eligibles chargés: {} users", eligibles.size());
+                } catch (Exception e) {
+                    log.warn("eligibles non disponible: {}", e.getMessage());
+                }
 
-                // 7. Construire le contexte
+                // 8. Construire le contexte
+                // Priorité : headers gateway → sinon depuis currentUser qf-users
                 UserContextDTO context = UserContextDTO.builder()
-                    .uid(uid)
-                    .username(username)
-                    .firstName(firstName)
-                    .lastName(lastName)
-                    .profileCode(profileCode)
-                    .profileName(profileName)
-                    .actif(actif)
+                    .uid(uid != null ? uid
+                        : (currentUser != null ? currentUser.getUid() : null))
+                    .username(username != null ? username
+                        : (currentUser != null ? currentUser.getUsername() : null))
+                    .firstName(firstName != null ? firstName
+                        : (currentUser != null ? currentUser.getFirstName() : null))
+                    .lastName(lastName != null ? lastName
+                        : (currentUser != null ? currentUser.getLastName() : null))
+                    .actif(actif != null ? actif
+                        : (currentUser != null ? currentUser.getActif() : null))
+                    // currentUser complet avec profile imbriqué
+                    // getProfileCode() → currentUser.profile.code ✅
+                    .currentUser(currentUser)
                     .nPlusOne(nPlusOne)
                     .camundaUser(camundaUser)
                     .dpacUser(dpacUser)
@@ -1786,13 +1913,18 @@ public class UserContextFilter extends OncePerRequestFilter {
                     .build();
 
                 userContextHolder.set(context);
-                log.debug("Contexte chargé — uid: {} profil: {}", uid, profileCode);
+
+                log.debug("Contexte complet chargé — uid: {} profil: {} agence: {}",
+                    context.getUid(),
+                    context.getProfileCode(),
+                    context.getAgence() != null ? context.getAgence().getCode() : "null");
 
             } catch (Exception e) {
-                log.warn("Erreur chargement contexte: {}", e.getMessage());
+                log.warn("Erreur chargement contexte utilisateur: {}", e.getMessage());
             }
         }
 
+        // Toujours continuer même si contexte non chargé
         filterChain.doFilter(request, response);
     }
 
@@ -1806,8 +1938,37 @@ public class UserContextFilter extends OncePerRequestFilter {
     }
 }
 
+package com.bnpparibas.irb.qlickflow.service;
 
+import com.bnpparibas.irb.qlickflow.model.UserModel;
 
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+public interface UserService {
+
+    // Appel HTTP vers qf-users (UUID technique)
+    Optional<UserModel> findById(UUID id);
+
+    // Depuis contexte — 0 appel HTTP
+    UserModel getCurrentUser();
+
+    // Depuis contexte si uid courant, sinon HTTP
+    UserModel getNPlusOne(String uid);
+
+    // "camunda" depuis contexte, sinon HTTP
+    Optional<UserModel> findByUid(String uid);
+
+    // Depuis contexte — 0 appel HTTP
+    Set<UserModel> getUsersEligibleForUnassignment();
+
+    // Depuis contexte — 0 appel HTTP
+    UserModel getDpacUser();
+
+    // Depuis contexte — 0 appel HTTP
+    UserModel getLmrUser();
+}
 
 package com.bnpparibas.irb.qlickflow.service.impl;
 
@@ -1841,6 +2002,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Optional<UserModel> findById(UUID id) {
+        // Pas cacheable → UUID arbitraire selon la demande
         log.debug("findById HTTP: {}", id);
         return userClient.findById(id, getBearerToken())
             .map(this::mapToUserModel);
@@ -1848,30 +2010,35 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserModel getCurrentUser() {
+        // Depuis contexte — 0 appel HTTP
         log.debug("getCurrentUser depuis contexte");
-        return mapContextToUserModel(userContextHolder.get());
+        return mapToUserModel(userContextHolder.get().getCurrentUser());
     }
 
     @Override
     public UserModel getNPlusOne(String uid) {
+        // Depuis contexte si c'est le user courant
         if (userContextHolder.isLoaded()
                 && uid != null
                 && uid.equals(userContextHolder.get().getUid())) {
-            log.debug("getNPlusOne depuis contexte");
+            log.debug("getNPlusOne depuis contexte pour uid: {}", uid);
             return mapToUserModel(userContextHolder.get().getNPlusOne());
         }
-        log.debug("getNPlusOne HTTP: {}", uid);
+        // Fallback HTTP si uid différent
+        log.debug("getNPlusOne HTTP pour uid: {}", uid);
         return mapToUserModel(userClient.getNPlusOne(uid, getBearerToken()));
     }
 
     @Override
     public Optional<UserModel> findByUid(String uid) {
+        // "camunda" depuis contexte
         if ("camunda".equals(uid) && userContextHolder.isLoaded()) {
             log.debug("findByUid camunda depuis contexte");
             return Optional.ofNullable(
                 mapToUserModel(userContextHolder.get().getCamundaUser())
             );
         }
+        // Fallback HTTP
         log.debug("findByUid HTTP: {}", uid);
         return userClient.findByUid(uid, getBearerToken())
             .map(this::mapToUserModel);
@@ -1879,6 +2046,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Set<UserModel> getUsersEligibleForUnassignment() {
+        // Depuis contexte — 0 appel HTTP
         log.debug("getUsersEligibleForUnassignment depuis contexte");
         return userContextHolder.get()
             .getUsersEligibleForUnassignment()
@@ -1889,34 +2057,21 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserModel getDpacUser() {
-        // ✅ Depuis contexte — 0 appel HTTP
+        // Depuis contexte — 0 appel HTTP
         log.debug("getDpacUser depuis contexte");
         return mapToUserModel(userContextHolder.get().getDpacUser());
     }
 
     @Override
     public UserModel getLmrUser() {
-        // ✅ Depuis contexte — 0 appel HTTP
+        // Depuis contexte — 0 appel HTTP
         log.debug("getLmrUser depuis contexte");
         return mapToUserModel(userContextHolder.get().getLmrUser());
     }
 
     // ===========================
-    // Mapping
+    // Mapping UserContextDTO.UserInfo → UserModel
     // ===========================
-
-    private UserModel mapContextToUserModel(UserContextDTO ctx) {
-        if (ctx == null) return null;
-        return UserModel.builder()
-            .uid(ctx.getUid())
-            .username(ctx.getUsername())
-            .firstName(ctx.getFirstName())
-            .lastName(ctx.getLastName())
-            .profileCode(ctx.getProfileCode())
-            .profileName(ctx.getProfileName())
-            .actif(ctx.getActif())
-            .build();
-    }
 
     private UserModel mapToUserModel(UserContextDTO.UserInfo info) {
         if (info == null) return null;
@@ -1927,6 +2082,7 @@ public class UserServiceImpl implements UserService {
             .firstName(info.getFirstName())
             .lastName(info.getLastName())
             .email(info.getEmail())
+            // getProfileCode() utilise info.profile.code automatiquement
             .profileCode(info.getProfileCode())
             .profileName(info.getProfileName())
             .actif(info.getActif())
@@ -1961,666 +2117,4 @@ public class UserServiceImpl implements UserService {
             .build();
     }
 }
-8. application.yml — ajouter dans qf-derog-tarif
-yamlservices:
-  qf-users:
-    url: http://localhost:8200
-
-Résumé des appels HTTP par requête :
-MéthodeSourceHTTPgetCurrentUser()Contexte (headers gateway)0 ✅getNPlusOne(uid courant)Contexte0 ✅getNPlusOne(autre uid)HTTP1findByUid("camunda")Contexte0 ✅findByUid(autre)HTTP1getUsersEligibleForUnassignment()Contexte0 ✅findById(UUID)HTTP1Au démarrage (filter)3 appels HTTP totalnPlusOne + camunda + eligibles
-
-
-
-
-
-
-
-
-
-
-Donc la liste est déjà personnalisée par qf-users selon le JWT. Notre implémentation répond bien au besoin MAIS il faut vérifier que UserModel contient assez d'infos pour mapToWfTaskUser().
-La réponse est OUI — voici pourquoi :
-UserContextFilter
-    └── appel HTTP → GET /api/v1/users/eligible/unassignment
-            ↓ qf-users calcule selon profil courant :
-            ├── DA  → findConseillersByAgence(currentUser.agence)
-            └── DZ  → findDirecteursByZone(currentUser.zone)
-            ↓ résultat stocké dans contexte
-                ↓
-DerogationRequestFacadeImpl.getEligibleUsersForDerogationsProcessing()
-    ├── userService.getCurrentUser()          → contexte ✅ 0 HTTP
-    ├── result.add(currentUser)               → OK
-    ├── result.add(mapToWfTaskUser(current))  → OK
-    └── userService.getUsersEligibleForUnassignment() → contexte ✅ 0 HTTP
-MAIS il faut s'assurer que UserContextDTO.UserInfo contient agence et zone pour que mapToWfTaskUser fonctionne. Voici la correction :
-
-UserContextDTO.java — ajouter agence et zone dans UserInfo
-javapackage com.bnpparibas.irb.qlickflow.context;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.util.Set;
-import java.util.UUID;
-
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserContextDTO {
-
-    private String uid;
-    private String username;
-    private String firstName;
-    private String lastName;
-    private String profileCode;
-    private String profileName;
-    private Boolean actif;
-
-    private UserInfo nPlusOne;
-    private UserInfo camundaUser;
-    private Set<UserInfo> usersEligibleForUnassignment;
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class UserInfo {
-        private UUID id;
-        private String uid;
-        private String username;
-        private String firstName;
-        private String lastName;
-        private String email;
-        private String profileCode;
-        private String profileName;
-        private Boolean actif;
-
-        // ✅ Nécessaire pour mapToWfTaskUser
-        private AgenceInfo agence;
-        private GroupeInfo groupe;
-        private ZoneInfo zone;
-
-        public String getFullName() {
-            return (firstName != null ? firstName : "")
-                + " "
-                + (lastName != null ? lastName : "");
-        }
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class AgenceInfo {
-        private UUID id;
-        private String nom;
-        private String code;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class GroupeInfo {
-        private UUID id;
-        private String nom;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ZoneInfo {
-        private UUID id;
-        private String nom;
-    }
-}
-
-UserModel.java — ajouter agence et zone pour mapToWfTaskUser
-javapackage com.bnpparibas.irb.qlickflow.model;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.util.UUID;
-
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserModel {
-
-    private UUID id;
-    private String uid;
-    private String username;
-    private String email;
-    private String firstName;
-    private String lastName;
-    private String profileCode;
-    private String profileName;
-    private Boolean actif;
-
-    // ✅ Nécessaire pour mapToWfTaskUser dans DerogationRequestFacadeImpl
-    private AgenceModel agence;
-    private GroupeModel groupe;
-    private ZoneModel zone;
-
-    public String getFullName() {
-        return (firstName != null ? firstName : "")
-            + " "
-            + (lastName != null ? lastName : "");
-    }
-
-    // ✅ Compatibilité avec getProfile().getCode()
-    public ProfileModel getProfile() {
-        if (profileCode == null) return null;
-        return new ProfileModel(profileCode, profileName);
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ProfileModel {
-        private String code;
-        private String name;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class AgenceModel {
-        private UUID id;
-        private String nom;
-        private String code;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class GroupeModel {
-        private UUID id;
-        private String nom;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ZoneModel {
-        private UUID id;
-        private String nom;
-    }
-}
-
-UserServiceImpl.java — mapping complet avec agence/zone
-javapackage com.bnpparibas.irb.qlickflow.service.impl;
-
-import com.bnpparibas.irb.qlickflow.client.UserClient;
-import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
-import com.bnpparibas.irb.qlickflow.context.UserContextHolder;
-import com.bnpparibas.irb.qlickflow.model.UserModel;
-import com.bnpparibas.irb.qlickflow.service.UserService;
-import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
-
-@Slf4j
-@Service
-@RequiredArgsConstructor
-public class UserServiceImpl implements UserService {
-
-    private final UserClient userClient;
-    private final UserContextHolder userContextHolder;
-    private final HttpServletRequest request;
-
-    private String getBearerToken() {
-        return request.getHeader("Authorization");
-    }
-
-    @Override
-    public Optional<UserModel> findById(UUID id) {
-        log.debug("findById HTTP: {}", id);
-        return userClient.findById(id, getBearerToken())
-            .map(this::mapToUserModel);
-    }
-
-    @Override
-    public UserModel getCurrentUser() {
-        log.debug("getCurrentUser depuis contexte");
-        return mapContextToUserModel(userContextHolder.get());
-    }
-
-    @Override
-    public UserModel getNPlusOne(String uid) {
-        if (userContextHolder.isLoaded()
-                && uid != null
-                && uid.equals(userContextHolder.get().getUid())) {
-            log.debug("getNPlusOne depuis contexte");
-            return mapToUserModel(userContextHolder.get().getNPlusOne());
-        }
-        log.debug("getNPlusOne HTTP: {}", uid);
-        return mapToUserModel(userClient.getNPlusOne(uid, getBearerToken()));
-    }
-
-    @Override
-    public Optional<UserModel> findByUid(String uid) {
-        if ("camunda".equals(uid) && userContextHolder.isLoaded()) {
-            log.debug("findByUid camunda depuis contexte");
-            return Optional.ofNullable(
-                mapToUserModel(userContextHolder.get().getCamundaUser())
-            );
-        }
-        log.debug("findByUid HTTP: {}", uid);
-        return userClient.findByUid(uid, getBearerToken())
-            .map(this::mapToUserModel);
-    }
-
-    @Override
-    public Set<UserModel> getUsersEligibleForUnassignment() {
-        // ✅ 0 appel HTTP — liste déjà filtrée par qf-users selon profil
-        log.debug("getUsersEligibleForUnassignment depuis contexte");
-        return userContextHolder.get()
-            .getUsersEligibleForUnassignment()
-            .stream()
-            .map(this::mapToUserModel)
-            .collect(Collectors.toSet());
-    }
-
-    // ===========================
-    // Mapping
-    // ===========================
-
-    private UserModel mapContextToUserModel(UserContextDTO ctx) {
-        if (ctx == null) return null;
-        return UserModel.builder()
-            .uid(ctx.getUid())
-            .username(ctx.getUsername())
-            .firstName(ctx.getFirstName())
-            .lastName(ctx.getLastName())
-            .profileCode(ctx.getProfileCode())
-            .profileName(ctx.getProfileName())
-            .actif(ctx.getActif())
-            .build();
-    }
-
-    private UserModel mapToUserModel(UserContextDTO.UserInfo info) {
-        if (info == null) return null;
-        return UserModel.builder()
-            .id(info.getId())
-            .uid(info.getUid())
-            .username(info.getUsername())
-            .firstName(info.getFirstName())
-            .lastName(info.getLastName())
-            .email(info.getEmail())
-            .profileCode(info.getProfileCode())
-            .profileName(info.getProfileName())
-            .actif(info.getActif())
-            // ✅ Mapping agence/groupe/zone
-            .agence(mapAgence(info.getAgence()))
-            .groupe(mapGroupe(info.getGroupe()))
-            .zone(mapZone(info.getZone()))
-            .build();
-    }
-
-    private UserModel.AgenceModel mapAgence(UserContextDTO.AgenceInfo agence) {
-        if (agence == null) return null;
-        return UserModel.AgenceModel.builder()
-            .id(agence.getId())
-            .nom(agence.getNom())
-            .code(agence.getCode())
-            .build();
-    }
-
-    private UserModel.GroupeModel mapGroupe(UserContextDTO.GroupeInfo groupe) {
-        if (groupe == null) return null;
-        return UserModel.GroupeModel.builder()
-            .id(groupe.getId())
-            .nom(groupe.getNom())
-            .build();
-    }
-
-    private UserModel.ZoneModel mapZone(UserContextDTO.ZoneInfo zone) {
-        if (zone == null) return null;
-        return UserModel.ZoneModel.builder()
-            .id(zone.getId())
-            .nom(zone.getNom())
-            .build();
-    }
-}
-
-Résumé final :
-AppelSourceHTTPgetCurrentUser()Contexte0 ✅getUsersEligibleForUnassignment()Contexte (filtrée par qf-users)0 ✅getNPlusOne(uid courant)Contexte0 ✅findByUid("camunda")Contexte0 ✅findById(UUID)HTTP1findByUid(autre)HTTP1Filter au démarrage3 appels HTTPnPlusOne + camunda + eligibles
-
-
-
-    <!-- ✅ WebClient pour appels inter-microservices -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-webflux</artifactId>
-    </dependency>
-
-    <!-- Reactor Netty (inclus dans webflux, mais explicite si besoin) -->
-    <dependency>
-        <groupId>io.projectreactor.netty</groupId>
-        <artifactId>reactor-netty-http</artifactId>
-    </dependency>
-
-
-
-
-Le problème vient du fait que dans qf-users, profile est une relation @ManyToOne — donc le JSON retourné a un objet profile imbriqué, pas un champ plat profileCode !
-JSON retourné par qf-users :
-json{
-  "data": {
-    "uid": "h70001",
-    "firstName": "John",
-    "profile": {           
-      "code": "CONSEILLER",
-      "name": "Conseiller"
-    },
-    "agence": {
-      "id": "...",
-      "nom": "...",
-      "code": "..."
-    }
-  }
-}
-Mais UserContextDTO.UserInfo attend :
-javaprivate String profileCode;  // ❌ champ plat — reste null !
-
-Fix — UserContextDTO.UserInfo — ajouter l'objet profile imbriqué
-java@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public static class UserInfo {
-    private UUID id;
-    private String uid;
-    private String username;
-    private String firstName;
-    private String lastName;
-    private String email;
-    private Boolean actif;
-
-    // ✅ Objet imbriqué comme dans qf-users
-    private ProfileInfo profile;
-    private AgenceInfo agence;
-    private GroupeInfo groupe;
-    private ZoneInfo zone;
-
-    // ✅ Getter de compatibilité pour le code existant
-    public String getProfileCode() {
-        return profile != null ? profile.getCode() : null;
-    }
-
-    public String getProfileName() {
-        return profile != null ? profile.getName() : null;
-    }
-
-    public String getFullName() {
-        return (firstName != null ? firstName : "")
-            + " "
-            + (lastName != null ? lastName : "");
-    }
-}
-
-// ✅ Nouveau
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public static class ProfileInfo {
-    private UUID id;
-    private String code;
-    private String name;
-}
-
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public static class AgenceInfo {
-    private UUID id;
-    private String nom;
-    private String code;
-}
-
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public static class GroupeInfo {
-    private UUID id;
-    private String nom;
-}
-
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public static class ZoneInfo {
-    private UUID id;
-    private String nom;
-}
-
-Fix — UserServiceImpl.java — le mapping reste identique car getProfileCode() existe toujours
-javaprivate UserModel mapToUserModel(UserContextDTO.UserInfo info) {
-    if (info == null) return null;
-    return UserModel.builder()
-        .id(info.getId())
-        .uid(info.getUid())
-        .username(info.getUsername())
-        .firstName(info.getFirstName())
-        .lastName(info.getLastName())
-        .email(info.getEmail())
-        // ✅ getProfileCode() utilise info.profile.code automatiquement
-        .profileCode(info.getProfileCode())
-        .profileName(info.getProfileName())
-        .actif(info.getActif())
-        .agence(mapAgence(info.getAgence()))
-        .groupe(mapGroupe(info.getGroupe()))
-        .zone(mapZone(info.getZone()))
-        .build();
-}
-
-Fix — UserContextFilter.java — profileCode depuis l'objet UserInfo
-java// Les headers gateway pour profileCode peuvent aussi être null
-// si le gateway ne les propage pas — utiliser directement l'appel HTTP
-
-// ✅ Récupérer le user courant complet depuis qf-users
-UserContextDTO.UserInfo currentUser = userClient.getCurrentUser(bearerToken);
-
-// ✅ Construire le contexte avec profile depuis l'objet UserInfo
-UserContextDTO context = UserContextDTO.builder()
-    .uid(uid != null ? uid : (currentUser != null ? currentUser.getUid() : null))
-    .username(username != null ? username : (currentUser != null ? currentUser.getUsername() : null))
-    .firstName(firstName != null ? firstName : (currentUser != null ? currentUser.getFirstName() : null))
-    .lastName(lastName != null ? lastName : (currentUser != null ? currentUser.getLastName() : null))
-    // ✅ profileCode depuis l'objet UserInfo — pas depuis le header
-    .profileCode(currentUser != null ? currentUser.getProfileCode() : null)
-    .profileName(currentUser != null ? currentUser.getProfileName() : null)
-    .actif(actif)
-    .nPlusOne(nPlusOne)
-    .camundaUser(camundaUser)
-    .dpacUser(dpacUser)
-    .lmrUser(lmrUser)
-    .usersEligibleForUnassignment(eligibles)
-    .build();
-
-Vérification — logger le JSON brut dans UserClient
-javapublic UserContextDTO.UserInfo getCurrentUser(String bearerToken) {
-    try {
-        return webClient.get()
-            .uri("/api/v1/users/current")
-            .header(HttpHeaders.AUTHORIZATION, bearerToken)
-            .retrieve()
-            .bodyToMono(String.class)
-            .map(json -> {
-                // ✅ Logger pour voir la vraie structure JSON
-                log.debug("getCurrentUser JSON: {}", json);
-                try {
-                    ObjectMapper mapper = new ObjectMapper();
-                    ApiResponse<UserContextDTO.UserInfo> resp =
-                        mapper.readValue(json,
-                            new TypeReference<>() {});
-                    return resp.getData();
-                } catch (Exception e) {
-                    log.error("Mapping error: {} | json: {}", e.getMessage(), json);
-                    return null;
-                }
-            })
-            .block();
-    } catch (Exception e) {
-        log.error("Erreur getCurrentUser: {}", e.getMessage());
-        return null;
-    }
-}
-```
-
----
-
-**Résumé du problème :**
-```
-qf-users retourne :          UserContextDTO.UserInfo attendait :
-{                            
-  "profile": {          ≠    profileCode: String  ← NULL !
-    "code": "CONSEILLER"     
-  }                          
-}                            
-
-✅ Fix :
-UserContextDTO.UserInfo {
-    ProfileInfo profile;     ← objet imbriqué
-    
-    // getter de compatibilité
-    getProfileCode() { return profile.getCode(); }
-
-
-  @Override
-protected void doFilterInternal(HttpServletRequest request,
-                                HttpServletResponse response,
-                                FilterChain filterChain)
-        throws ServletException, IOException {
-
-    String bearerToken = request.getHeader("Authorization");
-
-    if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-        try {
-            String uid         = request.getHeader("X-User-Uid");
-            String username    = request.getHeader("X-User-Username");
-            String firstName   = request.getHeader("X-User-FirstName");
-            String lastName    = request.getHeader("X-User-LastName");
-            String profileCode = request.getHeader("X-User-Profile-Code");
-            String profileName = request.getHeader("X-User-Profile-Name");
-            String actifHeader = request.getHeader("X-User-Actif");
-            Boolean actif      = actifHeader != null 
-                ? Boolean.parseBoolean(actifHeader) : null;
-
-            // ✅ Chaque appel indépendant — ne bloque pas si l'un échoue
-            UserContextDTO.UserInfo nPlusOne = null;
-            try {
-                if (uid != null) nPlusOne = userClient.getNPlusOne(uid, bearerToken);
-            } catch (Exception e) {
-                log.warn("nPlusOne non disponible: {}", e.getMessage());
-            }
-
-            UserContextDTO.UserInfo camundaUser = null;
-            try {
-                camundaUser = userClient.findByUid("camunda", bearerToken).orElse(null);
-            } catch (Exception e) {
-                log.warn("camundaUser non disponible: {}", e.getMessage());
-            }
-
-            UserContextDTO.UserInfo dpacUser = null;
-            try {
-                dpacUser = userClient.getDpacUser(bearerToken);
-            } catch (Exception e) {
-                log.warn("dpacUser non disponible: {}", e.getMessage());
-            }
-
-            UserContextDTO.UserInfo lmrUser = null;
-            try {
-                lmrUser = userClient.getLmrUser(bearerToken);
-            } catch (Exception e) {
-                log.warn("lmrUser non disponible: {}", e.getMessage());
-            }
-
-            Set<UserContextDTO.UserInfo> eligibles = Set.of();
-            try {
-                eligibles = userClient.getUsersEligibleForUnassignment(bearerToken);
-            } catch (Exception e) {
-                log.warn("eligibles non disponible: {}", e.getMessage());
-            }
-
-            UserContextDTO context = UserContextDTO.builder()
-                .uid(uid)
-                .username(username)
-                .firstName(firstName)
-                .lastName(lastName)
-                .profileCode(profileCode)
-                .profileName(profileName)
-                .actif(actif)
-                .nPlusOne(nPlusOne)
-                .camundaUser(camundaUser)
-                .dpacUser(dpacUser)
-                .lmrUser(lmrUser)
-                .usersEligibleForUnassignment(eligibles)
-                .build();
-
-            userContextHolder.set(context);
-            log.debug("Contexte chargé uid: {} profil: {}", uid, profileCode);
-
-        } catch (Exception e) {
-            log.warn("Erreur chargement contexte: {}", e.getMessage());
-        }
-    }
-
-    // ✅ Toujours continuer même si le contexte n'est pas chargé
-    filterChain.doFilter(request, response);
-}
-
-
-
-  public UserContextDTO.UserInfo getNPlusOne(String uid, String bearerToken) {
-    try {
-        return webClient.get()
-            .uri("/api/v1/users/{uid}/nplusone", uid)
-            .header(HttpHeaders.AUTHORIZATION, bearerToken)
-            .retrieve()
-            .bodyToMono(String.class) // ✅ D'abord en String pour débugger
-            .map(json -> {
-                log.debug("getNPlusOne response: {}", json); // ✅ voir le JSON réel
-                try {
-                    ObjectMapper mapper = new ObjectMapper();
-                    ApiResponse<UserContextDTO.UserInfo> response = 
-                        mapper.readValue(json, 
-                            new TypeReference<ApiResponse<UserContextDTO.UserInfo>>() {});
-                    return response.getData();
-                } catch (Exception e) {
-                    log.error("Erreur mapping getNPlusOne: {} | JSON: {}", 
-                        e.getMessage(), json);
-                    return null;
-                }
-            })
-            .block();
-    } catch (Exception e) {
-        log.warn("Erreur getNPlusOne uid {}: {}", uid, e.getMessage());
-        return null;
-    }
-}
-
 
