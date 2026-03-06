@@ -2139,27 +2139,32 @@ public class UserClient {
     // Méthode utilitaire commune de désérialisation (évite la duplication)
     // ----------------------------------------------------------------
     private UserContextDTO.UserInfo fetchUserInfo(String uri,
-                                                   Object uriVar,
-                                                   String bearerToken,
-                                                   String methodName) {
-        try {
-            var spec = webClient.get()
-                    .uri(uri, uriVar != null ? uriVar : "")
-                    .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                    .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference
-                            ApiResponse<UserContextDTO.UserInfo>>() {})
-                    .map(ApiResponse::getData)
-                    .block();
-            return spec;
-        } catch (WebClientResponseException.NotFound e) {
-            log.warn("[{}] Utilisateur non trouvé : {}", methodName, e.getMessage());
-            return null;
-        } catch (Exception e) {
-            log.error("[{}] Erreur : {}", methodName, e.getMessage());
-            return null;
-        }
+                                               Object uriVar,
+                                               String bearerToken,
+                                               String methodName) {
+    try {
+        // ✅ Extraire le type dans une variable séparée
+        ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>> typeRef =
+                new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {};
+
+        UserContextDTO.UserInfo result = webClient.get()
+                .uri(uri, uriVar != null ? uriVar : "")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(typeRef)
+                .map(ApiResponse::getData)
+                .block();
+
+        return result;
+
+    } catch (WebClientResponseException.NotFound e) {
+        log.warn("[{}] Utilisateur non trouvé : {}", methodName, e.getMessage());
+        return null;
+    } catch (Exception e) {
+        log.error("[{}] Erreur : {}", methodName, e.getMessage());
+        return null;
     }
+}
 
     // ----------------------------------------------------------------
     // CORRIGÉ : findById (par UUID) → /api/v1/users/{id}
