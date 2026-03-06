@@ -2318,3 +2318,193 @@ AppelSourceHTTPgetCurrentUser()Contexte0 ✅getUsersEligibleForUnassignment()Con
         <groupId>io.projectreactor.netty</groupId>
         <artifactId>reactor-netty-http</artifactId>
     </dependency>
+
+
+
+
+Le problème vient du fait que dans qf-users, profile est une relation @ManyToOne — donc le JSON retourné a un objet profile imbriqué, pas un champ plat profileCode !
+JSON retourné par qf-users :
+json{
+  "data": {
+    "uid": "h70001",
+    "firstName": "John",
+    "profile": {           
+      "code": "CONSEILLER",
+      "name": "Conseiller"
+    },
+    "agence": {
+      "id": "...",
+      "nom": "...",
+      "code": "..."
+    }
+  }
+}
+Mais UserContextDTO.UserInfo attend :
+javaprivate String profileCode;  // ❌ champ plat — reste null !
+
+Fix — UserContextDTO.UserInfo — ajouter l'objet profile imbriqué
+java@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public static class UserInfo {
+    private UUID id;
+    private String uid;
+    private String username;
+    private String firstName;
+    private String lastName;
+    private String email;
+    private Boolean actif;
+
+    // ✅ Objet imbriqué comme dans qf-users
+    private ProfileInfo profile;
+    private AgenceInfo agence;
+    private GroupeInfo groupe;
+    private ZoneInfo zone;
+
+    // ✅ Getter de compatibilité pour le code existant
+    public String getProfileCode() {
+        return profile != null ? profile.getCode() : null;
+    }
+
+    public String getProfileName() {
+        return profile != null ? profile.getName() : null;
+    }
+
+    public String getFullName() {
+        return (firstName != null ? firstName : "")
+            + " "
+            + (lastName != null ? lastName : "");
+    }
+}
+
+// ✅ Nouveau
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public static class ProfileInfo {
+    private UUID id;
+    private String code;
+    private String name;
+}
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public static class AgenceInfo {
+    private UUID id;
+    private String nom;
+    private String code;
+}
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public static class GroupeInfo {
+    private UUID id;
+    private String nom;
+}
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public static class ZoneInfo {
+    private UUID id;
+    private String nom;
+}
+
+Fix — UserServiceImpl.java — le mapping reste identique car getProfileCode() existe toujours
+javaprivate UserModel mapToUserModel(UserContextDTO.UserInfo info) {
+    if (info == null) return null;
+    return UserModel.builder()
+        .id(info.getId())
+        .uid(info.getUid())
+        .username(info.getUsername())
+        .firstName(info.getFirstName())
+        .lastName(info.getLastName())
+        .email(info.getEmail())
+        // ✅ getProfileCode() utilise info.profile.code automatiquement
+        .profileCode(info.getProfileCode())
+        .profileName(info.getProfileName())
+        .actif(info.getActif())
+        .agence(mapAgence(info.getAgence()))
+        .groupe(mapGroupe(info.getGroupe()))
+        .zone(mapZone(info.getZone()))
+        .build();
+}
+
+Fix — UserContextFilter.java — profileCode depuis l'objet UserInfo
+java// Les headers gateway pour profileCode peuvent aussi être null
+// si le gateway ne les propage pas — utiliser directement l'appel HTTP
+
+// ✅ Récupérer le user courant complet depuis qf-users
+UserContextDTO.UserInfo currentUser = userClient.getCurrentUser(bearerToken);
+
+// ✅ Construire le contexte avec profile depuis l'objet UserInfo
+UserContextDTO context = UserContextDTO.builder()
+    .uid(uid != null ? uid : (currentUser != null ? currentUser.getUid() : null))
+    .username(username != null ? username : (currentUser != null ? currentUser.getUsername() : null))
+    .firstName(firstName != null ? firstName : (currentUser != null ? currentUser.getFirstName() : null))
+    .lastName(lastName != null ? lastName : (currentUser != null ? currentUser.getLastName() : null))
+    // ✅ profileCode depuis l'objet UserInfo — pas depuis le header
+    .profileCode(currentUser != null ? currentUser.getProfileCode() : null)
+    .profileName(currentUser != null ? currentUser.getProfileName() : null)
+    .actif(actif)
+    .nPlusOne(nPlusOne)
+    .camundaUser(camundaUser)
+    .dpacUser(dpacUser)
+    .lmrUser(lmrUser)
+    .usersEligibleForUnassignment(eligibles)
+    .build();
+
+Vérification — logger le JSON brut dans UserClient
+javapublic UserContextDTO.UserInfo getCurrentUser(String bearerToken) {
+    try {
+        return webClient.get()
+            .uri("/api/v1/users/current")
+            .header(HttpHeaders.AUTHORIZATION, bearerToken)
+            .retrieve()
+            .bodyToMono(String.class)
+            .map(json -> {
+                // ✅ Logger pour voir la vraie structure JSON
+                log.debug("getCurrentUser JSON: {}", json);
+                try {
+                    ObjectMapper mapper = new ObjectMapper();
+                    ApiResponse<UserContextDTO.UserInfo> resp =
+                        mapper.readValue(json,
+                            new TypeReference<>() {});
+                    return resp.getData();
+                } catch (Exception e) {
+                    log.error("Mapping error: {} | json: {}", e.getMessage(), json);
+                    return null;
+                }
+            })
+            .block();
+    } catch (Exception e) {
+        log.error("Erreur getCurrentUser: {}", e.getMessage());
+        return null;
+    }
+}
+```
+
+---
+
+**Résumé du problème :**
+```
+qf-users retourne :          UserContextDTO.UserInfo attendait :
+{                            
+  "profile": {          ≠    profileCode: String  ← NULL !
+    "code": "CONSEILLER"     
+  }                          
+}                            
+
+✅ Fix :
+UserContextDTO.UserInfo {
+    ProfileInfo profile;     ← objet imbriqué
+    
+    // getter de compatibilité
+    getProfileCode() { return profile.getCode(); }
