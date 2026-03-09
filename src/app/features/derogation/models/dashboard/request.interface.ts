@@ -1309,58 +1309,138 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
-// UserServiceImpl.java
+Implémentation complète
+1. TechnicalTokenProvider.java
+javapackage com.bnpparibas.irb.qlickflow.security;
 
-@Override
-public UserModel getCurrentUser() {
-    // ✅ Depuis contexte si dispo, sinon appel HTTP
-    if (isRequestScopeActive() && userContextHolder.isLoaded()) {
-        log.debug("getCurrentUser depuis contexte");
-        return mapToUserModel(userContextHolder.get().getCurrentUser());
-    }
-    // Hors contexte HTTP (cron job) → appel direct
-    log.debug("getCurrentUser hors scope request → appel HTTP");
-    return userClient.getCurrentUser(getBearerToken());
-}
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSSigner;
+import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
-@Override
-public Optional<UserModel> findByUid(String uid) {
-    // ✅ Depuis contexte si dispo
-    if (isRequestScopeActive() && userContextHolder.isLoaded()) {
-        UserContextDTO ctx = userContextHolder.get();
-        if (ctx.getCurrentUser() != null 
-                && uid.equals(ctx.getCurrentUser().getUid())) {
-            return Optional.of(mapToUserModel(ctx.getCurrentUser()));
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+
+@Slf4j
+@Component
+public class TechnicalTokenProvider {
+
+    @Value("${security.jwt.secret}")
+    private String jwtSecret;
+
+    public String generateTechnicalToken(String uid) {
+        try {
+            byte[] secretBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+
+            JWSSigner signer = new MACSigner(secretBytes);
+
+            JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                    .subject(uid)
+                    .issueTime(new Date())
+                    .expirationTime(new Date(
+                            System.currentTimeMillis() + 3600_000)) // 1h
+                    .build();
+
+            SignedJWT signedJWT = new SignedJWT(
+                    new JWSHeader(JWSAlgorithm.HS256),
+                    claims
+            );
+
+            signedJWT.sign(signer);
+
+            return "Bearer " + signedJWT.serialize();
+
+        } catch (Exception e) {
+            log.error("Erreur génération token technique pour uid {}: {}",
+                    uid, e.getMessage());
+            throw new RuntimeException("Erreur génération token technique", e);
         }
     }
-    // Hors contexte HTTP → appel direct qf-users
-    return userClient.findByUid(uid, getBearerToken())
-                     .map(this::mapToUserModel);
 }
 
-// ✅ Méthode utilitaire — vérifie si on est dans une requête HTTP
-private boolean isRequestScopeActive() {
-    try {
-        RequestContextHolder.currentRequestAttributes();
-        return true;
-    } catch (IllegalStateException e) {
-        return false;
-    }
-}
+2. TaskSyncCronJob.java — modifier les appels
+java@Slf4j
+@Component
+@RequiredArgsConstructor
+public class TaskSyncCronJob {
 
-// ✅ getBearerToken sécurisé hors contexte
-private String getBearerToken() {
-    try {
-        if (isRequestScopeActive()) {
-            HttpServletRequest request = ((ServletRequestAttributes)
-                    RequestContextHolder.currentRequestAttributes()).getRequest();
-            return request.getHeader(HttpHeaders.AUTHORIZATION);
+    private final UserClient userClient;
+    private final TechnicalTokenProvider technicalTokenProvider; // ✅ injecter
+
+    @Scheduled(cron = "...")
+    public void sync() {
+        log.info("Start Task Sync Cron Job ...");
+        try {
+            // ✅ Générer token technique une seule fois pour tout le job
+            String technicalToken = 
+                    technicalTokenProvider.generateTechnicalToken("camunda");
+
+            syncTasks(technicalToken);
+
+        } catch (Exception e) {
+            log.error("Unexpected error in scheduled task: {}", e.getMessage());
         }
-    } catch (Exception e) {
-        log.warn("getBearerToken hors contexte HTTP: {}", e.getMessage());
     }
-    // Hors contexte → token technique
-    return authClient.getTechnicalToken(); 
-    // OU null si le cron n'a pas besoin d'appeler qf-users
+
+    private void syncTasks(String technicalToken) {
+        syncNewlyCreatedTasks(technicalToken);
+        // autres syncs...
+    }
+
+    private void syncNewlyCreatedTasks(String technicalToken) {
+        // ...
+        syncTasks(camundaTask -> {
+            // ✅ Utiliser userClient directement avec token technique
+            UserContextDTO.UserInfo camunda = userClient
+                    .findByUid("camunda", technicalToken)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "camunda technical user must exist"));
+
+            UserContextDTO.UserInfo assignee = userClient
+                    .findByUid(camundaTask.getAssignee(), technicalToken)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "User not found: " + camundaTask.getAssignee()));
+
+            var camundaAssignment = WfTaskAssignment.builder()
+                    .assignedBy(camunda.getUid())
+                    .assignee(assignee.getUid())
+                    .assignedAt(camundaTask.getCreated().toInstant())
+                    .syncAt(Instant.now())
+                    .syncStatus(WfTaskAssignment.SyncStatus.CONFIRMED)
+                    .build();
+
+            // ... reste du code inchangé
+        });
+    }
 }
+
+3. application.yml de qlickflow-back — rien à changer ✅
+Le secret est déjà présent :
+yamlsecurity:
+  jwt:
+    secret: n3x!qZ4r8@M2u7PjL9kC5vG1tY0aB6sWfH#dE*RzUoVxIwKy
+```
+
+---
+
+### Résumé du flux
+```
+TaskSyncCronJob
+    ↓
+TechnicalTokenProvider.generateTechnicalToken("camunda")
+    → crée un JWT signé avec le même secret
+    → retourne "Bearer eyJh..."
+    ↓
+UserClient.findByUid("camunda", token)
+    → appelle qf-users avec le token
+    ↓
+qf-users/JwtUtils.extractSubject(token)
+    → vérifie la signature ✅ (même secret)
+    → retourne "camunda" ✅
 
