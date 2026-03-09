@@ -1309,7 +1309,6 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
-
 @AllArgsConstructor
 public class DerogTarifToProcessSearchFilter {
 
@@ -1321,7 +1320,7 @@ public class DerogTarifToProcessSearchFilter {
         return Specification
                 .where(dossiersATraiterWithDraftRules())
                 .and(freeText(freeText));
-    } // seulement mes drafts (DA, ou Conseiller)
+    }
 
     private Specification<DerogationRequest> dossiersATraiterWithDraftRules() {
         return (root, query, cb) -> {
@@ -1347,8 +1346,7 @@ public class DerogTarifToProcessSearchFilter {
 
             Join<DerogationRequest, User> userInitiateur = root.join("initiateur", JoinType.INNER);
 
-            // FIX: Avant => cb.equal(userInitiateur, currentUser) — UserModel != entité User
-            // Maintenant => on compare sur le champ uid (String) de l'entité User
+            // initiateur est une entité User => on compare sur son uid
             Predicate ownedByUser = cb.equal(userInitiateur.get("uid"), currentUser.getUid());
 
             return cb.and(isDraft, ownedByUser);
@@ -1372,12 +1370,12 @@ public class DerogTarifToProcessSearchFilter {
 
             Predicate isLastAssignment = cb.equal(asg.get("id"), maxAssignmentIdSq);
 
-            // FIX: Avant => asg.get("assignee").in(Set<UserModel>) — UserModel != entité User
-            // Maintenant => on extrait les uids (String) et on compare sur le champ uid de l'entité User
+            // FIX: assignee est un String (uid directement), pas une relation User
+            // => on extrait les uids des UserModel et on compare directement
             Set<String> eligibleUids = usersEligibleForProcessing.stream()
                     .map(UserModel::getUid)
                     .collect(Collectors.toSet());
-            Predicate assignedToUsers = asg.get("assignee").get("uid").in(eligibleUids);
+            Predicate assignedToUsers = asg.get("assignee").in(eligibleUids);
 
             query.distinct(true);
 
