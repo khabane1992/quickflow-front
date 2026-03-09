@@ -1309,185 +1309,481 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
-Implémentation complète
-1. TechnicalTokenProvider.java
-javapackage com.bnpparibas.irb.qlickflow.security;
+Toutes les modifications — fichier par fichier
 
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.JWSSigner;
-import com.nimbusds.jose.crypto.MACSigner;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+1. UserContextFilter.java (qlickflow-back)
+java@Override
+protected void doFilterInternal(HttpServletRequest request,
+        HttpServletResponse response, FilterChain filterChain)
+        throws ServletException, IOException {
 
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.util.Date;
+    String bearerToken = request.getHeader(HttpHeaders.AUTHORIZATION);
+    String xUserUid = request.getHeader("X-User-Uid");
 
-@Slf4j
-@Component
-public class TechnicalTokenProvider {
-
-    @Value("${security.jwt.secret}")
-    private String jwtSecret;
-
-    public String generateTechnicalToken(String uid) {
-        try {
-            byte[] secretBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
-
-            JWSSigner signer = new MACSigner(secretBytes);
-
-            JWTClaimsSet claims = new JWTClaimsSet.Builder()
-                    .subject(uid)
-                    .issueTime(new Date())
-                    .expirationTime(new Date(
-                            System.currentTimeMillis() + 3600_000)) // 1h
-                    .build();
-
-            SignedJWT signedJWT = new SignedJWT(
-                    new JWSHeader(JWSAlgorithm.HS256),
-                    claims
-            );
-
-            signedJWT.sign(signer);
-
-            return "Bearer " + signedJWT.serialize();
-
-        } catch (Exception e) {
-            log.error("Erreur génération token technique pour uid {}: {}",
-                    uid, e.getMessage());
-            throw new RuntimeException("Erreur génération token technique", e);
-        }
+    if (bearerToken == null || !bearerToken.startsWith("Bearer ")) {
+        filterChain.doFilter(request, response);
+        return;
     }
+
+    try {
+        // ✅ Étape 1 — currentUser
+        UserContextDTO.UserInfo currentUser = null;
+        try {
+            currentUser = userClient.getCurrentUser(bearerToken);
+        } catch (Exception e) {
+            log.warn("[UserContextFilter] getCurrentUser failed: {}", e.getMessage());
+        }
+
+        String uidToUse = (xUserUid != null) ? xUserUid
+                : (currentUser != null ? currentUser.getUid() : null);
+
+        // ✅ Étape 2 — nPlusOne
+        UserContextDTO.UserInfo nPlusOne = null;
+        try {
+            if (uidToUse != null) {
+                nPlusOne = userClient.getNPlusOne(uidToUse, bearerToken);
+            }
+        } catch (Exception e) {
+            log.warn("[UserContextFilter] getNPlusOne failed: {}", e.getMessage());
+        }
+
+        // ✅ Étape 3 — camundaUser
+        UserContextDTO.UserInfo camundaUser = null;
+        try {
+            camundaUser = userClient.findByUid("camunda", bearerToken).orElse(null);
+        } catch (Exception e) {
+            log.warn("[UserContextFilter] camundaUser failed: {}", e.getMessage());
+        }
+
+        // ✅ Étape 4 — dpacUser
+        UserContextDTO.UserInfo dpacUser = null;
+        try {
+            dpacUser = userClient.getDpacUser(bearerToken);
+        } catch (Exception e) {
+            log.warn("[UserContextFilter] dpacUser failed: {}", e.getMessage());
+        }
+
+        // ✅ Étape 5 — lmrUser
+        UserContextDTO.UserInfo lmrUser = null;
+        try {
+            lmrUser = userClient.getLmrUser(bearerToken);
+        } catch (Exception e) {
+            log.warn("[UserContextFilter] lmrUser failed: {}", e.getMessage());
+        }
+
+        // ✅ Étape 6 — eligibles
+        Set<UserContextDTO.UserInfo> eligibles = Set.of();
+        try {
+            eligibles = userClient.getUsersEligibleForUnassignment(bearerToken);
+        } catch (Exception e) {
+            log.warn("[UserContextFilter] eligibles failed: {}", e.getMessage());
+        }
+
+        // ✅ Étape 7 — construire le contexte
+        UserContextDTO context = UserContextDTO.builder()
+                .uid(uidToUse)
+                .currentUser(currentUser)
+                .nPlusOne(nPlusOne)
+                .camundaUser(camundaUser)
+                .dpacUser(dpacUser)
+                .lmrUser(lmrUser)
+                .usersEligibleForUnassignment(eligibles)
+                .build();
+
+        userContextHolder.set(context);
+
+    } catch (Exception e) {
+        log.error("[UserContextFilter] Erreur globale: {}", e.getMessage());
+        // ✅ Ne jamais bloquer la requête
+    }
+
+    filterChain.doFilter(request, response);
 }
 
-2. TaskSyncCronJob.java — modifier les appels
+@Override
+protected boolean shouldNotFilter(HttpServletRequest request) {
+    String path = request.getRequestURI();
+    return path.contains("/auth/")
+            || path.contains("/actuator")
+            || path.contains("/swagger-ui")
+            || path.contains("/v3/api-docs");
+}
+
+2. UserClient.java (qlickflow-back)
 java@Slf4j
 @Component
-@RequiredArgsConstructor
-public class TaskSyncCronJob {
+public class UserClient {
 
-    private final UserClient userClient;
-    private final TechnicalTokenProvider technicalTokenProvider; // ✅ injecter
+    private final WebClient webClient;
 
-    @Scheduled(cron = "...")
-    public void sync() {
-        log.info("Start Task Sync Cron Job ...");
+    public UserClient(
+            @Value("${services.qf-users.url}") String qfUsersUrl) {
+        this.webClient = WebClient.builder().baseUrl(qfUsersUrl).build();
+    }
+
+    // ✅ Méthode centrale — pas de .map() qui rejette null
+    private UserContextDTO.UserInfo fetchUserInfo(String uri, Object uriVar,
+            String bearerToken, String methodName) {
         try {
-            // ✅ Générer token technique une seule fois pour tout le job
-            String technicalToken = 
-                    technicalTokenProvider.generateTechnicalToken("camunda");
+            ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>> typeRef =
+                    new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {};
 
-            syncTasks(technicalToken);
+            ApiResponse<UserContextDTO.UserInfo> response = webClient.get()
+                    .uri(uri, uriVar != null ? uriVar : "")
+                    .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                    .retrieve()
+                    .bodyToMono(typeRef)
+                    .block();
 
+            if (response == null) {
+                log.warn("[{}] Réponse null", methodName);
+                return null;
+            }
+
+            // ✅ data null = normal (ex: pas de N+1)
+            return response.getData();
+
+        } catch (WebClientResponseException.NotFound e) {
+            log.warn("[{}] Non trouvé: {}", methodName, e.getMessage());
+            return null;
         } catch (Exception e) {
-            log.error("Unexpected error in scheduled task: {}", e.getMessage());
-        }
-    }
-
-    private void syncTasks(String technicalToken) {
-        syncNewlyCreatedTasks(technicalToken);
-        // autres syncs...
-    }
-
-    private void syncNewlyCreatedTasks(String technicalToken) {
-        // ...
-        syncTasks(camundaTask -> {
-            // ✅ Utiliser userClient directement avec token technique
-            UserContextDTO.UserInfo camunda = userClient
-                    .findByUid("camunda", technicalToken)
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "camunda technical user must exist"));
-
-            UserContextDTO.UserInfo assignee = userClient
-                    .findByUid(camundaTask.getAssignee(), technicalToken)
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "User not found: " + camundaTask.getAssignee()));
-
-            var camundaAssignment = WfTaskAssignment.builder()
-                    .assignedBy(camunda.getUid())
-                    .assignee(assignee.getUid())
-                    .assignedAt(camundaTask.getCreated().toInstant())
-                    .syncAt(Instant.now())
-                    .syncStatus(WfTaskAssignment.SyncStatus.CONFIRMED)
-                    .build();
-
-            // ... reste du code inchangé
-        });
-    }
-}
-
-3. application.yml de qlickflow-back — rien à changer ✅
-Le secret est déjà présent :
-yamlsecurity:
-  jwt:
-    secret: n3x!qZ4r8@M2u7PjL9kC5vG1tY0aB6sWfH#dE*RzUoVxIwKy
-```
-
----
-
-### Résumé du flux
-```
-TaskSyncCronJob
-    ↓
-TechnicalTokenProvider.generateTechnicalToken("camunda")
-    → crée un JWT signé avec le même secret
-    → retourne "Bearer eyJh..."
-    ↓
-UserClient.findByUid("camunda", token)
-    → appelle qf-users avec le token
-    ↓
-qf-users/JwtUtils.extractSubject(token)
-    → vérifie la signature ✅ (même secret)
-    → retourne "camunda" ✅
-
-
-private UserContextDTO.UserInfo fetchUserInfo(String uri, Object uriVar, 
-        String bearerToken, String methodName) {
-    try {
-        ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>> typeRef =
-                new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {};
-
-        ApiResponse<UserContextDTO.UserInfo> response = webClient.get()
-                .uri(uri, uriVar != null ? uriVar : "")
-                .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                .retrieve()
-                .bodyToMono(typeRef)
-                .block();
-
-        // ✅ Extraire data sans passer par .map() qui rejette les null
-        if (response == null) {
-            log.warn("[{}] Réponse null", methodName);
+            log.error("[{}] Erreur: {}", methodName, e.getMessage());
             return null;
         }
+    }
 
-        // ✅ data null = normal (ex: pas de N+1 pour ce profil)
-        return response.getData();
+    public Optional<UserContextDTO.UserInfo> findById(UUID id, String bearerToken) {
+        return Optional.ofNullable(
+                fetchUserInfo("/api/v1/users/{id}", id, bearerToken, "findById"));
+    }
 
-    } catch (WebClientResponseException.NotFound e) {
-        log.warn("[{}] Utilisateur non trouvé : {}", methodName, e.getMessage());
-        return null;
-    } catch (Exception e) {
-        log.error("[{}] Erreur : {}", methodName, e.getMessage());
-        return null;
+    public Optional<UserContextDTO.UserInfo> findByUid(String uid, String bearerToken) {
+        return Optional.ofNullable(
+                fetchUserInfo("/api/v1/users/uid/{uid}", uid, bearerToken, "findByUid"));
+    }
+
+    public UserContextDTO.UserInfo getCurrentUser(String bearerToken) {
+        return fetchUserInfo("/api/v1/users/current", null, bearerToken, "getCurrentUser");
+    }
+
+    public UserContextDTO.UserInfo getNPlusOne(String uid, String bearerToken) {
+        return fetchUserInfo("/api/v1/users/{uid}/nplusone", uid, bearerToken, "getNPlusOne");
+    }
+
+    public UserContextDTO.UserInfo getDpacUser(String bearerToken) {
+        return fetchUserInfo("/api/v1/users/dpac", null, bearerToken, "getDpacUser");
+    }
+
+    public UserContextDTO.UserInfo getLmrUser(String bearerToken) {
+        return fetchUserInfo("/api/v1/users/lmr", null, bearerToken, "getLmrUser");
+    }
+
+    public Set<UserContextDTO.UserInfo> getUsersEligibleForUnassignment(String bearerToken) {
+        try {
+            ParameterizedTypeReference<ApiResponse<List<UserContextDTO.UserInfo>>> typeRef =
+                    new ParameterizedTypeReference<ApiResponse<List<UserContextDTO.UserInfo>>>() {};
+
+            ApiResponse<List<UserContextDTO.UserInfo>> response = webClient.get()
+                    .uri("/api/v1/users/eligible/unassignment")
+                    .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                    .retrieve()
+                    .bodyToMono(typeRef)
+                    .block();
+
+            if (response == null || response.getData() == null) {
+                return Set.of();
+            }
+
+            return new HashSet<>(response.getData());
+
+        } catch (Exception e) {
+            log.warn("[getUsersEligibleForUnassignment] Erreur: {}", e.getMessage());
+            return Set.of();
+        }
     }
 }
-```
 
----
+3. UserServiceImpl.java (qlickflow-back)
+java@Service
+@RequiredArgsConstructor
+@Slf4j
+public class UserServiceImpl implements UserService {
 
-## Résumé du problème
-```
-// AVANT — Reactor interdit null dans map()
-.bodyToMono(typeRef)
-.map(ApiResponse::getData)  // 💥 si getData() = null → warning + null ignoré
-.block()
+    private final UserClient userClient;
+    private final UserContextHolder userContextHolder;
 
-// APRÈS — récupérer la réponse entière puis extraire data
-.bodyToMono(typeRef)
-.block()                    // ✅ récupérer ApiResponse
-response.getData()          // ✅ null accepté ici
+    // ✅ Vérifie si on est dans un contexte HTTP
+    private boolean isRequestScopeActive() {
+        try {
+            RequestContextHolder.currentRequestAttributes();
+            return true;
+        } catch (IllegalStateException e) {
+            return false;
+        }
+    }
+
+    // ✅ Récupère le token depuis la requête courante
+    private String getBearerToken() {
+        try {
+            if (isRequestScopeActive()) {
+                HttpServletRequest request = ((ServletRequestAttributes)
+                        RequestContextHolder.currentRequestAttributes()).getRequest();
+                return request.getHeader(HttpHeaders.AUTHORIZATION);
+            }
+        } catch (Exception e) {
+            log.warn("getBearerToken hors contexte HTTP: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    @Override
+    public UserModel getCurrentUser() {
+        if (isRequestScopeActive() && userContextHolder.isLoaded()
+                && userContextHolder.get().getCurrentUser() != null) {
+            log.debug("getCurrentUser depuis contexte");
+            return mapToUserModel(userContextHolder.get().getCurrentUser());
+        }
+        String token = getBearerToken();
+        if (token == null) {
+            log.warn("getCurrentUser : pas de token disponible");
+            return null;
+        }
+        UserContextDTO.UserInfo info = userClient.getCurrentUser(token);
+        return info != null ? mapToUserModel(info) : null;
+    }
+
+    @Override
+    public Optional<UserModel> findByUid(String uid) {
+        if (isRequestScopeActive() && userContextHolder.isLoaded()) {
+            UserContextDTO ctx = userContextHolder.get();
+            if (ctx.getCurrentUser() != null
+                    && uid.equals(ctx.getCurrentUser().getUid())) {
+                return Optional.of(mapToUserModel(ctx.getCurrentUser()));
+            }
+        }
+        String token = getBearerToken();
+        if (token == null) {
+            log.warn("findByUid hors contexte HTTP sans token, uid: {}", uid);
+            return Optional.empty();
+        }
+        return userClient.findByUid(uid, token).map(this::mapToUserModel);
+    }
+
+    // ✅ Surcharge pour le cron job avec token explicite
+    @Override
+    public Optional<UserModel> findByUid(String uid, String token) {
+        return userClient.findByUid(uid, token).map(this::mapToUserModel);
+    }
+
+    @Override
+    public UserModel getNPlusOne(String uid) {
+        if (isRequestScopeActive() && userContextHolder.isLoaded()
+                && uid != null
+                && uid.equals(userContextHolder.get().getUid())) {
+            log.debug("getNPlusOne depuis contexte pour uid: {}", uid);
+            UserContextDTO.UserInfo info = userContextHolder.get().getNPlusOne();
+            return info != null ? mapToUserModel(info) : null;
+        }
+        String token = getBearerToken();
+        if (token == null) {
+            log.warn("getNPlusOne hors contexte HTTP sans token");
+            return null;
+        }
+        UserContextDTO.UserInfo info = userClient.getNPlusOne(uid, token);
+        return info != null ? mapToUserModel(info) : null;
+    }
+
+    @Override
+    public Set<UserModel> getUsersEligibleForUnassignment() {
+        if (isRequestScopeActive() && userContextHolder.isLoaded()) {
+            log.debug("getUsersEligibleForUnassignment depuis contexte");
+            return userContextHolder.get()
+                    .getUsersEligibleForUnassignment()
+                    .stream()
+                    .map(this::mapToUserModel)
+                    .collect(Collectors.toSet());
+        }
+        String token = getBearerToken();
+        if (token == null) {
+            log.warn("getUsersEligibleForUnassignment hors contexte sans token");
+            return Set.of();
+        }
+        return userClient.getUsersEligibleForUnassignment(token)
+                .stream()
+                .map(this::mapToUserModel)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public UserModel getDpacUser() {
+        if (isRequestScopeActive() && userContextHolder.isLoaded()) {
+            log.debug("getDpacUser depuis contexte");
+            UserContextDTO.UserInfo info = userContextHolder.get().getDpacUser();
+            return info != null ? mapToUserModel(info) : null;
+        }
+        String token = getBearerToken();
+        if (token == null) return null;
+        UserContextDTO.UserInfo info = userClient.getDpacUser(token);
+        return info != null ? mapToUserModel(info) : null;
+    }
+
+    @Override
+    public UserModel getLmrUser() {
+        if (isRequestScopeActive() && userContextHolder.isLoaded()) {
+            log.debug("getLmrUser depuis contexte");
+            UserContextDTO.UserInfo info = userContextHolder.get().getLmrUser();
+            return info != null ? mapToUserModel(info) : null;
+        }
+        String token = getBearerToken();
+        if (token == null) return null;
+        UserContextDTO.UserInfo info = userClient.getLmrUser(token);
+        return info != null ? mapToUserModel(info) : null;
+    }
+}
+
+4. UserController.java (qf-users)
+java// ✅ /current
+@GetMapping("/current")
+public ResponseEntity<ApiResponse<UserDTO>> getCurrentUser(
+        @RequestHeader(value = "X-User-Uid", required = false) String xUserUid,
+        @RequestHeader(value = "Authorization", required = false) String bearerToken) {
+
+    String uid = resolveUid(xUserUid, bearerToken);
+    if (uid == null) return unauthorizedResponse();
+
+    UserDTO user = userFacade.findByUid(uid);
+    return buildResponse(user);
+}
+
+// ✅ /eligible/unassignment
+@GetMapping("/eligible/unassignment")
+public ResponseEntity<ApiResponse<List<UserDTO>>> getUsersEligibleForUnassignment(
+        @RequestHeader(value = "X-User-Uid", required = false) String xUserUid,
+        @RequestHeader(value = "Authorization", required = false) String bearerToken) {
+
+    String uid = resolveUid(xUserUid, bearerToken);
+    if (uid == null) return unauthorizedListResponse();
+
+    List<UserDTO> users = userFacade.getUsersEligibleForUnassignment(uid);
+    return ResponseEntity.ok(ApiResponse.<List<UserDTO>>builder()
+            .data(users).success(true)
+            .message("Utilisateurs éligibles récupérés").build());
+}
+
+// ✅ /dpac
+@GetMapping("/dpac")
+public ResponseEntity<ApiResponse<UserDTO>> getDpacUser(
+        @RequestHeader(value = "X-User-Uid", required = false) String xUserUid,
+        @RequestHeader(value = "Authorization", required = false) String bearerToken) {
+
+    String uid = resolveUid(xUserUid, bearerToken);
+    if (uid == null) return unauthorizedResponse();
+
+    UserDTO user = userFacade.getDpacUser(uid);
+    return buildResponse(user);
+}
+
+// ✅ /lmr
+@GetMapping("/lmr")
+public ResponseEntity<ApiResponse<UserDTO>> getLmrUser(
+        @RequestHeader(value = "X-User-Uid", required = false) String xUserUid,
+        @RequestHeader(value = "Authorization", required = false) String bearerToken) {
+
+    String uid = resolveUid(xUserUid, bearerToken);
+    if (uid == null) return unauthorizedResponse();
+
+    UserDTO user = userFacade.getLmrUser(uid);
+    return buildResponse(user);
+}
+
+// ✅ Méthode utilitaire — résoudre uid depuis X-User-Uid ou JWT
+private String resolveUid(String xUserUid, String bearerToken) {
+    if (xUserUid != null && !xUserUid.isBlank()) return xUserUid;
+    if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+        return jwtUtils.extractSubject(bearerToken);
+    }
+    return null;
+}
+
+private ResponseEntity<ApiResponse<UserDTO>> unauthorizedResponse() {
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .body(ApiResponse.<UserDTO>builder()
+                    .success(false).message("Non authentifié").build());
+}
+
+private ResponseEntity<ApiResponse<List<UserDTO>>> unauthorizedListResponse() {
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .body(ApiResponse.<List<UserDTO>>builder()
+                    .success(false).message("Non authentifié").build());
+}
+
+private ResponseEntity<ApiResponse<UserDTO>> buildResponse(UserDTO user) {
+    return ResponseEntity.ok(ApiResponse.<UserDTO>builder()
+            .data(user).success(true)
+            .message(user != null ? "Succès" : "Non trouvé").build());
+}
+
+5. UserFacadeImpl.java (qf-users) — méthodes à adapter
+java// ✅ Recevoir uid en paramètre au lieu de getCurrentUser() interne
+public List<UserDTO> getUsersEligibleForUnassignment(String currentUserUid) {
+    User currentUser = userRepository.findByUid(currentUserUid)
+            .orElseThrow(() -> new IllegalArgumentException(
+                    "User non trouvé: " + currentUserUid));
+
+    ProfileEnum profileEnum = ProfileEnum.valueOf(
+            currentUser.getProfile().getCode());
+
+    List<User> users = switch (profileEnum) {
+        case DA -> userRepository.findConseillersByAgence(currentUser.getAgence());
+        case DZ -> userRepository.findDirecteursByZone(currentUser.getZone());
+        default -> Collections.emptyList();
+    };
+
+    return users.stream().map(userMapper::toDTO).collect(Collectors.toList());
+}
+
+public UserDTO getDpacUser(String currentUserUid) {
+    User currentUser = userRepository.findByUid(currentUserUid)
+            .orElse(null);
+    if (currentUser == null) return null;
+    // logique dpac selon votre besoin
+    User dpac = userRepository.findDpacUser().orElse(null);
+    return dpac != null ? userMapper.toDTO(dpac) : null;
+}
+
+public UserDTO getLmrUser(String currentUserUid) {
+    User currentUser = userRepository.findByUid(currentUserUid)
+            .orElse(null);
+    if (currentUser == null) return null;
+    // logique lmr selon votre besoin
+    User lmr = userRepository.findLmrUser().orElse(null);
+    return lmr != null ? userMapper.toDTO(lmr) : null;
+}
+
+6. TaskSyncCronJob.java — uniquement lignes modifiées
+javapublic void sync() {
+    log.info("Start Task Sync Cron Job ...");
+    // ✅ Token technique une seule fois
+    String technicalToken = technicalTokenProvider.generateTechnicalToken("camunda");
+    syncNewlyCreatedTasks(technicalToken);
+    syncCompletedTasks(); // pas de userService ici → inchangé
+}
+
+private void syncNewlyCreatedTasks(String technicalToken) {
+    // ... code existant ...
+    syncTasks(processInstancesMap, tasksGroupedByProcessId, technicalToken);
+}
+
+private void syncTasks(..., String technicalToken) {
+    // lignes 117-121 :
+    var camunda = userService.findByUid("camunda", technicalToken)
+            .orElseThrow(() -> new IllegalArgumentException(
+                    "camunda technical user must exist"));
+    var assignee = userService.findByUid(camundaTask.getAssignee(), technicalToken)
+            .orElseThrow(() -> new IllegalArgumentException(
+                    "User not found: " + camundaTask.getAssignee()));
+}
+
+Résumé global
+FichierModificationsUserContextFiltertry/catch sur chaque appel, jamais bloquerUserClientfetchUserInfo sans .map(), null géréUserServiceImplisRequestScopeActive(), surcharge findByUid(uid, token)UserController (qf-users)resolveUid() sur tous les endpointsUserFacadeImpl (qf-users)uid en paramètre, plus de getCurrentUser() interneTaskSyncCronJobtechnicalToken passé en paramètre
 
