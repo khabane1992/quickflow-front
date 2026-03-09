@@ -1309,6 +1309,7 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
+
 @AllArgsConstructor
 public class DerogTarifToProcessSearchFilter {
 
@@ -1344,10 +1345,8 @@ public class DerogTarifToProcessSearchFilter {
         return (root, query, cb) -> {
             Predicate isDraft = cb.equal(root.get("status"), DerogationStatus.DRAFT.name());
 
-            Join<DerogationRequest, User> userInitiateur = root.join("initiateur", JoinType.INNER);
-
-            // initiateur est une entité User => on compare sur son uid
-            Predicate ownedByUser = cb.equal(userInitiateur.get("uid"), currentUser.getUid());
+            // FIX: initiateur est un String (uid direct), pas une relation joinable
+            Predicate ownedByUser = cb.equal(root.get("initiateur"), currentUser.getUid());
 
             return cb.and(isDraft, ownedByUser);
         };
@@ -1370,8 +1369,7 @@ public class DerogTarifToProcessSearchFilter {
 
             Predicate isLastAssignment = cb.equal(asg.get("id"), maxAssignmentIdSq);
 
-            // FIX: assignee est un String (uid directement), pas une relation User
-            // => on extrait les uids des UserModel et on compare directement
+            // assignee est un String (uid direct)
             Set<String> eligibleUids = usersEligibleForProcessing.stream()
                     .map(UserModel::getUid)
                     .collect(Collectors.toSet());
@@ -1396,15 +1394,11 @@ public class DerogTarifToProcessSearchFilter {
                     cb.like(cb.lower(cb.coalesce(exp, "")), pattern);
 
             // Participants = WfTaskAssignment (toutes les tasks du dossier)
+            // assignee est un String uid — pas de join possible
             Join<DerogationRequest, WfTask> tasks = root.join("tasks", JoinType.LEFT);
             Join<WfTask, WfTaskAssignment> assignments = tasks.join("assignments", JoinType.LEFT);
-            Join<WfTaskAssignment, User> assignee = assignments.join("assignee", JoinType.LEFT);
 
-            Predicate onParticipants = cb.or(
-                    like.apply(assignee.get("uid")),
-                    like.apply(assignee.get("firstName")),
-                    like.apply(assignee.get("lastName"))
-            );
+            Predicate onParticipants = like.apply(assignments.get("assignee"));
 
             // champs DerogationRequest
             Predicate onDerogationRequest = cb.or(
