@@ -1309,117 +1309,192 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
-@AllArgsConstructor
-public class DerogTarifToFollowUpSearchFilter {
+@Component
+@RequiredArgsConstructor
+public class DerogationRequestMapper {
 
-    private UserModel user;
-    private String freeText;
+    private final MotifDerogationService motifDerogationService;
+    private final UserService userService;
+    private final SequentialBusinessKeyGenerator sequentialBusinessKeyGenerator;
+    private final DocumentMapper documentMapper;
 
-    public Specification<DerogationRequest> toSpec() {
-        return followUpCases()
-                .and(statusIn(List.of(
-                        DerogationStatus.REVUE.name(),
-                        DerogationStatus.SUBMITTED.name(),
-                        DerogationStatus.SAISIE_DPAC.name(),
-                        DerogationStatus.VALIDATION_AGENCE.name(),
-                        DerogationStatus.VALIDATION_DIE.name(),
-                        DerogationStatus.DEMANDE_INFO_COMPLEMENTAIRES.name(),
-                        DerogationStatus.VALIDATION_LMR.name()
-                )))
-                .and(freeText(freeText));
+    public DerogationRequestDTO toDTO(DerogationRequest entity, UserModel currentUser) {
+        if (entity == null) {
+            return null;
+        }
+
+        List<DocumentDTO> documentDTOs = entity.getDocuments().stream()
+                .map(documentMapper::toDTO)
+                .collect(Collectors.toList());
+
+        List<CommentaireDTO> commentaireDTOs = entity.getCommentaires().stream()
+                .map(comment -> {
+                    // FIX: orElse(null) au lieu de .get() — user peut ne pas exister
+                    UserModel commentAuthor = userService
+                            .findByUid(String.valueOf(comment.getUser()))
+                            .orElse(null);
+
+                    return CommentaireDTO.builder()
+                            .id(comment.getId())
+                            .text(comment.getText())
+                            .author(commentAuthor != null ? commentAuthor.getFullName() : comment.getUser())
+                            .profileAuthor(commentAuthor != null && commentAuthor.getProfile() != null
+                                    ? commentAuthor.getProfile().getName() : null)
+                            .createdAt(comment.getCreatedAt())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        // FIX: orElse(null) au lieu de .get()
+        UserModel usermodel = userService
+                .findByUid(String.valueOf(entity.getInitiateur()))
+                .orElse(null);
+        String ownerName = usermodel != null
+                ? usermodel.getFirstName() + " " + usermodel.getLastName()
+                : entity.getInitiateur();
+
+        WfTask latestTask = entity.getLatestTask();
+        var receptionDate = latestTask.getCreatedAt().toLocalDate();
+
+        // FIX: orElse(null) au lieu de .get()
+        UserModel responsable = userService
+                .findByUid(String.valueOf(latestTask.getCurrentAssignment().getAssignee()))
+                .orElse(null);
+        String responsableName = responsable != null
+                ? responsable.getFirstName() + " " + responsable.getLastName()
+                : latestTask.getCurrentAssignment().getAssignee();
+
+        return DerogationRequestDTO.builder()
+                .id(entity.getId())
+                .clientSubId(entity.getClientSubId())
+                .clientName((entity.getFirstName() != null ? entity.getFirstName() : "") + " "
+                        + (entity.getLastName() != null ? entity.getLastName() : ""))
+                .accountNumber(entity.getAccountNumber())
+                .initiateurId(entity.getInitiateur() != null ? usermodel != null
+                        ? usermodel.getId() : null : null)
+                .owner(ownerName)
+                .agency(entity.getAgency())
+                .responsible(responsableName)
+                .proposedEffectiveDate(entity.getEffectiveDate())
+                .proposedEndDate(entity.getEndDate())
+                .receptionDate(receptionDate)
+                .closedDate(entity.getClosedDate())
+                .motifDerogation(getMotifLabel(entity.getMotifDerogation()))
+                .commissionCode(entity.getCommissionCode())
+                .createdAt(entity.getCreatedAt())
+                .status(entity.getDerogTarifStatus())
+                .firstName(entity.getFirstName())
+                .lastName(entity.getLastName())
+                .businessLine(entity.getBusinessLine())
+                .segment(entity.getSegment())
+                .packageField(entity.getPackageField())
+                .tarificationStandard(entity.getTarificationStandard())
+                .devise(entity.getDevise())
+                .tauxMontant(entity.getTauxMontant())
+                .tauxMontantLabel(entity.getTauxMontantLabel())
+                .convention(entity.getConvention())
+                .employeur(entity.getEmployeur())
+                .salaire(entity.getSalaire())
+                .pnb(entity.getPnb())
+                .documents(documentDTOs)
+                .commentaires(commentaireDTOs)
+                .taskId(entity.getTasks() == null || entity.getTasks().isEmpty()
+                        ? null : entity.getTasks().iterator().next().getId())
+                .processEnabled(isDerogationATraiter(currentUser, responsable))
+                .assignEnabled(isDerogationAReaffecter(currentUser, responsable))
+                .build();
     }
 
-    private Specification<DerogationRequest> followUpCases() {
-        return ((root, query, cb) -> {
+    private boolean isDerogationATraiter(UserModel currentUser, UserModel responsable) {
+        ProfileEnum currentProfile = ProfileEnum.valueOf(currentUser.getProfile().getCode());
 
-            Join<DerogationRequest, WfTask> latestTask = root.join("latestTask", JoinType.INNER);
-
-            // 1/ max(assignment.id) sur la latestTask = assignment courant
-            Subquery<Long> maxAssignIdSq = query.subquery(Long.class);
-            Root<WfTaskAssignment> aMax = maxAssignIdSq.from(WfTaskAssignment.class);
-            maxAssignIdSq.select(cb.max(aMax.get("id")));
-            maxAssignIdSq.where(cb.equal(aMax.get("task").get("id"), latestTask.get("id")));
-
-            // 2/ assignee courant de la latestTask
-            // FIX: assignee est un String (uid) => Subquery<String> pas Subquery<User>
-            Subquery<String> currentAssigneeSq = query.subquery(String.class);
-            Root<WfTaskAssignment> aCur = currentAssigneeSq.from(WfTaskAssignment.class);
-            currentAssigneeSq.select(aCur.get("assignee"));
-            currentAssigneeSq.where(cb.equal(aCur.get("id"), maxAssignIdSq.getSelection()));
-
-            // FIX: comparer l'uid du UserModel, pas le UserModel lui-même
-            Predicate notCurrentAssignedToMe = cb.notEqual(currentAssigneeSq, user.getUid());
-
-            // 3/ j'ai participé dans le passé (sur n'importe quelle task),
-            // mais on exclut explicitement l'assignment courant de la latestTask
-            Subquery<Long> pastParticipationSq = query.subquery(Long.class);
-            Root<WfTaskAssignment> a = pastParticipationSq.from(WfTaskAssignment.class);
-            Join<WfTaskAssignment, WfTask> task = a.join("task", JoinType.INNER);
-
-            // Assumption: WfTask a un lien vers l'instance (ex.task.instance / task.wfInstance)
-            Predicate sameInstance = cb.equal(task.get("wfInstance").get("id"), root.get("id"));
-
-            // FIX: assignee est un String (uid) => comparer avec user.getUid()
-            Predicate assignedToMe = cb.equal(a.get("assignee"), user.getUid());
-
-            // "Assignment passé" = soit autre task, soit même task mais id < max(id)
-            Predicate pastOnOtherTask = cb.notEqual(task.get("id"), latestTask.get("id"));
-            Predicate passOnSameTask = cb.and(
-                    cb.equal(task.get("id"), latestTask.get("id")),
-                    cb.lessThan(a.get("id"), maxAssignIdSq.getSelection())
-            );
-
-            pastParticipationSq.select(cb.literal(1L));
-            pastParticipationSq.where(
-                    sameInstance,
-                    assignedToMe,
-                    cb.or(pastOnOtherTask, passOnSameTask)
-            );
-
-            Predicate iParticipatedBefore = cb.exists(pastParticipationSq);
-
-            return cb.and(notCurrentAssignedToMe, iParticipatedBefore);
-        });
+        if (currentProfile == ProfileEnum.DZ) {
+            return false;
+        }
+        if (currentProfile == ProfileEnum.APAC_COMPTA || currentProfile == ProfileEnum.LMR) {
+            return true;
+        }
+        if (currentUser.getUid().equals(responsable != null ? responsable.getUid() : null)) {
+            return true;
+        }
+        return false;
     }
 
-    public static Specification<DerogationRequest> statusIn(List<String> statuses) {
-        return (root, query, cb) -> root.get("status").in(statuses);
+    private boolean isDerogationAReaffecter(UserModel currentUser, UserModel responsable) {
+        ProfileEnum currentProfile = ProfileEnum.valueOf(currentUser.getProfile().getCode());
+
+        boolean isDerogationAssignedToMe = currentUser.getUid()
+                .equals(responsable != null ? responsable.getUid() : "");
+
+        return switch (currentProfile) {
+            case DIE -> isDerogationAssignedToMe;
+            case DA -> !isDerogationAssignedToMe;
+            case DZ -> true;
+            default -> false;
+        };
     }
 
-    public static Specification<DerogationRequest> freeText(String filterValue) {
-        return ((root, query, cb) -> {
-            if (filterValue == null || filterValue.isBlank()) {
-                return cb.conjunction();
-            }
+    public DerogationRequest toEntity(CreateDerogationRequestDTO dto) {
+        if (dto == null) {
+            return null;
+        }
 
-            query.distinct(true);
-            String pattern = "%" + filterValue.trim().toLowerCase() + "%";
+        String currentUserUid = userService.getCurrentUser().getUid();
 
-            Function<Expression<String>, Predicate> like = exp ->
-                    cb.like(cb.lower(cb.coalesce(exp, "")), pattern);
+        Optional<UserModel> initiateurOpt = userService.findById(dto.getInitiateur());
+        UserModel initiateur = initiateurOpt.orElseThrow(() ->
+                new IllegalArgumentException("L'initiateur avec l'ID " + dto.getInitiateur() + " n'a pas été trouvé."));
 
-            // Participants = WfTaskAssignment (toutes les tasks du dossier)
-            // FIX: assignee est un String (uid), pas une relation joinable
-            Join<DerogationRequest, WfTask> tasks = root.join("tasks", JoinType.LEFT);
-            Join<WfTask, WfTaskAssignment> assignments = tasks.join("assignments", JoinType.LEFT);
+        DerogationRequest request = DerogationRequest.builder()
+                .id(dto.getId())
+                .wfType(WfType.DEROG_TARIF_RETAIL_V1)
+                .businessKey(sequentialBusinessKeyGenerator.generate(WfType.DEROG_TARIF_RETAIL_V1,
+                        "DTR-" + currentUserUid))
+                .clientSubId(dto.getClientSubId())
+                .accountNumber(dto.getAccountNumber())
+                .commissionCode(dto.getCommissionCode())
+                .initiateur(initiateur.getUid())
+                .agency(dto.getAgency())
+                .effectiveDate(dto.getEffectiveDate())
+                .endDate(dto.getEndDate())
+                .receptionDate(dto.getReceptionDate())
+                .closedDate(dto.getClosedDate())
+                .businessLine(dto.getBusinessLine())
+                .segment(dto.getSegment())
+                .motifDerogation(dto.getMotifDerogation())
+                .firstName(dto.getFirstName())
+                .lastName(dto.getLastName())
+                .packageField(dto.getPackageField())
+                .tarificationStandard(dto.getTarificationStandard())
+                .devise(dto.getDevise())
+                .tauxMontant(dto.getTauxMontant())
+                .tauxMontantLabel(dto.getTauxMontantLabel())
+                .convention(dto.getConvention())
+                .employeur(dto.getEmployeur())
+                .salaire(dto.getSalaire())
+                .pnb(dto.getPnb())
+                .status(DerogationStatus.DRAFT.name())
+                .commentaires(new ArrayList<>())
+                .build();
 
-            // On peut seulement chercher sur l'uid (assignee est un String)
-            Predicate onParticipants = like.apply(assignments.get("assignee"));
+        var wfTaskAssignment = WfTaskAssignment.builder()
+                .assignee(userService.getCurrentUser().getUid())
+                .assignedBy(userService.getCurrentUser().getUid())
+                .assignedAt(Instant.now())
+                .syncStatus(WfTaskAssignment.SyncStatus.CONFIRMED)
+                .build();
 
-            // champs DerogationRequest
-            Predicate onDerogationRequest = cb.or(
-                    like.apply(root.get("commissionCode")),
-                    like.apply(root.get("agency")),
-                    like.apply(root.get("motifDerogation")),
-                    like.apply(root.get("segment")),
-                    like.apply(root.get("businessLine")),
-                    like.apply(root.get("clientSubId")),
-                    like.apply(root.get("firstName")),
-                    like.apply(root.get("lastName")),
-                    like.apply(root.get("businessKey"))
-            );
+        WfTask draftWfTask = WfTask.builder()
+                .status(WfTask.WfTaskStatus.CREATED)
+                .currentAssignment(wfTaskAssignment)
+                .assignments(Set.of(wfTaskAssignment))
+                .createdAt(OffsetDateTime.now())
+                .name("Draft")
+                .build();
 
-            return cb.or(onParticipants, onDerogationRequest);
-        });
+        wfTaskAssignment.setTask(draftWfTask);
+        request.addTask(draftWfTask);
+
+        return request;
     }
 }
