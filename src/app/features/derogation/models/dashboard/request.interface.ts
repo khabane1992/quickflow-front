@@ -1309,76 +1309,81 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
-
 @AllArgsConstructor
-public class DerogTarifToProcessSearchFilter {
+public class DerogTarifToFollowUpSearchFilter {
 
-    private Set<UserModel> usersEligibleForProcessing;
-    private UserModel currentUser;
+    private UserModel user;
     private String freeText;
 
     public Specification<DerogationRequest> toSpec() {
-        return Specification
-                .where(dossiersATraiterWithDraftRules())
+        return followUpCases()
+                .and(statusIn(List.of(
+                        DerogationStatus.REVUE.name(),
+                        DerogationStatus.SUBMITTED.name(),
+                        DerogationStatus.SAISIE_DPAC.name(),
+                        DerogationStatus.VALIDATION_AGENCE.name(),
+                        DerogationStatus.VALIDATION_DIE.name(),
+                        DerogationStatus.DEMANDE_INFO_COMPLEMENTAIRES.name(),
+                        DerogationStatus.VALIDATION_LMR.name()
+                )))
                 .and(freeText(freeText));
     }
 
-    private Specification<DerogationRequest> dossiersATraiterWithDraftRules() {
-        return (root, query, cb) -> {
-            query.distinct(true);
-
-            Predicate isDraft = cb.equal(root.get("status"), DerogationStatus.DRAFT.name());
-
-            // non-drafts: pipeline normal "à traiter"
-            Predicate nonDraftToProcess = cb.and(
-                    cb.not(isDraft),
-                    toProcessBy(usersEligibleForProcessing).toPredicate(root, query, cb));
-
-            // drafts: uniquement ceux de l'utilisateur en cours
-            Predicate draftVisible = draftVisibleForCurrentUser().toPredicate(root, query, cb);
-
-            return cb.or(nonDraftToProcess, draftVisible);
-        };
-    }
-
-    private Specification<DerogationRequest> draftVisibleForCurrentUser() {
-        return (root, query, cb) -> {
-            Predicate isDraft = cb.equal(root.get("status"), DerogationStatus.DRAFT.name());
-
-            // FIX: initiateur est un String (uid direct), pas une relation joinable
-            Predicate ownedByUser = cb.equal(root.get("initiateur"), currentUser.getUid());
-
-            return cb.and(isDraft, ownedByUser);
-        };
-    }
-
-    private Specification<DerogationRequest> toProcessBy(Set<UserModel> usersEligibleForProcessing) {
+    private Specification<DerogationRequest> followUpCases() {
         return ((root, query, cb) -> {
 
             Join<DerogationRequest, WfTask> latestTask = root.join("latestTask", JoinType.INNER);
 
-            Predicate taskCreated = cb.equal(latestTask.get("status"), WfTask.WfTaskStatus.CREATED);
+            // 1/ max(assignment.id) sur la latestTask = assignment courant
+            Subquery<Long> maxAssignIdSq = query.subquery(Long.class);
+            Root<WfTaskAssignment> aMax = maxAssignIdSq.from(WfTaskAssignment.class);
+            maxAssignIdSq.select(cb.max(aMax.get("id")));
+            maxAssignIdSq.where(cb.equal(aMax.get("task").get("id"), latestTask.get("id")));
 
-            Join<WfTask, WfTaskAssignment> asg = latestTask.join("assignments", JoinType.INNER);
+            // 2/ assignee courant de la latestTask
+            // FIX: assignee est un String (uid) => Subquery<String> pas Subquery<User>
+            Subquery<String> currentAssigneeSq = query.subquery(String.class);
+            Root<WfTaskAssignment> aCur = currentAssigneeSq.from(WfTaskAssignment.class);
+            currentAssigneeSq.select(aCur.get("assignee"));
+            currentAssigneeSq.where(cb.equal(aCur.get("id"), maxAssignIdSq.getSelection()));
 
-            Subquery<Long> maxAssignmentIdSq = query.subquery(Long.class);
-            Root<WfTaskAssignment> a2 = maxAssignmentIdSq.from(WfTaskAssignment.class);
-            maxAssignmentIdSq
-                    .select(cb.max(a2.get("id")))
-                    .where(cb.equal(a2.get("task"), latestTask));
+            // FIX: comparer l'uid du UserModel, pas le UserModel lui-même
+            Predicate notCurrentAssignedToMe = cb.notEqual(currentAssigneeSq, user.getUid());
 
-            Predicate isLastAssignment = cb.equal(asg.get("id"), maxAssignmentIdSq);
+            // 3/ j'ai participé dans le passé (sur n'importe quelle task),
+            // mais on exclut explicitement l'assignment courant de la latestTask
+            Subquery<Long> pastParticipationSq = query.subquery(Long.class);
+            Root<WfTaskAssignment> a = pastParticipationSq.from(WfTaskAssignment.class);
+            Join<WfTaskAssignment, WfTask> task = a.join("task", JoinType.INNER);
 
-            // assignee est un String (uid direct)
-            Set<String> eligibleUids = usersEligibleForProcessing.stream()
-                    .map(UserModel::getUid)
-                    .collect(Collectors.toSet());
-            Predicate assignedToUsers = asg.get("assignee").in(eligibleUids);
+            // Assumption: WfTask a un lien vers l'instance (ex.task.instance / task.wfInstance)
+            Predicate sameInstance = cb.equal(task.get("wfInstance").get("id"), root.get("id"));
 
-            query.distinct(true);
+            // FIX: assignee est un String (uid) => comparer avec user.getUid()
+            Predicate assignedToMe = cb.equal(a.get("assignee"), user.getUid());
 
-            return cb.and(taskCreated, isLastAssignment, assignedToUsers);
+            // "Assignment passé" = soit autre task, soit même task mais id < max(id)
+            Predicate pastOnOtherTask = cb.notEqual(task.get("id"), latestTask.get("id"));
+            Predicate passOnSameTask = cb.and(
+                    cb.equal(task.get("id"), latestTask.get("id")),
+                    cb.lessThan(a.get("id"), maxAssignIdSq.getSelection())
+            );
+
+            pastParticipationSq.select(cb.literal(1L));
+            pastParticipationSq.where(
+                    sameInstance,
+                    assignedToMe,
+                    cb.or(pastOnOtherTask, passOnSameTask)
+            );
+
+            Predicate iParticipatedBefore = cb.exists(pastParticipationSq);
+
+            return cb.and(notCurrentAssignedToMe, iParticipatedBefore);
         });
+    }
+
+    public static Specification<DerogationRequest> statusIn(List<String> statuses) {
+        return (root, query, cb) -> root.get("status").in(statuses);
     }
 
     public static Specification<DerogationRequest> freeText(String filterValue) {
@@ -1394,10 +1399,11 @@ public class DerogTarifToProcessSearchFilter {
                     cb.like(cb.lower(cb.coalesce(exp, "")), pattern);
 
             // Participants = WfTaskAssignment (toutes les tasks du dossier)
-            // assignee est un String uid — pas de join possible
+            // FIX: assignee est un String (uid), pas une relation joinable
             Join<DerogationRequest, WfTask> tasks = root.join("tasks", JoinType.LEFT);
             Join<WfTask, WfTaskAssignment> assignments = tasks.join("assignments", JoinType.LEFT);
 
+            // On peut seulement chercher sur l'uid (assignee est un String)
             Predicate onParticipants = like.apply(assignments.get("assignee"));
 
             // champs DerogationRequest
