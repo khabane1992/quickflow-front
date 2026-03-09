@@ -1310,187 +1310,118 @@ WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057c
 
 
 
-@PostMapping("/demands-to-process")
-public ResponseEntity<ApiResponse<List<DerogationRequestDTO>>> getDemandsToProcess(
-        @RequestBody FilterRequest filterRequest) {
-    try {
-        log.info(">>> getDemandsToProcess called, filter: {}", filterRequest.getFilterValue());
-        List<DerogationRequestDTO> demands = derogationRequestFacade
-                .getDerogationsToProcess(filterRequest.getFilterValue());
-        return ResponseEntity.ok(ApiResponse.success(demands));
-    } catch (Exception e) {
-        log.error("Erreur dans getDemandsToProcess: {}", e.getMessage(), e); // ✅
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Une erreur s'est produite lors de la récupération des demandes."));
-    }
-}
+@AllArgsConstructor
+public class DerogTarifToProcessSearchFilter {
 
-@PostMapping("/demands-pending-validation")
-public ResponseEntity<ApiResponse<List<DerogationRequestDTO>>> getDemandsPendingValidation(
-        @RequestBody FilterRequest filterRequest) {
-    try {
-        log.info(">>> getDemandsPendingValidation called, filter: {}", filterRequest);
-        List<DerogationRequestDTO> demands = derogationRequestFacade
-                .getFollowUpDerogations(filterRequest.getFilterValue());
-        return ResponseEntity.ok(ApiResponse.success(demands));
-    } catch (Exception e) {
-        log.error("Erreur dans getDemandsPendingValidation: {}", e.getMessage(), e); // ✅
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Une erreur s'est produite lors de la récupération des demandes."));
-    }
-}
+    private Set<UserModel> usersEligibleForProcessing;
+    private UserModel currentUser;
+    private String freeText;
 
-@PostMapping("/demands-processed")
-public ResponseEntity<ApiResponse<List<DerogationRequestDTO>>> getDemandsProcessed(
-        @RequestBody FilterRequest filterRequest) {
-    try {
-        log.info(">>> getDemandsProcessed called, filter: {}", filterRequest);
-        List<DerogationRequestDTO> demands = derogationRequestFacade
-                .getFinalizedDerogations(filterRequest.getFilterValue());
-        return ResponseEntity.ok(ApiResponse.success(demands));
-    } catch (Exception e) {
-        log.error("Erreur dans getDemandsProcessed: {}", e.getMessage(), e); // ✅
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Une erreur s'est produite lors de la récupération des demandes."));
-    }
-}
+    public Specification<DerogationRequest> toSpec() {
+        return Specification
+                .where(dossiersATraiterWithDraftRules())
+                .and(freeText(freeText));
+    } // seulement mes drafts (DA, ou Conseiller)
 
-DerogationRequestFacadeImpl.java — méthodes complètes
-java@Override
-public List<DerogationRequestDTO> getDerogationsToProcess(String freeText) {
-    log.info(">>> getDerogationsToProcess called, freeText: {}", freeText);
+    private Specification<DerogationRequest> dossiersATraiterWithDraftRules() {
+        return (root, query, cb) -> {
+            query.distinct(true);
 
-    UserModel currentUser = userService.getCurrentUser();
-    log.info(">>> currentUser = {}", currentUser);
+            Predicate isDraft = cb.equal(root.get("status"), DerogationStatus.DRAFT.name());
 
-    // ✅ Guard — si pas de contexte utilisateur
-    if (currentUser == null) {
-        log.warn("getDerogationsToProcess: currentUser null, retour liste vide");
-        return List.of();
-    }
+            // non-drafts: pipeline normal "à traiter"
+            Predicate nonDraftToProcess = cb.and(
+                    cb.not(isDraft),
+                    toProcessBy(usersEligibleForProcessing).toPredicate(root, query, cb));
 
-    Set<UserModel> usersForDerogationsProcessing = 
-            getEligibleUsersForDerogationsProcessing();
-    log.info(">>> usersForDerogationsProcessing size = {}", 
-            usersForDerogationsProcessing.size());
+            // drafts: uniquement ceux de l'utilisateur en cours
+            Predicate draftVisible = draftVisibleForCurrentUser().toPredicate(root, query, cb);
 
-    var todoList = derogationRequestService.getDerogationsToProcess(
-            usersForDerogationsProcessing, currentUser, freeText);
-
-    return derogationRequestMapper.toDTO(todoList);
-}
-
-@Override
-public List<DerogationRequestDTO> getFollowUpDerogations(String freeText) {
-    log.info(">>> getFollowUpDerogations called, freeText: {}", freeText);
-
-    UserModel currentUser = userService.getCurrentUser();
-    log.info(">>> currentUser = {}", currentUser);
-
-    // ✅ Guard
-    if (currentUser == null) {
-        log.warn("getFollowUpDerogations: currentUser null, retour liste vide");
-        return List.of();
-    }
-
-    var wfTaskUser = mapToWfTaskUser(currentUser);
-    log.info(">>> wfTaskUser = {}", wfTaskUser);
-
-    List<DerogationRequest> followUpDerogations =
-            derogationRequestService.getFollowUpDerogations(wfTaskUser, freeText);
-
-    return derogationRequestMapper.toDTO(followUpDerogations);
-}
-
-@Override
-public List<DerogationRequestDTO> getFinalizedDerogations(String filterValue) {
-    log.info(">>> getFinalizedDerogations called, filterValue: {}", filterValue);
-
-    UserModel currentUser = userService.getCurrentUser();
-    log.info(">>> currentUser = {}", currentUser);
-
-    // ✅ Guard
-    if (currentUser == null) {
-        log.warn("getFinalizedDerogations: currentUser null, retour liste vide");
-        return List.of();
-    }
-
-    var wfTaskAssignee = mapToWfTaskUser(currentUser);
-    log.info(">>> wfTaskAssignee = {}", wfTaskAssignee);
-
-    List<DerogationRequest> finalizedDerogations =
-            derogationRequestService.getFinalizedDerogations(wfTaskAssignee, filterValue);
-
-    return derogationRequestMapper.toDTO(finalizedDerogations);
-}
-
-private Set<UserModel> getEligibleUsersForDerogationsProcessing() {
-    log.info(">>> getEligibleUsersForDerogationsProcessing called");
-
-    UserModel currentUser = userService.getCurrentUser();
-
-    // ✅ Guard
-    if (currentUser == null) {
-        log.warn("getEligibleUsersForDerogationsProcessing: currentUser null");
-        return Set.of();
-    }
-
-    Set<UserModel> result = new HashSet<>();
-    result.add(currentUser);
-
-    UserModel wfTaskUser = mapToWfTaskUser(currentUser);
-    if (wfTaskUser != null) {
-        result.add(wfTaskUser);
-    }
-
-    // ✅ Guard sur getUsersEligibleForUnassignment
-    Set<UserModel> eligibles = userService.getUsersEligibleForUnassignment();
-    if (eligibles != null && !eligibles.isEmpty()) {
-        result.addAll(eligibles);
-    }
-
-    log.info(">>> eligible users count: {}", result.size());
-    return result;
-}
-
-private UserModel mapToWfTaskUser(UserModel user) {
-    // ✅ Guard complet
-    if (user == null) {
-        log.warn("mapToWfTaskUser: user null");
-        return null;
-    }
-    if (user.getProfile() == null || user.getProfile().getCode() == null) {
-        log.warn("mapToWfTaskUser: profile null pour uid: {}", user.getUid());
-        return user;
-    }
-
-    try {
-        ProfileEnum profileEnum = ProfileEnum.valueOf(user.getProfile().getCode());
-        return switch (profileEnum) {
-            case APAC_COMPTA -> {
-                UserModel dpac = userService.getDpacUser();
-                yield dpac != null ? dpac : user; // ✅ fallback sur user si null
-            }
-            case LMR -> {
-                UserModel lmr = userService.getLmrUser();
-                yield lmr != null ? lmr : user; // ✅ fallback sur user si null
-            }
-            default -> user;
+            return cb.or(nonDraftToProcess, draftVisible);
         };
-    } catch (IllegalArgumentException e) {
-        log.warn("mapToWfTaskUser: profile inconnu '{}' pour uid: {}",
-                user.getProfile().getCode(), user.getUid());
-        return user;
+    }
+
+    private Specification<DerogationRequest> draftVisibleForCurrentUser() {
+        return (root, query, cb) -> {
+            Predicate isDraft = cb.equal(root.get("status"), DerogationStatus.DRAFT.name());
+
+            Join<DerogationRequest, User> userInitiateur = root.join("initiateur", JoinType.INNER);
+
+            // FIX: Avant => cb.equal(userInitiateur, currentUser) — UserModel != entité User
+            // Maintenant => on compare sur le champ uid (String) de l'entité User
+            Predicate ownedByUser = cb.equal(userInitiateur.get("uid"), currentUser.getUid());
+
+            return cb.and(isDraft, ownedByUser);
+        };
+    }
+
+    private Specification<DerogationRequest> toProcessBy(Set<UserModel> usersEligibleForProcessing) {
+        return ((root, query, cb) -> {
+
+            Join<DerogationRequest, WfTask> latestTask = root.join("latestTask", JoinType.INNER);
+
+            Predicate taskCreated = cb.equal(latestTask.get("status"), WfTask.WfTaskStatus.CREATED);
+
+            Join<WfTask, WfTaskAssignment> asg = latestTask.join("assignments", JoinType.INNER);
+
+            Subquery<Long> maxAssignmentIdSq = query.subquery(Long.class);
+            Root<WfTaskAssignment> a2 = maxAssignmentIdSq.from(WfTaskAssignment.class);
+            maxAssignmentIdSq
+                    .select(cb.max(a2.get("id")))
+                    .where(cb.equal(a2.get("task"), latestTask));
+
+            Predicate isLastAssignment = cb.equal(asg.get("id"), maxAssignmentIdSq);
+
+            // FIX: Avant => asg.get("assignee").in(Set<UserModel>) — UserModel != entité User
+            // Maintenant => on extrait les uids (String) et on compare sur le champ uid de l'entité User
+            Set<String> eligibleUids = usersEligibleForProcessing.stream()
+                    .map(UserModel::getUid)
+                    .collect(Collectors.toSet());
+            Predicate assignedToUsers = asg.get("assignee").get("uid").in(eligibleUids);
+
+            query.distinct(true);
+
+            return cb.and(taskCreated, isLastAssignment, assignedToUsers);
+        });
+    }
+
+    public static Specification<DerogationRequest> freeText(String filterValue) {
+        return ((root, query, cb) -> {
+            if (filterValue == null || filterValue.isBlank()) {
+                return cb.conjunction();
+            }
+
+            query.distinct(true);
+            String pattern = "%" + filterValue.trim().toLowerCase() + "%";
+
+            Function<Expression<String>, Predicate> like = exp ->
+                    cb.like(cb.lower(cb.coalesce(exp, "")), pattern);
+
+            // Participants = WfTaskAssignment (toutes les tasks du dossier)
+            Join<DerogationRequest, WfTask> tasks = root.join("tasks", JoinType.LEFT);
+            Join<WfTask, WfTaskAssignment> assignments = tasks.join("assignments", JoinType.LEFT);
+            Join<WfTaskAssignment, User> assignee = assignments.join("assignee", JoinType.LEFT);
+
+            Predicate onParticipants = cb.or(
+                    like.apply(assignee.get("uid")),
+                    like.apply(assignee.get("firstName")),
+                    like.apply(assignee.get("lastName"))
+            );
+
+            // champs DerogationRequest
+            Predicate onDerogationRequest = cb.or(
+                    like.apply(root.get("commissionCode")),
+                    like.apply(root.get("agency")),
+                    like.apply(root.get("motifDerogation")),
+                    like.apply(root.get("segment")),
+                    like.apply(root.get("businessLine")),
+                    like.apply(root.get("clientSubId")),
+                    like.apply(root.get("firstName")),
+                    like.apply(root.get("lastName")),
+                    like.apply(root.get("businessKey"))
+            );
+
+            return cb.or(onParticipants, onDerogationRequest);
+        });
     }
 }
-```
-
----
-
-## Ce que les logs vont vous montrer
-
-Après redémarrage, dans la console backend vous verrez exactement :
-```
->>> getDemandsToProcess called, filter: xxx
->>> currentUser = null          ← si null → problème dans UserContextFilter/getCurrentUser
->>> currentUser = UserModel{...} ← si ok → problème ailleurs
