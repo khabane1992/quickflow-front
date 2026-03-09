@@ -1444,3 +1444,50 @@ qf-users/JwtUtils.extractSubject(token)
     → vérifie la signature ✅ (même secret)
     → retourne "camunda" ✅
 
+
+private UserContextDTO.UserInfo fetchUserInfo(String uri, Object uriVar, 
+        String bearerToken, String methodName) {
+    try {
+        ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>> typeRef =
+                new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {};
+
+        ApiResponse<UserContextDTO.UserInfo> response = webClient.get()
+                .uri(uri, uriVar != null ? uriVar : "")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(typeRef)
+                .block();
+
+        // ✅ Extraire data sans passer par .map() qui rejette les null
+        if (response == null) {
+            log.warn("[{}] Réponse null", methodName);
+            return null;
+        }
+
+        // ✅ data null = normal (ex: pas de N+1 pour ce profil)
+        return response.getData();
+
+    } catch (WebClientResponseException.NotFound e) {
+        log.warn("[{}] Utilisateur non trouvé : {}", methodName, e.getMessage());
+        return null;
+    } catch (Exception e) {
+        log.error("[{}] Erreur : {}", methodName, e.getMessage());
+        return null;
+    }
+}
+```
+
+---
+
+## Résumé du problème
+```
+// AVANT — Reactor interdit null dans map()
+.bodyToMono(typeRef)
+.map(ApiResponse::getData)  // 💥 si getData() = null → warning + null ignoré
+.block()
+
+// APRÈS — récupérer la réponse entière puis extraire data
+.bodyToMono(typeRef)
+.block()                    // ✅ récupérer ApiResponse
+response.getData()          // ✅ null accepté ici
+
