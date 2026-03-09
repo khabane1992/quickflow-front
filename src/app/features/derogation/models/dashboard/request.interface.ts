@@ -1309,90 +1309,58 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
-Étape 1 — JwtUtils dans qf-users
-java// qf-users — JwtUtils.java
-@Component
-public class JwtUtils {
+// UserServiceImpl.java
 
-    // Même secret que dans SecurityConfig de qf-users
-    @Value("${jwt.secret:n3x!qZ4r8@M2u7PjL9kC5vG1tY0aB6sWfH#dE*RzUoVxIwKy}")
-    private String jwtSecret;
+@Override
+public UserModel getCurrentUser() {
+    // ✅ Depuis contexte si dispo, sinon appel HTTP
+    if (isRequestScopeActive() && userContextHolder.isLoaded()) {
+        log.debug("getCurrentUser depuis contexte");
+        return mapToUserModel(userContextHolder.get().getCurrentUser());
+    }
+    // Hors contexte HTTP (cron job) → appel direct
+    log.debug("getCurrentUser hors scope request → appel HTTP");
+    return userClient.getCurrentUser(getBearerToken());
+}
 
-    public String extractSubject(String bearerToken) {
-        try {
-            String token = bearerToken.startsWith("Bearer ")
-                    ? bearerToken.substring(7).trim()
-                    : bearerToken.trim();
-
-            SecretKeySpec secretKey = new SecretKeySpec(
-                    jwtSecret.getBytes(StandardCharsets.UTF_8),
-                    "HmacSHA256"
-            );
-
-            return Jwts.parserBuilder()
-                    .setSigningKey(secretKey)
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody()
-                    .getSubject(); // username ou uid selon votre config
-        } catch (Exception e) {
-            return null;
+@Override
+public Optional<UserModel> findByUid(String uid) {
+    // ✅ Depuis contexte si dispo
+    if (isRequestScopeActive() && userContextHolder.isLoaded()) {
+        UserContextDTO ctx = userContextHolder.get();
+        if (ctx.getCurrentUser() != null 
+                && uid.equals(ctx.getCurrentUser().getUid())) {
+            return Optional.of(mapToUserModel(ctx.getCurrentUser()));
         }
+    }
+    // Hors contexte HTTP → appel direct qf-users
+    return userClient.findByUid(uid, getBearerToken())
+                     .map(this::mapToUserModel);
+}
+
+// ✅ Méthode utilitaire — vérifie si on est dans une requête HTTP
+private boolean isRequestScopeActive() {
+    try {
+        RequestContextHolder.currentRequestAttributes();
+        return true;
+    } catch (IllegalStateException e) {
+        return false;
     }
 }
 
-Étape 2 — UserController.getCurrentUser dans qf-users
-java@GetMapping("/current")
-public ResponseEntity<ApiResponse<UserDTO>> getCurrentUser(
-        @RequestHeader(value = "Authorization", required = false) String bearerToken,
-        @RequestHeader(value = "X-User-Uid", required = false) String xUserUid) {
-
-    // ─────────────────────────────────────────────
-    // Cas 1 : vient du gateway → header X-User-Uid
-    // ─────────────────────────────────────────────
-    if (xUserUid != null && !xUserUid.isBlank()) {
-        UserDTO user = userFacade.findByUid(xUserUid);
-        return buildResponse(user);
-    }
-
-    // ─────────────────────────────────────────────
-    // Cas 2 : appel direct microservice → décoder JWT
-    // ─────────────────────────────────────────────
-    if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-        String subject = jwtUtils.extractSubject(bearerToken);
-        if (subject != null) {
-            // Selon ce que vous mettez comme subject dans le JWT
-            // (username ou uid — vérifiez votre AuthService)
-            UserDTO user = userFacade.findByUsername(subject);
-            // OU : userFacade.findByUid(subject);
-            return buildResponse(user);
+// ✅ getBearerToken sécurisé hors contexte
+private String getBearerToken() {
+    try {
+        if (isRequestScopeActive()) {
+            HttpServletRequest request = ((ServletRequestAttributes)
+                    RequestContextHolder.currentRequestAttributes()).getRequest();
+            return request.getHeader(HttpHeaders.AUTHORIZATION);
         }
+    } catch (Exception e) {
+        log.warn("getBearerToken hors contexte HTTP: {}", e.getMessage());
     }
-
-    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-            .body(ApiResponse.<UserDTO>builder()
-                    .message("Non authentifié")
-                    .success(false)
-                    .build());
-}
-
-// ─────────────────────────────────────────────
-// Méthode utilitaire
-// ─────────────────────────────────────────────
-private ResponseEntity<ApiResponse<UserDTO>> buildResponse(UserDTO user) {
-    if (user == null) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.<UserDTO>builder()
-                        .message("Utilisateur non trouvé")
-                        .success(false)
-                        .build());
-    }
-    return ResponseEntity.ok(
-            ApiResponse.<UserDTO>builder()
-                    .data(user)
-                    .message("User courant récupéré avec succès")
-                    .success(true)
-                    .build()
-    );
+    // Hors contexte → token technique
+    return authClient.getTechnicalToken(); 
+    // OU null si le cron n'a pas besoin d'appeler qf-users
 }
 
