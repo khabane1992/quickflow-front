@@ -1309,481 +1309,188 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
-Toutes les modifications — fichier par fichier
 
-1. UserContextFilter.java (qlickflow-back)
-java@Override
-protected void doFilterInternal(HttpServletRequest request,
-        HttpServletResponse response, FilterChain filterChain)
-        throws ServletException, IOException {
-
-    String bearerToken = request.getHeader(HttpHeaders.AUTHORIZATION);
-    String xUserUid = request.getHeader("X-User-Uid");
-
-    if (bearerToken == null || !bearerToken.startsWith("Bearer ")) {
-        filterChain.doFilter(request, response);
-        return;
-    }
-
+@PostMapping("/demands-to-process")
+public ResponseEntity<ApiResponse<List<DerogationRequestDTO>>> getDemandsToProcess(
+        @RequestBody FilterRequest filterRequest) {
     try {
-        // ✅ Étape 1 — currentUser
-        UserContextDTO.UserInfo currentUser = null;
-        try {
-            currentUser = userClient.getCurrentUser(bearerToken);
-        } catch (Exception e) {
-            log.warn("[UserContextFilter] getCurrentUser failed: {}", e.getMessage());
-        }
-
-        String uidToUse = (xUserUid != null) ? xUserUid
-                : (currentUser != null ? currentUser.getUid() : null);
-
-        // ✅ Étape 2 — nPlusOne
-        UserContextDTO.UserInfo nPlusOne = null;
-        try {
-            if (uidToUse != null) {
-                nPlusOne = userClient.getNPlusOne(uidToUse, bearerToken);
-            }
-        } catch (Exception e) {
-            log.warn("[UserContextFilter] getNPlusOne failed: {}", e.getMessage());
-        }
-
-        // ✅ Étape 3 — camundaUser
-        UserContextDTO.UserInfo camundaUser = null;
-        try {
-            camundaUser = userClient.findByUid("camunda", bearerToken).orElse(null);
-        } catch (Exception e) {
-            log.warn("[UserContextFilter] camundaUser failed: {}", e.getMessage());
-        }
-
-        // ✅ Étape 4 — dpacUser
-        UserContextDTO.UserInfo dpacUser = null;
-        try {
-            dpacUser = userClient.getDpacUser(bearerToken);
-        } catch (Exception e) {
-            log.warn("[UserContextFilter] dpacUser failed: {}", e.getMessage());
-        }
-
-        // ✅ Étape 5 — lmrUser
-        UserContextDTO.UserInfo lmrUser = null;
-        try {
-            lmrUser = userClient.getLmrUser(bearerToken);
-        } catch (Exception e) {
-            log.warn("[UserContextFilter] lmrUser failed: {}", e.getMessage());
-        }
-
-        // ✅ Étape 6 — eligibles
-        Set<UserContextDTO.UserInfo> eligibles = Set.of();
-        try {
-            eligibles = userClient.getUsersEligibleForUnassignment(bearerToken);
-        } catch (Exception e) {
-            log.warn("[UserContextFilter] eligibles failed: {}", e.getMessage());
-        }
-
-        // ✅ Étape 7 — construire le contexte
-        UserContextDTO context = UserContextDTO.builder()
-                .uid(uidToUse)
-                .currentUser(currentUser)
-                .nPlusOne(nPlusOne)
-                .camundaUser(camundaUser)
-                .dpacUser(dpacUser)
-                .lmrUser(lmrUser)
-                .usersEligibleForUnassignment(eligibles)
-                .build();
-
-        userContextHolder.set(context);
-
+        log.info(">>> getDemandsToProcess called, filter: {}", filterRequest.getFilterValue());
+        List<DerogationRequestDTO> demands = derogationRequestFacade
+                .getDerogationsToProcess(filterRequest.getFilterValue());
+        return ResponseEntity.ok(ApiResponse.success(demands));
     } catch (Exception e) {
-        log.error("[UserContextFilter] Erreur globale: {}", e.getMessage());
-        // ✅ Ne jamais bloquer la requête
+        log.error("Erreur dans getDemandsToProcess: {}", e.getMessage(), e); // ✅
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Une erreur s'est produite lors de la récupération des demandes."));
+    }
+}
+
+@PostMapping("/demands-pending-validation")
+public ResponseEntity<ApiResponse<List<DerogationRequestDTO>>> getDemandsPendingValidation(
+        @RequestBody FilterRequest filterRequest) {
+    try {
+        log.info(">>> getDemandsPendingValidation called, filter: {}", filterRequest);
+        List<DerogationRequestDTO> demands = derogationRequestFacade
+                .getFollowUpDerogations(filterRequest.getFilterValue());
+        return ResponseEntity.ok(ApiResponse.success(demands));
+    } catch (Exception e) {
+        log.error("Erreur dans getDemandsPendingValidation: {}", e.getMessage(), e); // ✅
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Une erreur s'est produite lors de la récupération des demandes."));
+    }
+}
+
+@PostMapping("/demands-processed")
+public ResponseEntity<ApiResponse<List<DerogationRequestDTO>>> getDemandsProcessed(
+        @RequestBody FilterRequest filterRequest) {
+    try {
+        log.info(">>> getDemandsProcessed called, filter: {}", filterRequest);
+        List<DerogationRequestDTO> demands = derogationRequestFacade
+                .getFinalizedDerogations(filterRequest.getFilterValue());
+        return ResponseEntity.ok(ApiResponse.success(demands));
+    } catch (Exception e) {
+        log.error("Erreur dans getDemandsProcessed: {}", e.getMessage(), e); // ✅
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Une erreur s'est produite lors de la récupération des demandes."));
+    }
+}
+
+DerogationRequestFacadeImpl.java — méthodes complètes
+java@Override
+public List<DerogationRequestDTO> getDerogationsToProcess(String freeText) {
+    log.info(">>> getDerogationsToProcess called, freeText: {}", freeText);
+
+    UserModel currentUser = userService.getCurrentUser();
+    log.info(">>> currentUser = {}", currentUser);
+
+    // ✅ Guard — si pas de contexte utilisateur
+    if (currentUser == null) {
+        log.warn("getDerogationsToProcess: currentUser null, retour liste vide");
+        return List.of();
     }
 
-    filterChain.doFilter(request, response);
+    Set<UserModel> usersForDerogationsProcessing = 
+            getEligibleUsersForDerogationsProcessing();
+    log.info(">>> usersForDerogationsProcessing size = {}", 
+            usersForDerogationsProcessing.size());
+
+    var todoList = derogationRequestService.getDerogationsToProcess(
+            usersForDerogationsProcessing, currentUser, freeText);
+
+    return derogationRequestMapper.toDTO(todoList);
 }
 
 @Override
-protected boolean shouldNotFilter(HttpServletRequest request) {
-    String path = request.getRequestURI();
-    return path.contains("/auth/")
-            || path.contains("/actuator")
-            || path.contains("/swagger-ui")
-            || path.contains("/v3/api-docs");
+public List<DerogationRequestDTO> getFollowUpDerogations(String freeText) {
+    log.info(">>> getFollowUpDerogations called, freeText: {}", freeText);
+
+    UserModel currentUser = userService.getCurrentUser();
+    log.info(">>> currentUser = {}", currentUser);
+
+    // ✅ Guard
+    if (currentUser == null) {
+        log.warn("getFollowUpDerogations: currentUser null, retour liste vide");
+        return List.of();
+    }
+
+    var wfTaskUser = mapToWfTaskUser(currentUser);
+    log.info(">>> wfTaskUser = {}", wfTaskUser);
+
+    List<DerogationRequest> followUpDerogations =
+            derogationRequestService.getFollowUpDerogations(wfTaskUser, freeText);
+
+    return derogationRequestMapper.toDTO(followUpDerogations);
 }
 
-2. UserClient.java (qlickflow-back)
-java@Slf4j
-@Component
-public class UserClient {
+@Override
+public List<DerogationRequestDTO> getFinalizedDerogations(String filterValue) {
+    log.info(">>> getFinalizedDerogations called, filterValue: {}", filterValue);
 
-    private final WebClient webClient;
+    UserModel currentUser = userService.getCurrentUser();
+    log.info(">>> currentUser = {}", currentUser);
 
-    public UserClient(
-            @Value("${services.qf-users.url}") String qfUsersUrl) {
-        this.webClient = WebClient.builder().baseUrl(qfUsersUrl).build();
+    // ✅ Guard
+    if (currentUser == null) {
+        log.warn("getFinalizedDerogations: currentUser null, retour liste vide");
+        return List.of();
     }
 
-    // ✅ Méthode centrale — pas de .map() qui rejette null
-    private UserContextDTO.UserInfo fetchUserInfo(String uri, Object uriVar,
-            String bearerToken, String methodName) {
-        try {
-            ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>> typeRef =
-                    new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {};
+    var wfTaskAssignee = mapToWfTaskUser(currentUser);
+    log.info(">>> wfTaskAssignee = {}", wfTaskAssignee);
 
-            ApiResponse<UserContextDTO.UserInfo> response = webClient.get()
-                    .uri(uri, uriVar != null ? uriVar : "")
-                    .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                    .retrieve()
-                    .bodyToMono(typeRef)
-                    .block();
+    List<DerogationRequest> finalizedDerogations =
+            derogationRequestService.getFinalizedDerogations(wfTaskAssignee, filterValue);
 
-            if (response == null) {
-                log.warn("[{}] Réponse null", methodName);
-                return null;
-            }
-
-            // ✅ data null = normal (ex: pas de N+1)
-            return response.getData();
-
-        } catch (WebClientResponseException.NotFound e) {
-            log.warn("[{}] Non trouvé: {}", methodName, e.getMessage());
-            return null;
-        } catch (Exception e) {
-            log.error("[{}] Erreur: {}", methodName, e.getMessage());
-            return null;
-        }
-    }
-
-    public Optional<UserContextDTO.UserInfo> findById(UUID id, String bearerToken) {
-        return Optional.ofNullable(
-                fetchUserInfo("/api/v1/users/{id}", id, bearerToken, "findById"));
-    }
-
-    public Optional<UserContextDTO.UserInfo> findByUid(String uid, String bearerToken) {
-        return Optional.ofNullable(
-                fetchUserInfo("/api/v1/users/uid/{uid}", uid, bearerToken, "findByUid"));
-    }
-
-    public UserContextDTO.UserInfo getCurrentUser(String bearerToken) {
-        return fetchUserInfo("/api/v1/users/current", null, bearerToken, "getCurrentUser");
-    }
-
-    public UserContextDTO.UserInfo getNPlusOne(String uid, String bearerToken) {
-        return fetchUserInfo("/api/v1/users/{uid}/nplusone", uid, bearerToken, "getNPlusOne");
-    }
-
-    public UserContextDTO.UserInfo getDpacUser(String bearerToken) {
-        return fetchUserInfo("/api/v1/users/dpac", null, bearerToken, "getDpacUser");
-    }
-
-    public UserContextDTO.UserInfo getLmrUser(String bearerToken) {
-        return fetchUserInfo("/api/v1/users/lmr", null, bearerToken, "getLmrUser");
-    }
-
-    public Set<UserContextDTO.UserInfo> getUsersEligibleForUnassignment(String bearerToken) {
-        try {
-            ParameterizedTypeReference<ApiResponse<List<UserContextDTO.UserInfo>>> typeRef =
-                    new ParameterizedTypeReference<ApiResponse<List<UserContextDTO.UserInfo>>>() {};
-
-            ApiResponse<List<UserContextDTO.UserInfo>> response = webClient.get()
-                    .uri("/api/v1/users/eligible/unassignment")
-                    .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                    .retrieve()
-                    .bodyToMono(typeRef)
-                    .block();
-
-            if (response == null || response.getData() == null) {
-                return Set.of();
-            }
-
-            return new HashSet<>(response.getData());
-
-        } catch (Exception e) {
-            log.warn("[getUsersEligibleForUnassignment] Erreur: {}", e.getMessage());
-            return Set.of();
-        }
-    }
+    return derogationRequestMapper.toDTO(finalizedDerogations);
 }
 
-3. UserServiceImpl.java (qlickflow-back)
-java@Service
-@RequiredArgsConstructor
-@Slf4j
-public class UserServiceImpl implements UserService {
+private Set<UserModel> getEligibleUsersForDerogationsProcessing() {
+    log.info(">>> getEligibleUsersForDerogationsProcessing called");
 
-    private final UserClient userClient;
-    private final UserContextHolder userContextHolder;
+    UserModel currentUser = userService.getCurrentUser();
 
-    // ✅ Vérifie si on est dans un contexte HTTP
-    private boolean isRequestScopeActive() {
-        try {
-            RequestContextHolder.currentRequestAttributes();
-            return true;
-        } catch (IllegalStateException e) {
-            return false;
-        }
+    // ✅ Guard
+    if (currentUser == null) {
+        log.warn("getEligibleUsersForDerogationsProcessing: currentUser null");
+        return Set.of();
     }
 
-    // ✅ Récupère le token depuis la requête courante
-    private String getBearerToken() {
-        try {
-            if (isRequestScopeActive()) {
-                HttpServletRequest request = ((ServletRequestAttributes)
-                        RequestContextHolder.currentRequestAttributes()).getRequest();
-                return request.getHeader(HttpHeaders.AUTHORIZATION);
-            }
-        } catch (Exception e) {
-            log.warn("getBearerToken hors contexte HTTP: {}", e.getMessage());
-        }
+    Set<UserModel> result = new HashSet<>();
+    result.add(currentUser);
+
+    UserModel wfTaskUser = mapToWfTaskUser(currentUser);
+    if (wfTaskUser != null) {
+        result.add(wfTaskUser);
+    }
+
+    // ✅ Guard sur getUsersEligibleForUnassignment
+    Set<UserModel> eligibles = userService.getUsersEligibleForUnassignment();
+    if (eligibles != null && !eligibles.isEmpty()) {
+        result.addAll(eligibles);
+    }
+
+    log.info(">>> eligible users count: {}", result.size());
+    return result;
+}
+
+private UserModel mapToWfTaskUser(UserModel user) {
+    // ✅ Guard complet
+    if (user == null) {
+        log.warn("mapToWfTaskUser: user null");
         return null;
     }
-
-    @Override
-    public UserModel getCurrentUser() {
-        if (isRequestScopeActive() && userContextHolder.isLoaded()
-                && userContextHolder.get().getCurrentUser() != null) {
-            log.debug("getCurrentUser depuis contexte");
-            return mapToUserModel(userContextHolder.get().getCurrentUser());
-        }
-        String token = getBearerToken();
-        if (token == null) {
-            log.warn("getCurrentUser : pas de token disponible");
-            return null;
-        }
-        UserContextDTO.UserInfo info = userClient.getCurrentUser(token);
-        return info != null ? mapToUserModel(info) : null;
+    if (user.getProfile() == null || user.getProfile().getCode() == null) {
+        log.warn("mapToWfTaskUser: profile null pour uid: {}", user.getUid());
+        return user;
     }
 
-    @Override
-    public Optional<UserModel> findByUid(String uid) {
-        if (isRequestScopeActive() && userContextHolder.isLoaded()) {
-            UserContextDTO ctx = userContextHolder.get();
-            if (ctx.getCurrentUser() != null
-                    && uid.equals(ctx.getCurrentUser().getUid())) {
-                return Optional.of(mapToUserModel(ctx.getCurrentUser()));
+    try {
+        ProfileEnum profileEnum = ProfileEnum.valueOf(user.getProfile().getCode());
+        return switch (profileEnum) {
+            case APAC_COMPTA -> {
+                UserModel dpac = userService.getDpacUser();
+                yield dpac != null ? dpac : user; // ✅ fallback sur user si null
             }
-        }
-        String token = getBearerToken();
-        if (token == null) {
-            log.warn("findByUid hors contexte HTTP sans token, uid: {}", uid);
-            return Optional.empty();
-        }
-        return userClient.findByUid(uid, token).map(this::mapToUserModel);
-    }
-
-    // ✅ Surcharge pour le cron job avec token explicite
-    @Override
-    public Optional<UserModel> findByUid(String uid, String token) {
-        return userClient.findByUid(uid, token).map(this::mapToUserModel);
-    }
-
-    @Override
-    public UserModel getNPlusOne(String uid) {
-        if (isRequestScopeActive() && userContextHolder.isLoaded()
-                && uid != null
-                && uid.equals(userContextHolder.get().getUid())) {
-            log.debug("getNPlusOne depuis contexte pour uid: {}", uid);
-            UserContextDTO.UserInfo info = userContextHolder.get().getNPlusOne();
-            return info != null ? mapToUserModel(info) : null;
-        }
-        String token = getBearerToken();
-        if (token == null) {
-            log.warn("getNPlusOne hors contexte HTTP sans token");
-            return null;
-        }
-        UserContextDTO.UserInfo info = userClient.getNPlusOne(uid, token);
-        return info != null ? mapToUserModel(info) : null;
-    }
-
-    @Override
-    public Set<UserModel> getUsersEligibleForUnassignment() {
-        if (isRequestScopeActive() && userContextHolder.isLoaded()) {
-            log.debug("getUsersEligibleForUnassignment depuis contexte");
-            return userContextHolder.get()
-                    .getUsersEligibleForUnassignment()
-                    .stream()
-                    .map(this::mapToUserModel)
-                    .collect(Collectors.toSet());
-        }
-        String token = getBearerToken();
-        if (token == null) {
-            log.warn("getUsersEligibleForUnassignment hors contexte sans token");
-            return Set.of();
-        }
-        return userClient.getUsersEligibleForUnassignment(token)
-                .stream()
-                .map(this::mapToUserModel)
-                .collect(Collectors.toSet());
-    }
-
-    @Override
-    public UserModel getDpacUser() {
-        if (isRequestScopeActive() && userContextHolder.isLoaded()) {
-            log.debug("getDpacUser depuis contexte");
-            UserContextDTO.UserInfo info = userContextHolder.get().getDpacUser();
-            return info != null ? mapToUserModel(info) : null;
-        }
-        String token = getBearerToken();
-        if (token == null) return null;
-        UserContextDTO.UserInfo info = userClient.getDpacUser(token);
-        return info != null ? mapToUserModel(info) : null;
-    }
-
-    @Override
-    public UserModel getLmrUser() {
-        if (isRequestScopeActive() && userContextHolder.isLoaded()) {
-            log.debug("getLmrUser depuis contexte");
-            UserContextDTO.UserInfo info = userContextHolder.get().getLmrUser();
-            return info != null ? mapToUserModel(info) : null;
-        }
-        String token = getBearerToken();
-        if (token == null) return null;
-        UserContextDTO.UserInfo info = userClient.getLmrUser(token);
-        return info != null ? mapToUserModel(info) : null;
+            case LMR -> {
+                UserModel lmr = userService.getLmrUser();
+                yield lmr != null ? lmr : user; // ✅ fallback sur user si null
+            }
+            default -> user;
+        };
+    } catch (IllegalArgumentException e) {
+        log.warn("mapToWfTaskUser: profile inconnu '{}' pour uid: {}",
+                user.getProfile().getCode(), user.getUid());
+        return user;
     }
 }
+```
 
-4. UserController.java (qf-users)
-java// ✅ /current
-@GetMapping("/current")
-public ResponseEntity<ApiResponse<UserDTO>> getCurrentUser(
-        @RequestHeader(value = "X-User-Uid", required = false) String xUserUid,
-        @RequestHeader(value = "Authorization", required = false) String bearerToken) {
+---
 
-    String uid = resolveUid(xUserUid, bearerToken);
-    if (uid == null) return unauthorizedResponse();
+## Ce que les logs vont vous montrer
 
-    UserDTO user = userFacade.findByUid(uid);
-    return buildResponse(user);
-}
-
-// ✅ /eligible/unassignment
-@GetMapping("/eligible/unassignment")
-public ResponseEntity<ApiResponse<List<UserDTO>>> getUsersEligibleForUnassignment(
-        @RequestHeader(value = "X-User-Uid", required = false) String xUserUid,
-        @RequestHeader(value = "Authorization", required = false) String bearerToken) {
-
-    String uid = resolveUid(xUserUid, bearerToken);
-    if (uid == null) return unauthorizedListResponse();
-
-    List<UserDTO> users = userFacade.getUsersEligibleForUnassignment(uid);
-    return ResponseEntity.ok(ApiResponse.<List<UserDTO>>builder()
-            .data(users).success(true)
-            .message("Utilisateurs éligibles récupérés").build());
-}
-
-// ✅ /dpac
-@GetMapping("/dpac")
-public ResponseEntity<ApiResponse<UserDTO>> getDpacUser(
-        @RequestHeader(value = "X-User-Uid", required = false) String xUserUid,
-        @RequestHeader(value = "Authorization", required = false) String bearerToken) {
-
-    String uid = resolveUid(xUserUid, bearerToken);
-    if (uid == null) return unauthorizedResponse();
-
-    UserDTO user = userFacade.getDpacUser(uid);
-    return buildResponse(user);
-}
-
-// ✅ /lmr
-@GetMapping("/lmr")
-public ResponseEntity<ApiResponse<UserDTO>> getLmrUser(
-        @RequestHeader(value = "X-User-Uid", required = false) String xUserUid,
-        @RequestHeader(value = "Authorization", required = false) String bearerToken) {
-
-    String uid = resolveUid(xUserUid, bearerToken);
-    if (uid == null) return unauthorizedResponse();
-
-    UserDTO user = userFacade.getLmrUser(uid);
-    return buildResponse(user);
-}
-
-// ✅ Méthode utilitaire — résoudre uid depuis X-User-Uid ou JWT
-private String resolveUid(String xUserUid, String bearerToken) {
-    if (xUserUid != null && !xUserUid.isBlank()) return xUserUid;
-    if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-        return jwtUtils.extractSubject(bearerToken);
-    }
-    return null;
-}
-
-private ResponseEntity<ApiResponse<UserDTO>> unauthorizedResponse() {
-    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-            .body(ApiResponse.<UserDTO>builder()
-                    .success(false).message("Non authentifié").build());
-}
-
-private ResponseEntity<ApiResponse<List<UserDTO>>> unauthorizedListResponse() {
-    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-            .body(ApiResponse.<List<UserDTO>>builder()
-                    .success(false).message("Non authentifié").build());
-}
-
-private ResponseEntity<ApiResponse<UserDTO>> buildResponse(UserDTO user) {
-    return ResponseEntity.ok(ApiResponse.<UserDTO>builder()
-            .data(user).success(true)
-            .message(user != null ? "Succès" : "Non trouvé").build());
-}
-
-5. UserFacadeImpl.java (qf-users) — méthodes à adapter
-java// ✅ Recevoir uid en paramètre au lieu de getCurrentUser() interne
-public List<UserDTO> getUsersEligibleForUnassignment(String currentUserUid) {
-    User currentUser = userRepository.findByUid(currentUserUid)
-            .orElseThrow(() -> new IllegalArgumentException(
-                    "User non trouvé: " + currentUserUid));
-
-    ProfileEnum profileEnum = ProfileEnum.valueOf(
-            currentUser.getProfile().getCode());
-
-    List<User> users = switch (profileEnum) {
-        case DA -> userRepository.findConseillersByAgence(currentUser.getAgence());
-        case DZ -> userRepository.findDirecteursByZone(currentUser.getZone());
-        default -> Collections.emptyList();
-    };
-
-    return users.stream().map(userMapper::toDTO).collect(Collectors.toList());
-}
-
-public UserDTO getDpacUser(String currentUserUid) {
-    User currentUser = userRepository.findByUid(currentUserUid)
-            .orElse(null);
-    if (currentUser == null) return null;
-    // logique dpac selon votre besoin
-    User dpac = userRepository.findDpacUser().orElse(null);
-    return dpac != null ? userMapper.toDTO(dpac) : null;
-}
-
-public UserDTO getLmrUser(String currentUserUid) {
-    User currentUser = userRepository.findByUid(currentUserUid)
-            .orElse(null);
-    if (currentUser == null) return null;
-    // logique lmr selon votre besoin
-    User lmr = userRepository.findLmrUser().orElse(null);
-    return lmr != null ? userMapper.toDTO(lmr) : null;
-}
-
-6. TaskSyncCronJob.java — uniquement lignes modifiées
-javapublic void sync() {
-    log.info("Start Task Sync Cron Job ...");
-    // ✅ Token technique une seule fois
-    String technicalToken = technicalTokenProvider.generateTechnicalToken("camunda");
-    syncNewlyCreatedTasks(technicalToken);
-    syncCompletedTasks(); // pas de userService ici → inchangé
-}
-
-private void syncNewlyCreatedTasks(String technicalToken) {
-    // ... code existant ...
-    syncTasks(processInstancesMap, tasksGroupedByProcessId, technicalToken);
-}
-
-private void syncTasks(..., String technicalToken) {
-    // lignes 117-121 :
-    var camunda = userService.findByUid("camunda", technicalToken)
-            .orElseThrow(() -> new IllegalArgumentException(
-                    "camunda technical user must exist"));
-    var assignee = userService.findByUid(camundaTask.getAssignee(), technicalToken)
-            .orElseThrow(() -> new IllegalArgumentException(
-                    "User not found: " + camundaTask.getAssignee()));
-}
-
-Résumé global
-FichierModificationsUserContextFiltertry/catch sur chaque appel, jamais bloquerUserClientfetchUserInfo sans .map(), null géréUserServiceImplisRequestScopeActive(), surcharge findByUid(uid, token)UserController (qf-users)resolveUid() sur tous les endpointsUserFacadeImpl (qf-users)uid en paramètre, plus de getCurrentUser() interneTaskSyncCronJobtechnicalToken passé en paramètre
-
+Après redémarrage, dans la console backend vous verrez exactement :
+```
+>>> getDemandsToProcess called, filter: xxx
+>>> currentUser = null          ← si null → problème dans UserContextFilter/getCurrentUser
+>>> currentUser = UserModel{...} ← si ok → problème ailleurs
