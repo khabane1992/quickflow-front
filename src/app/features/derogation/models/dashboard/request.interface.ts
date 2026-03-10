@@ -1309,57 +1309,149 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
+public List<UserModel> getUsersCandidateToReaffctetionByCurrentUserProfile(String bearerToken) {
+    try {
+        ParameterizedTypeReference<ApiResponse<List<UserContextDTO.UserInfo>>> typeRef =
+                new ParameterizedTypeReference<ApiResponse<List<UserContextDTO.UserInfo>>>() {};
 
-public DerogationRequest startDerogTarifRetWf(StartDeggTarifRetWfInstanceCommand command) {
+        List<UserContextDTO.UserInfo> list = webClient.get()
+                .uri(uri: "/api/v1/users/current-user-users")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .bodyToMono(typeRef)
+                .map(ApiResponse::getData)
+                .block();
 
-    var derogTarigRetWfInstance = derogTarifRetWfInstanceBuilder.build(command);
+        return list != null
+                ? list.stream().map(this::mapToUserModel).collect(Collectors.toList())
+                : List.of();
 
-    var initiateur = userService.findById(UUID.fromString(command.getInitiateur()))
-            .orElseThrow(() -> new IllegalArgumentException(
-                    "initiateur not found, initiateur : " + command.getInitiateur()));
+    } catch (Exception e) {
+        log.warn("[getUsersCandidateToReaffctetionByCurrentUserProfile] Erreur : {}", e.getMessage());
+        return List.of();
+    }
+}
 
-    var variables = new HashMap<String, Object>();
-    ProfileEnum profileEnum = ProfileEnum.valueOf(initiateur.getProfileCode());
 
-    if (profileEnum == ProfileEnum.CONSEILLER) {
-        var validateurDA  = userService.getNPlusOne(initiateur.getUid());
-        var validateurDIE = userService.getNPlusOne(validateurDA.getUid());
+@Override
+public List<UserModel> getUsersCandidateToReaffctetionByCurrentUserProfile() {
+    log.debug("getUsersCandidateToReaffctetionByCurrentUserProfile depuis contexte");
 
-        fillVariables(variables, command, initiateur,
-                validateurDA.getUid(),
-                validateurDIE.getUid(),
-                DerogTarifRetailProcessInstanceVariables.CONSEILLER);
+    String bearerToken = userContextHolder.get().getBearerToken();
 
-    } else if (profileEnum == ProfileEnum.DA) {
-        var validateurDIE = userService.getNPlusOne(initiateur.getUid());
+    return userClient.getUsersCandidateToReaffctetionByCurrentUserProfile(bearerToken);
+}
 
-        fillVariables(variables, command, initiateur,
-                initiateur.getUid(),          // validateurDA = initiateur lui-même
-                validateurDIE.getUid(),
-                DerogTarifRetailProcessInstanceVariables.DA);
 
-    } else {
-        throw new IllegalArgumentException(
-                "Initiateur profile ne peut être que Conseiller ou DA ! Initiateur : " + initiateur);
+
+Voici la classe complète UserContextFilter :
+java@Slf4j
+@Component
+@RequiredArgsConstructor
+public class UserContextFilter extends OncePerRequestFilter {
+
+    private final UserContextHolder userContextHolder;
+    private final UserClient userClient;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String bearerToken = request.getHeader(HttpHeaders.AUTHORIZATION);
+        String xUserUid = request.getHeader("X-User-Uid");
+
+        if (bearerToken == null || !bearerToken.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        try {
+            UserContextDTO.UserInfo currentUser = null;
+            try {
+                currentUser = userClient.getCurrentUser(bearerToken);
+            } catch (Exception e) {
+                log.warn("[UserContextFilter] getCurrentUser failed: {}", e.getMessage());
+            }
+
+            String uidToUse = (xUserUid != null) ? xUserUid
+                    : (currentUser != null ? currentUser.getUid() : null);
+
+            UserContextDTO.UserInfo nPlusOne = null;
+            try {
+                if (uidToUse != null) {
+                    nPlusOne = userClient.getNPlusOne(uidToUse, bearerToken);
+                }
+            } catch (Exception e) {
+                log.warn("[UserContextFilter] getNPlusOne failed: {}", e.getMessage());
+            }
+
+            UserContextDTO.UserInfo camundaUser = null;
+            try {
+                camundaUser = userClient.findByUid(uid: "camunda", bearerToken).orElse(null);
+            } catch (Exception e) {
+                log.warn("[UserContextFilter] camundaUser failed: {}", e.getMessage());
+            }
+
+            UserContextDTO.UserInfo dpacUser = null;
+            try {
+                dpacUser = userClient.getDpacUser(bearerToken);
+            } catch (Exception e) {
+                log.warn("[UserContextFilter] dpacUser failed: {}", e.getMessage());
+            }
+
+            UserContextDTO.UserInfo lmrUser = null;
+            try {
+                lmrUser = userClient.getLmrUser(bearerToken);
+            } catch (Exception e) {
+                log.warn("[UserContextFilter] lmrUser failed: {}", e.getMessage());
+            }
+
+            Set<UserContextDTO.UserInfo> eligibles = Set.of();
+            try {
+                eligibles = userClient.getUsersEligibleForUnassignment(bearerToken);
+            } catch (Exception e) {
+                log.warn("[UserContextFilter] eligibles failed: {}", e.getMessage());
+            }
+
+            // ✅ AJOUT — candidats à la réaffectation
+            List<UserContextDTO.UserInfo> candidatsReaffectation = List.of();
+            try {
+                candidatsReaffectation = userClient
+                        .getUsersCandidateToReaffctetionByCurrentUserProfile(bearerToken);
+            } catch (Exception e) {
+                log.warn("[UserContextFilter] candidatsReaffectation failed: {}", e.getMessage());
+            }
+
+            UserContextDTO context = UserContextDTO.builder()
+                    .uid(uidToUse)
+                    .currentUser(currentUser)
+                    .nPlusOne(nPlusOne)
+                    .camundaUser(camundaUser)
+                    .dpacUser(dpacUser)
+                    .lmrUser(lmrUser)
+                    .usersEligibleForUnassignment(eligibles)
+                    .usersCandidateToReaffctetionByCurrentUserProfile(candidatsReaffectation) // ✅
+                    .build();
+
+            userContextHolder.set(context);
+
+        } catch (Exception e) {
+            log.error("[UserContextFilter] Erreur globale: {}", e.getMessage());
+        }
+
+        filterChain.doFilter(request, response);
     }
 
-    return (DerogationRequest) wfInstanceManager.startWfInstance(derogTarigRetWfInstance, variables);
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.contains("/auth/")
+                || path.contains("/actuator/")
+                || path.contains("/swagger-ui")
+                || path.contains("/v3/api-docs");
+    }
 }
-
-// ===== MÉTHODE EXTRAITE =====
-private void fillVariables(
-        Map<String, Object> variables,
-        StartDeggTarifRetWfInstanceCommand command,
-        UserModel initiateur,
-        String validateurDAUid,
-        String validateurDIEUid,
-        String initiateurProfile) {
-
-    variables.put("motif",            command.getMotifDerogation());
-    variables.put("initiateur",       initiateur.getUid());
-    variables.put("validateurDA",     validateurDAUid);
-    variables.put("validateurDIE",    validateurDIEUid);
-    variables.put("validateurDPAC",   DerogTarifRetailProcessInstanceVariables.DPAC);
-    variables.put("validateurLMR",    DerogTarifRetailProcessInstanceVariables.LMR);
-    variables.put("initiateurProfile", initiateurProfile);
-}
+N'oubliez pas aussi d'ajouter dans UserContextDTO :
+javaprivate List<UserInfo> usersCandidateToReaffctetionByCurrentUserProfile;
