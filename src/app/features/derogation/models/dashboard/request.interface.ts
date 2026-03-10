@@ -1309,80 +1309,57 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
-@AllArgsConstructor
-public class FinalizedDerogTarifSearchFilter {
 
-    private final UserModel wfTaskAssignee;
-    private final String freeText;
+public DerogationRequest startDerogTarifRetWf(StartDeggTarifRetWfInstanceCommand command) {
 
-    public Specification<DerogationRequest> toSpec() {
-        return hasWfType(WfType.DEROG_TARIF_RETAIL_V1)
-                .and(statusIn(DerogationStatus.finalStatuses()))
-                .and(freeText(freeText))
-                .and(hasAssignmentInPast(wfTaskAssignee));
+    var derogTarigRetWfInstance = derogTarifRetWfInstanceBuilder.build(command);
+
+    var initiateur = userService.findById(UUID.fromString(command.getInitiateur()))
+            .orElseThrow(() -> new IllegalArgumentException(
+                    "initiateur not found, initiateur : " + command.getInitiateur()));
+
+    var variables = new HashMap<String, Object>();
+    ProfileEnum profileEnum = ProfileEnum.valueOf(initiateur.getProfileCode());
+
+    if (profileEnum == ProfileEnum.CONSEILLER) {
+        var validateurDA  = userService.getNPlusOne(initiateur.getUid());
+        var validateurDIE = userService.getNPlusOne(validateurDA.getUid());
+
+        fillVariables(variables, command, initiateur,
+                validateurDA.getUid(),
+                validateurDIE.getUid(),
+                DerogTarifRetailProcessInstanceVariables.CONSEILLER);
+
+    } else if (profileEnum == ProfileEnum.DA) {
+        var validateurDIE = userService.getNPlusOne(initiateur.getUid());
+
+        fillVariables(variables, command, initiateur,
+                initiateur.getUid(),          // validateurDA = initiateur lui-même
+                validateurDIE.getUid(),
+                DerogTarifRetailProcessInstanceVariables.DA);
+
+    } else {
+        throw new IllegalArgumentException(
+                "Initiateur profile ne peut être que Conseiller ou DA ! Initiateur : " + initiateur);
     }
 
-    private Specification<DerogationRequest> hasAssignmentInPast(UserModel wfTaskAssignee) {
-        return ((root, query, cb) -> {
-            Join<DerogationRequest, WfTask> tasks = root.join("tasks", JoinType.INNER);
-            Join<WfTask, WfTaskAssignment> assignments = tasks.join("assignments", JoinType.INNER);
+    return (DerogationRequest) wfInstanceManager.startWfInstance(derogTarigRetWfInstance, variables);
+}
 
-            // FIX: assignee est un String (uid direct), pas une relation joinable
-            // => on compare directement sur le champ String
-            Predicate assignedToUsers = cb.equal(
-                    assignments.get("assignee"),
-                    wfTaskAssignee.getUid()
-            );
+// ===== MÉTHODE EXTRAITE =====
+private void fillVariables(
+        Map<String, Object> variables,
+        StartDeggTarifRetWfInstanceCommand command,
+        UserModel initiateur,
+        String validateurDAUid,
+        String validateurDIEUid,
+        String initiateurProfile) {
 
-            query.distinct(true);
-
-            return cb.and(assignedToUsers);
-        });
-    }
-
-    public static Specification<DerogationRequest> statusIn(Set<DerogationStatus> statuses) {
-        return (root, query, cb) -> root.get("status")
-                .in(statuses.stream().map(DerogationStatus::name).toList());
-    }
-
-    public static Specification<DerogationRequest> hasWfType(WfType wfType) {
-        return ((root, query, cb) -> cb.equal(root.get("wfType"), wfType));
-    }
-
-    public static Specification<DerogationRequest> freeText(String filterValue) {
-        return ((root, query, cb) -> {
-            if (filterValue == null || filterValue.isBlank()) {
-                return cb.conjunction();
-            }
-
-            query.distinct(true);
-            String pattern = "%" + filterValue.trim().toLowerCase() + "%";
-
-            Function<Expression<String>, Predicate> like = exp ->
-                    cb.like(cb.lower(cb.coalesce(exp, "")), pattern);
-
-            // Participants = WfTaskAssignment (toutes les tasks du dossier)
-            // FIX: assignee est un String (uid direct), pas une relation joinable
-            Join<DerogationRequest, WfTask> tasks = root.join("tasks", JoinType.LEFT);
-            Join<WfTask, WfTaskAssignment> assignments = tasks.join("assignments", JoinType.LEFT);
-
-            // On cherche uniquement sur l'uid (assignee est un String)
-            Predicate onParticipants = like.apply(assignments.get("assignee"));
-
-            // champs DerogationRequest
-            Predicate onDerogationRequest = cb.or(
-                    like.apply(root.get("commissionCode")),
-                    like.apply(root.get("agency")),
-                    like.apply(root.get("motifDerogation")),
-                    like.apply(root.get("segment")),
-                    like.apply(root.get("businessLine")),
-                    like.apply(root.get("clientSubId")),
-                    like.apply(root.get("firstName")),
-                    like.apply(root.get("lastName")),
-                    like.apply(root.get("businessKey"))
-            );
-
-            return cb.or(onParticipants, onDerogationRequest);
-        });
-    }
+    variables.put("motif",            command.getMotifDerogation());
+    variables.put("initiateur",       initiateur.getUid());
+    variables.put("validateurDA",     validateurDAUid);
+    variables.put("validateurDIE",    validateurDIEUid);
+    variables.put("validateurDPAC",   DerogTarifRetailProcessInstanceVariables.DPAC);
+    variables.put("validateurLMR",    DerogTarifRetailProcessInstanceVariables.LMR);
+    variables.put("initiateurProfile", initiateurProfile);
 }
