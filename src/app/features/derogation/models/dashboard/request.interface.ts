@@ -1309,149 +1309,259 @@ SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d3103
 WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
 
 
-public List<UserModel> getUsersCandidateToReaffctetionByCurrentUserProfile(String bearerToken) {
-    try {
-        ParameterizedTypeReference<ApiResponse<List<UserContextDTO.UserInfo>>> typeRef =
-                new ParameterizedTypeReference<ApiResponse<List<UserContextDTO.UserInfo>>>() {};
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserContextDTO {
 
-        List<UserContextDTO.UserInfo> list = webClient.get()
-                .uri(uri: "/api/v1/users/current-user-users")
-                .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                .retrieve()
-                .bodyToMono(typeRef)
-                .map(ApiResponse::getData)
-                .block();
+    private String uid;
+    private String username;
+    private String firstName;
+    private String lastName;
+    private Boolean actif;
 
-        return list != null
-                ? list.stream().map(this::mapToUserModel).collect(Collectors.toList())
-                : List.of();
+    private UserInfo currentUser;
+    private UserInfo nPlusOne;
+    private UserInfo camundaUser;
+    private UserInfo dpacUser;
+    private UserInfo lmrUser;
+    private Set<UserInfo> usersEligibleForUnassignment = new HashSet<>();
 
-    } catch (Exception e) {
-        log.warn("[getUsersCandidateToReaffctetionByCurrentUserProfile] Erreur : {}", e.getMessage());
-        return List.of();
+    // ✅ Getters commodité depuis currentUser
+    public String getProfileCode() {
+        return currentUser != null && currentUser.getProfile() != null
+                ? currentUser.getProfile().getCode() : null;
+    }
+    public String getProfileName() {
+        return currentUser != null && currentUser.getProfile() != null
+                ? currentUser.getProfile().getName() : null;
+    }
+    public AgenceInfo getAgence() {
+        return currentUser != null ? currentUser.getAgence() : null;
+    }
+    public GroupeInfo getGroupe() {
+        return currentUser != null ? currentUser.getGroupe() : null;
+    }
+    public ZoneInfo getZone() {
+        return currentUser != null ? currentUser.getZone() : null;
+    }
+
+    // =========================================================
+    // UserInfo
+    // =========================================================
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UserInfo {
+        private UUID id;
+        private String uid;
+        private String username;
+        private String email;
+        private String firstName;
+        private String lastName;
+        private Boolean actif;
+        private ProfileInfo profile;
+        private AgenceInfo agence;
+        private GroupeInfo groupe;
+        private ZoneInfo zone;
+    }
+
+    // =========================================================
+    // ProfileInfo
+    // =========================================================
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ProfileInfo {
+        private UUID id;
+        private String code;
+        private String name;
+    }
+
+    // =========================================================
+    // AgenceInfo — tous les champs
+    // =========================================================
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AgenceInfo {
+        private UUID id;
+        private String nom;
+        private String code;
+        private Boolean actif;
+        private GroupeInfo groupe;           // agence appartient à un groupe
+        private UserInfo directoryAgency;    // directeur agence
+    }
+
+    // =========================================================
+    // GroupeInfo — tous les champs
+    // =========================================================
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class GroupeInfo {
+        private UUID id;
+        private String nom;
+        private Boolean actif;
+        private ZoneInfo zone;              // groupe appartient à une zone
+        private UserInfo directorGroup;     // directeur groupe
+    }
+
+    // =========================================================
+    // ZoneInfo — tous les champs
+    // =========================================================
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ZoneInfo {
+        private UUID id;
+        private String nom;
+        private Boolean actif;
+        private UserInfo directorZone;      // directeur zone
     }
 }
 
+// ✅ UserInfo → UserModel
+private UserModel mapToUserModel(UserContextDTO.UserInfo info) {
+    if (info == null) return null;
 
-@Override
-public List<UserModel> getUsersCandidateToReaffctetionByCurrentUserProfile() {
-    log.debug("getUsersCandidateToReaffctetionByCurrentUserProfile depuis contexte");
-
-    String bearerToken = userContextHolder.get().getBearerToken();
-
-    return userClient.getUsersCandidateToReaffctetionByCurrentUserProfile(bearerToken);
+    return UserModel.builder()
+            .id(info.getId())
+            .uid(info.getUid())
+            .username(info.getUsername())
+            .email(info.getEmail())
+            .firstName(info.getFirstName())
+            .lastName(info.getLastName())
+            .actif(info.getActif())
+            .profileCode(info.getProfile() != null
+                    ? info.getProfile().getCode() : null)
+            .profileName(info.getProfile() != null
+                    ? info.getProfile().getName() : null)
+            .agence(mapToAgenceModel(info.getAgence()))
+            .groupe(mapToGroupeModel(info.getGroupe()))
+            .zone(mapToZoneModel(info.getZone()))
+            .build();
 }
 
+// ✅ AgenceInfo → AgenceModel
+private UserModel.AgenceModel mapToAgenceModel(
+        UserContextDTO.AgenceInfo agence) {
+    if (agence == null) return null;
 
+    return UserModel.AgenceModel.builder()
+            .id(agence.getId())
+            .nom(agence.getNom())
+            .code(agence.getCode())
+            .actif(agence.getActif())
+            .groupe(mapToGroupeModel(agence.getGroupe()))
+            .directoryAgency(mapToUserModel(agence.getDirectoryAgency()))
+            .build();
+}
 
-Voici la classe complète UserContextFilter :
-java@Slf4j
-@Component
-@RequiredArgsConstructor
-public class UserContextFilter extends OncePerRequestFilter {
+// ✅ GroupeInfo → GroupeModel
+private UserModel.GroupeModel mapToGroupeModel(
+        UserContextDTO.GroupeInfo groupe) {
+    if (groupe == null) return null;
 
-    private final UserContextHolder userContextHolder;
-    private final UserClient userClient;
+    return UserModel.GroupeModel.builder()
+            .id(groupe.getId())
+            .nom(groupe.getNom())
+            .actif(groupe.getActif())
+            .zone(mapToZoneModel(groupe.getZone()))
+            .directorGroup(mapToUserModel(groupe.getDirectorGroup()))
+            .build();
+}
 
-    @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain)
-            throws ServletException, IOException {
+// ✅ ZoneInfo → ZoneModel
+private UserModel.ZoneModel mapToZoneModel(
+        UserContextDTO.ZoneInfo zone) {
+    if (zone == null) return null;
 
-        String bearerToken = request.getHeader(HttpHeaders.AUTHORIZATION);
-        String xUserUid = request.getHeader("X-User-Uid");
+    return UserModel.ZoneModel.builder()
+            .id(zone.getId())
+            .nom(zone.getNom())
+            .actif(zone.getActif())
+            .directorZone(mapToUserModel(zone.getDirectorZone()))
+            .build();
+}
 
-        if (bearerToken == null || !bearerToken.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserModel {
 
-        try {
-            UserContextDTO.UserInfo currentUser = null;
-            try {
-                currentUser = userClient.getCurrentUser(bearerToken);
-            } catch (Exception e) {
-                log.warn("[UserContextFilter] getCurrentUser failed: {}", e.getMessage());
-            }
+    private UUID id;
+    private String uid;
+    private String username;
+    private String email;
+    private String firstName;
+    private String lastName;
+    private Boolean actif;
+    private String profileCode;
+    private String profileName;
+    private AgenceModel agence;
+    private GroupeModel groupe;
+    private ZoneModel zone;
 
-            String uidToUse = (xUserUid != null) ? xUserUid
-                    : (currentUser != null ? currentUser.getUid() : null);
-
-            UserContextDTO.UserInfo nPlusOne = null;
-            try {
-                if (uidToUse != null) {
-                    nPlusOne = userClient.getNPlusOne(uidToUse, bearerToken);
-                }
-            } catch (Exception e) {
-                log.warn("[UserContextFilter] getNPlusOne failed: {}", e.getMessage());
-            }
-
-            UserContextDTO.UserInfo camundaUser = null;
-            try {
-                camundaUser = userClient.findByUid(uid: "camunda", bearerToken).orElse(null);
-            } catch (Exception e) {
-                log.warn("[UserContextFilter] camundaUser failed: {}", e.getMessage());
-            }
-
-            UserContextDTO.UserInfo dpacUser = null;
-            try {
-                dpacUser = userClient.getDpacUser(bearerToken);
-            } catch (Exception e) {
-                log.warn("[UserContextFilter] dpacUser failed: {}", e.getMessage());
-            }
-
-            UserContextDTO.UserInfo lmrUser = null;
-            try {
-                lmrUser = userClient.getLmrUser(bearerToken);
-            } catch (Exception e) {
-                log.warn("[UserContextFilter] lmrUser failed: {}", e.getMessage());
-            }
-
-            Set<UserContextDTO.UserInfo> eligibles = Set.of();
-            try {
-                eligibles = userClient.getUsersEligibleForUnassignment(bearerToken);
-            } catch (Exception e) {
-                log.warn("[UserContextFilter] eligibles failed: {}", e.getMessage());
-            }
-
-            // ✅ AJOUT — candidats à la réaffectation
-            List<UserContextDTO.UserInfo> candidatsReaffectation = List.of();
-            try {
-                candidatsReaffectation = userClient
-                        .getUsersCandidateToReaffctetionByCurrentUserProfile(bearerToken);
-            } catch (Exception e) {
-                log.warn("[UserContextFilter] candidatsReaffectation failed: {}", e.getMessage());
-            }
-
-            UserContextDTO context = UserContextDTO.builder()
-                    .uid(uidToUse)
-                    .currentUser(currentUser)
-                    .nPlusOne(nPlusOne)
-                    .camundaUser(camundaUser)
-                    .dpacUser(dpacUser)
-                    .lmrUser(lmrUser)
-                    .usersEligibleForUnassignment(eligibles)
-                    .usersCandidateToReaffctetionByCurrentUserProfile(candidatsReaffectation) // ✅
-                    .build();
-
-            userContextHolder.set(context);
-
-        } catch (Exception e) {
-            log.error("[UserContextFilter] Erreur globale: {}", e.getMessage());
-        }
-
-        filterChain.doFilter(request, response);
+    public ProfileModel getProfile() {
+        if (profileCode == null && profileName == null) return null;
+        return new ProfileModel(profileCode, profileName);
     }
 
-    @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        return path.contains("/auth/")
-                || path.contains("/actuator/")
-                || path.contains("/swagger-ui")
-                || path.contains("/v3/api-docs");
+    // =========================================================
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ProfileModel {
+        private String code;
+        private String name;
+    }
+
+    // =========================================================
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AgenceModel {
+        private UUID id;
+        private String nom;
+        private String code;
+        private Boolean actif;
+        private GroupeModel groupe;
+        private UserModel directoryAgency;  // ✅ directeur agence
+    }
+
+    // =========================================================
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class GroupeModel {
+        private UUID id;
+        private String nom;
+        private Boolean actif;
+        private ZoneModel zone;
+        private UserModel directorGroup;    // ✅ directeur groupe
+    }
+
+    // =========================================================
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ZoneModel {
+        private UUID id;
+        private String nom;
+        private Boolean actif;
+        private UserModel directorZone;     // ✅ directeur zone
     }
 }
-N'oubliez pas aussi d'ajouter dans UserContextDTO :
-javaprivate List<UserInfo> usersCandidateToReaffctetionByCurrentUserProfile;
+
