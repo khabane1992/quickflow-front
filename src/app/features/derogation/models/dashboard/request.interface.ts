@@ -2799,3 +2799,862 @@ public class UserContextHolder {
     }
 }
 
+
+package com.bnpparibas.irb.qlickflow.dto;
+
+import lombok.*;
+import java.util.List;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserContextResponse {
+
+    private UserContextUserInfo currentUser;
+    private UserContextUserInfo nPlusOne;
+    private UserContextUserInfo dpacUser;
+    private UserContextUserInfo lmrUser;
+    private UserContextUserInfo camundaUser;
+    private List<UserContextUserInfo> usersEligibleForUnassignment;
+    private List<UserReaffectationDto> usersCandidateToReaffctetionByCurrentUserProfile;
+
+    // ===========================
+    // Inner class — DTO léger
+    // sans cycle UserDTO imbriqué
+    // ===========================
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UserContextUserInfo {
+        private UUID id;
+        private String uid;
+        private String username;
+        private String email;
+        private String firstName;
+        private String lastName;
+        private Boolean actif;
+        private String profileCode;
+        private String profileNom;
+        // Agence — données plates
+        private UUID agenceId;
+        private String agenceNom;
+        private String agenceCode;
+        private Boolean agenceActif;
+        // Groupe — données plates
+        private UUID groupeId;
+        private String groupeNom;
+        private Boolean groupeActif;
+        // Zone — données plates
+        private UUID zoneId;
+        private String zoneNom;
+        private Boolean zoneActif;
+
+        public String getFullName() {
+            return (firstName != null ? firstName : "")
+                + " "
+                + (lastName != null ? lastName : "");
+        }
+    }
+}
+
+package com.bnpparibas.irb.qlickflow.mapper;
+
+import com.bnpparibas.irb.qlickflow.dto.*;
+import com.bnpparibas.irb.qlickflow.dto.UserContextResponse.UserContextUserInfo;
+import com.bnpparibas.irb.qlickflow.entities.habilitation.*;
+import org.mapstruct.*;
+
+@Mapper(componentModel = "spring")
+public interface UserMapper {
+
+    // ===========================
+    // User → UserDTO
+    // ===========================
+
+    @Mapping(target = "profile",  source = "profile")
+    @Mapping(target = "agence",   source = "agence")
+    @Mapping(target = "groupe",   source = "groupe")
+    @Mapping(target = "zone",     source = "zone")
+    UserDTO toDTO(User user);
+
+    @Mapping(target = "profile",  ignore = true)
+    @Mapping(target = "agence",   ignore = true)
+    @Mapping(target = "groupe",   ignore = true)
+    @Mapping(target = "zone",     ignore = true)
+    @Mapping(target = "password", ignore = true)
+    User toEntity(UserDTO userDTO);
+
+    // ===========================
+    // User → UserInfoDTO
+    // (version légère sans
+    //  relations imbriquées)
+    // ===========================
+
+    @Mapping(target = "profileCode",
+             expression = "java(user.getProfile() != null "
+                        + "? user.getProfile().getCode() : null)")
+    @Mapping(target = "profileNom",
+             expression = "java(user.getProfile() != null "
+                        + "? user.getProfile().getNom() : null)")
+    @Mapping(target = "agenceNom",
+             expression = "java(user.getAgence() != null "
+                        + "? user.getAgence().getNom() : null)")
+    UserInfoDTO toInfoDTO(User user);
+
+    // ===========================
+    // User → UserContextUserInfo
+    // (DTO plat — pas de UserDTO
+    //  imbriqué → pas de cycle)
+    // ===========================
+
+    @Mapping(target = "profileCode",
+             expression = "java(user.getProfile() != null "
+                        + "? user.getProfile().getCode() : null)")
+    @Mapping(target = "profileNom",
+             expression = "java(user.getProfile() != null "
+                        + "? user.getProfile().getNom() : null)")
+    @Mapping(target = "agenceId",
+             expression = "java(user.getAgence() != null "
+                        + "? user.getAgence().getId() : null)")
+    @Mapping(target = "agenceNom",
+             expression = "java(user.getAgence() != null "
+                        + "? user.getAgence().getNom() : null)")
+    @Mapping(target = "agenceCode",
+             expression = "java(user.getAgence() != null "
+                        + "? user.getAgence().getCode() : null)")
+    @Mapping(target = "agenceActif",
+             expression = "java(user.getAgence() != null "
+                        + "? user.getAgence().getActif() : null)")
+    @Mapping(target = "groupeId",
+             expression = "java(resolveGroupeId(user))")
+    @Mapping(target = "groupeNom",
+             expression = "java(resolveGroupeNom(user))")
+    @Mapping(target = "groupeActif",
+             expression = "java(resolveGroupeActif(user))")
+    @Mapping(target = "zoneId",
+             expression = "java(resolveZoneId(user))")
+    @Mapping(target = "zoneNom",
+             expression = "java(resolveZoneNom(user))")
+    @Mapping(target = "zoneActif",
+             expression = "java(resolveZoneActif(user))")
+    UserContextUserInfo toContextUserInfo(User user);
+
+    // ===========================
+    // Helpers — résolution
+    // hiérarchique des relations
+    // organisationnelles
+    // ===========================
+
+    /**
+     * Groupe : user.groupe en priorité,
+     * sinon user.agence.groupe
+     */
+    default Groupe resolveGroupe(User user) {
+        if (user == null) return null;
+        if (user.getGroupe() != null) return user.getGroupe();
+        if (user.getAgence() != null) return user.getAgence().getGroupe();
+        return null;
+    }
+
+    default java.util.UUID resolveGroupeId(User user) {
+        Groupe g = resolveGroupe(user);
+        return g != null ? g.getId() : null;
+    }
+
+    default String resolveGroupeNom(User user) {
+        Groupe g = resolveGroupe(user);
+        return g != null ? g.getNom() : null;
+    }
+
+    default Boolean resolveGroupeActif(User user) {
+        Groupe g = resolveGroupe(user);
+        return g != null ? g.getActif() : null;
+    }
+
+    /**
+     * Zone : user.zone en priorité,
+     * sinon user.groupe.zone,
+     * sinon user.agence.groupe.zone
+     */
+    default Zone resolveZone(User user) {
+        if (user == null) return null;
+        if (user.getZone() != null) return user.getZone();
+        if (user.getGroupe() != null
+                && user.getGroupe().getZone() != null) {
+            return user.getGroupe().getZone();
+        }
+        if (user.getAgence() != null
+                && user.getAgence().getGroupe() != null
+                && user.getAgence().getGroupe().getZone() != null) {
+            return user.getAgence().getGroupe().getZone();
+        }
+        return null;
+    }
+
+    default java.util.UUID resolveZoneId(User user) {
+        Zone z = resolveZone(user);
+        return z != null ? z.getId() : null;
+    }
+
+    default String resolveZoneNom(User user) {
+        Zone z = resolveZone(user);
+        return z != null ? z.getNom() : null;
+    }
+
+    default Boolean resolveZoneActif(User user) {
+        Zone z = resolveZone(user);
+        return z != null ? z.getActif() : null;
+    }
+
+    // ===========================
+    // Mappings relations
+    // ===========================
+
+    @Mapping(target = "permissions", source = "permissions")
+    ProfileDTO toProfileDTO(Profile profile);
+
+    PermissionDTO toPermissionDTO(Permission permission);
+
+    @Mapping(target = "groupe",         source = "groupe")
+    @Mapping(target = "directoryAgency", source = "directoryAgency")
+    AgenceDTO toAgenceDTO(Agence agence);
+
+    @Mapping(target = "zone",          source = "zone")
+    @Mapping(target = "directorGroup", source = "directorGroup")
+    GroupeDTO toGroupeDTO(Groupe groupe);
+
+    @Mapping(target = "directorZone", source = "directorZone")
+    ZoneDTO toZoneDTO(Zone zone);
+}
+
+package com.bnpparibas.irb.qlickflow.service;
+
+import com.bnpparibas.irb.qlickflow.entities.habilitation.User;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface UserService {
+
+    // Lecture
+    Optional<User> findById(UUID id);
+    Optional<User> findByUid(String uid);
+    Optional<User> findByEmail(String email);
+
+    // Utilisateur courant — depuis Spring Security
+    User getCurrentUser();
+
+    // Écriture
+    User createUser(User user);
+    User updateUser(User user);
+
+    // Listes
+    List<User> findAllActiveUsers();
+    List<User> getUsersEligibleForUnassignment();
+    List<User> getUsersCandidateToReaffctetionByCurrentUserProfile();
+
+    // Habilitation
+    User assignProfileToUser(UUID userId, UUID profileId);
+
+    // Résolution hiérarchique
+    User getNPlusOne(String uid);
+    User getLmrUser();
+    User getDpacUser();
+}
+
+package com.bnpparibas.irb.qlickflow.service.impl;
+
+import com.bnpparibas.irb.qlickflow.entities.habilitation.*;
+import com.bnpparibas.irb.qlickflow.enums.ProfileEnum;
+import com.bnpparibas.irb.qlickflow.repository.*;
+import com.bnpparibas.irb.qlickflow.service.UserService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class UserServiceImpl implements UserService {
+
+    private final UserRepository userRepository;
+    private final ProfileRepository profileRepository;
+
+    // ===========================
+    // Lecture simple
+    // ===========================
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<User> findById(UUID id) {
+        log.debug("[UserService] findById: {}", id);
+        return userRepository.findById(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<User> findByUid(String uid) {
+        log.debug("[UserService] findByUid: {}", uid);
+        return userRepository.findByUid(uid);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<User> findByEmail(String email) {
+        log.debug("[UserService] findByEmail: {}", email);
+        return userRepository.findByEmail(email);
+    }
+
+    // ===========================
+    // Utilisateur courant
+    // depuis Spring Security
+    // ===========================
+
+    @Override
+    @Transactional(readOnly = true)
+    public User getCurrentUser() {
+        Authentication authentication =
+            SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException(
+                "Aucune authentification dans le SecurityContext"
+            );
+        }
+        String uid = authentication.getName();
+        log.debug("[UserService] getCurrentUser uid: {}", uid);
+        return userRepository.findByUid(uid)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Utilisateur courant non trouvé, uid: " + uid
+            ));
+    }
+
+    // ===========================
+    // Écriture
+    // ===========================
+
+    @Override
+    @Transactional
+    public User createUser(User user) {
+        log.debug("[UserService] createUser uid: {}", user.getUid());
+        return userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public User updateUser(User user) {
+        log.debug("[UserService] updateUser uid: {}", user.getUid());
+        return userRepository.save(user);
+    }
+
+    // ===========================
+    // Habilitation
+    // ===========================
+
+    @Override
+    @Transactional
+    public User assignProfileToUser(UUID userId, UUID profileId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "User non trouvé, id: " + userId
+            ));
+        Profile profile = profileRepository.findById(profileId)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Profile non trouvé, id: " + profileId
+            ));
+        user.setProfile(profile);
+        log.debug("[UserService] assignProfileToUser userId: {} profileId: {}",
+            userId, profileId);
+        return userRepository.save(user);
+    }
+
+    // ===========================
+    // Listes
+    // ===========================
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findAllActiveUsers() {
+        log.debug("[UserService] findAllActiveUsers");
+        return userRepository.findAllByActifTrue();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> getUsersEligibleForUnassignment() {
+        User currentUser = getCurrentUser();
+        ProfileEnum profileEnum =
+            ProfileEnum.valueOf(currentUser.getProfile().getCode());
+
+        log.debug("[UserService] getUsersEligibleForUnassignment profil: {}",
+            profileEnum);
+
+        return switch (profileEnum) {
+            case DA -> userRepository
+                .findConseillersByAgence(currentUser.getAgence());
+            case DZ -> userRepository
+                .findDirecteursByZone(currentUser.getZone());
+            default -> {
+                log.debug("[UserService] profil {} non éligible au désassignement",
+                    profileEnum);
+                yield Collections.emptyList();
+            }
+        };
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> getUsersCandidateToReaffctetionByCurrentUserProfile() {
+        User currentUser = getCurrentUser();
+        ProfileEnum profileEnum =
+            ProfileEnum.valueOf(currentUser.getProfile().getCode());
+
+        log.debug("[UserService] getUsersCandidateToReaffctetionByCurrentUserProfile "
+            + "profil: {}", profileEnum);
+
+        return switch (profileEnum) {
+            case DA -> userRepository
+                .findConseillersByAgence(currentUser.getAgence());
+            case DG -> userRepository
+                .findDirecteursByGroupe(currentUser.getGroupe());
+            case DZ -> userRepository
+                .findDirecteursByZone(currentUser.getZone());
+            default -> {
+                log.debug("[UserService] profil {} sans candidats réaffectation",
+                    profileEnum);
+                yield Collections.emptyList();
+            }
+        };
+    }
+
+    // ===========================
+    // Résolution hiérarchique
+    // ===========================
+
+    @Override
+    @Transactional(readOnly = true)
+    public User getNPlusOne(String uid) {
+        User user = userRepository.findByUid(uid)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "User non trouvé, uid: " + uid
+            ));
+
+        ProfileEnum profileEnum =
+            ProfileEnum.valueOf(user.getProfile().getCode());
+
+        log.debug("[UserService] getNPlusOne uid: {} profil: {}",
+            uid, profileEnum);
+
+        return switch (profileEnum) {
+
+            // CONSEILLER → directeur de son agence
+            case CONSEILLER -> {
+                if (user.getAgence() != null
+                        && user.getAgence().getDirectoryAgency() != null) {
+                    yield user.getAgence().getDirectoryAgency();
+                }
+                throw new IllegalArgumentException(
+                    "Aucun directeur d'agence trouvé pour uid: " + uid
+                );
+            }
+
+            // DA → directeur de son groupe
+            case DA -> {
+                if (user.getAgence() != null
+                        && user.getAgence().getGroupe() != null
+                        && user.getAgence().getGroupe().getDirectorGroup() != null) {
+                    yield user.getAgence().getGroupe().getDirectorGroup();
+                }
+                throw new IllegalArgumentException(
+                    "Aucun directeur de groupe trouvé pour uid: " + uid
+                );
+            }
+
+            // DG → directeur de sa zone
+            case DG -> {
+                if (user.getGroupe() != null
+                        && user.getGroupe().getZone() != null
+                        && user.getGroupe().getZone().getDirectorZone() != null) {
+                    yield user.getGroupe().getZone().getDirectorZone();
+                }
+                throw new IllegalArgumentException(
+                    "Aucun directeur de zone trouvé pour uid: " + uid
+                );
+            }
+
+            // DZ → pas de N+1
+            default -> throw new IllegalArgumentException(
+                "Pas de N+1 pour le profil: " + profileEnum
+            );
+        };
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public User getLmrUser() {
+        User currentUser = getCurrentUser();
+        log.debug("[UserService] getLmrUser pour uid: {}",
+            currentUser.getUid());
+
+        // LMR = directeur de zone
+        // Priorité 1 : zone directe du user
+        if (currentUser.getZone() != null
+                && currentUser.getZone().getDirectorZone() != null) {
+            return currentUser.getZone().getDirectorZone();
+        }
+        // Priorité 2 : zone via groupe direct
+        if (currentUser.getGroupe() != null
+                && currentUser.getGroupe().getZone() != null
+                && currentUser.getGroupe().getZone().getDirectorZone() != null) {
+            return currentUser.getGroupe().getZone().getDirectorZone();
+        }
+        // Priorité 3 : zone via agence → groupe
+        if (currentUser.getAgence() != null
+                && currentUser.getAgence().getGroupe() != null
+                && currentUser.getAgence().getGroupe().getZone() != null
+                && currentUser.getAgence().getGroupe().getZone()
+                    .getDirectorZone() != null) {
+            return currentUser.getAgence().getGroupe().getZone()
+                .getDirectorZone();
+        }
+        throw new IllegalArgumentException(
+            "LMR non trouvé pour uid: " + currentUser.getUid()
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public User getDpacUser() {
+        User currentUser = getCurrentUser();
+        log.debug("[UserService] getDpacUser pour uid: {}",
+            currentUser.getUid());
+
+        // DPAC = directeur de groupe
+        // Priorité 1 : groupe direct du user
+        if (currentUser.getGroupe() != null
+                && currentUser.getGroupe().getDirectorGroup() != null) {
+            return currentUser.getGroupe().getDirectorGroup();
+        }
+        // Priorité 2 : groupe via agence
+        if (currentUser.getAgence() != null
+                && currentUser.getAgence().getGroupe() != null
+                && currentUser.getAgence().getGroupe().getDirectorGroup() != null) {
+            return currentUser.getAgence().getGroupe().getDirectorGroup();
+        }
+        throw new IllegalArgumentException(
+            "DPAC non trouvé pour uid: " + currentUser.getUid()
+        );
+    }
+}
+
+package com.bnpparibas.irb.qlickflow.facade;
+
+import com.bnpparibas.irb.qlickflow.dto.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface UserFacade {
+
+    // Lecture
+    Optional<UserDTO> findById(UUID id);
+    Optional<UserDTO> findByUid(String uid);
+    Optional<UserDTO> findByEmail(String email);
+    Optional<UserInfoDTO> getUserInfo(String uid);
+
+    // Écriture
+    UserDTO createUser(UserDTO userDTO);
+    UserDTO updateUser(UserDTO userDTO);
+
+    // Listes
+    List<UserDTO> findAllActiveUsers();
+    List<UserDTO> getUsersEligibleForUnassignment();
+    List<UserReaffectationDto>
+        getUsersCandidateToReaffctetionByCurrentUserProfile();
+
+    // Habilitation
+    UserDTO assignProfileToUser(UUID userId, UUID profileId);
+    Page<UserDTO> findAllUsersByProfileCode(Pageable pageable);
+    Page<UserDTO> findAllUsersByNonAdminProfileCode(Pageable pageable);
+
+    // Résolution hiérarchique
+    UserDTO getNPlusOne(String uid);
+    UserDTO getLmrUser();
+    UserDTO getDpacUser();
+
+    // ✅ Endpoint agrégé — 1 seul appel pour qf-back
+    UserContextResponse getUserContext();
+}
+
+package com.bnpparibas.irb.qlickflow.facade.impl;
+
+import com.bnpparibas.irb.qlickflow.dto.*;
+import com.bnpparibas.irb.qlickflow.dto.UserContextResponse.UserContextUserInfo;
+import com.bnpparibas.irb.qlickflow.entities.habilitation.User;
+import com.bnpparibas.irb.qlickflow.enums.ProfileEnum;
+import com.bnpparibas.irb.qlickflow.facade.UserFacade;
+import com.bnpparibas.irb.qlickflow.mapper.UserMapper;
+import com.bnpparibas.irb.qlickflow.repository.UserRepository;
+import com.bnpparibas.irb.qlickflow.service.UserService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class UserFacadeImpl implements UserFacade {
+
+    private final UserService userService;
+    private final UserMapper userMapper;
+    private final UserRepository userRepository;
+
+    @Value("${app.users.camunda-uid:camunda}")
+    private String camundaUid;
+
+    // ===========================
+    // Lecture simple
+    // ===========================
+
+    @Override
+    public Optional<UserDTO> findById(UUID id) {
+        return userService.findById(id)
+            .map(userMapper::toDTO);
+    }
+
+    @Override
+    public Optional<UserDTO> findByUid(String uid) {
+        return userService.findByUid(uid)
+            .map(userMapper::toDTO);
+    }
+
+    @Override
+    public Optional<UserDTO> findByEmail(String email) {
+        return userService.findByEmail(email)
+            .map(userMapper::toDTO);
+    }
+
+    @Override
+    public Optional<UserInfoDTO> getUserInfo(String uid) {
+        return userService.findByUid(uid)
+            .map(userMapper::toInfoDTO);
+    }
+
+    // ===========================
+    // Écriture
+    // ===========================
+
+    @Override
+    public UserDTO createUser(UserDTO userDTO) {
+        User user = userMapper.toEntity(userDTO);
+        return userMapper.toDTO(userService.createUser(user));
+    }
+
+    @Override
+    public UserDTO updateUser(UserDTO userDTO) {
+        User user = userMapper.toEntity(userDTO);
+        return userMapper.toDTO(userService.updateUser(user));
+    }
+
+    // ===========================
+    // Listes
+    // ===========================
+
+    @Override
+    public List<UserDTO> findAllActiveUsers() {
+        return userService.findAllActiveUsers()
+            .stream()
+            .map(userMapper::toDTO)
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<UserDTO> getUsersEligibleForUnassignment() {
+        return userService.getUsersEligibleForUnassignment()
+            .stream()
+            .map(userMapper::toDTO)
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<UserReaffectationDto>
+            getUsersCandidateToReaffctetionByCurrentUserProfile() {
+        return userService
+            .getUsersCandidateToReaffctetionByCurrentUserProfile()
+            .stream()
+            .map(u -> UserReaffectationDto.builder()
+                .id(u.getId())
+                .uid(u.getUid())
+                .firstName(u.getFirstName())
+                .lastName(u.getLastName())
+                .email(u.getEmail())
+                .profileCode(u.getProfile() != null
+                    ? u.getProfile().getCode() : null)
+                .agenceNom(u.getAgence() != null
+                    ? u.getAgence().getNom() : null)
+                .build()
+            )
+            .collect(Collectors.toList());
+    }
+
+    // ===========================
+    // Habilitation
+    // ===========================
+
+    @Override
+    public UserDTO assignProfileToUser(UUID userId, UUID profileId) {
+        return userMapper.toDTO(
+            userService.assignProfileToUser(userId, profileId)
+        );
+    }
+
+    @Override
+    public Page<UserDTO> findAllUsersByProfileCode(Pageable pageable) {
+        return userRepository
+            .findAllByProfileCodeIn(
+                List.of("ADMIN", "SUPER_ADMIN"), pageable)
+            .map(userMapper::toDTO);
+    }
+
+    @Override
+    public Page<UserDTO> findAllUsersByNonAdminProfileCode(Pageable pageable) {
+        return userRepository
+            .findAllByProfileCodeNotIn(
+                List.of("ADMIN", "SUPER_ADMIN"), pageable)
+            .map(userMapper::toDTO);
+    }
+
+    // ===========================
+    // Résolution hiérarchique
+    // ===========================
+
+    @Override
+    public UserDTO getNPlusOne(String uid) {
+        return userMapper.toDTO(userService.getNPlusOne(uid));
+    }
+
+    @Override
+    public UserDTO getLmrUser() {
+        return userMapper.toDTO(userService.getLmrUser());
+    }
+
+    @Override
+    public UserDTO getDpacUser() {
+        return userMapper.toDTO(userService.getDpacUser());
+    }
+
+    // ===========================
+    // Endpoint agrégé
+    // GET /api/v1/users/context
+    // ===========================
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserContextResponse getUserContext() {
+        User currentUser = userService.getCurrentUser();
+        String uid = currentUser.getUid();
+        ProfileEnum profileEnum =
+            ProfileEnum.valueOf(currentUser.getProfile().getCode());
+
+        log.debug("[UserFacade] getUserContext uid: {} profil: {}",
+            uid, profileEnum);
+
+        // N+1 — isolé, ne bloque pas le reste
+        User nPlusOne = null;
+        try {
+            nPlusOne = userService.getNPlusOne(uid);
+        } catch (Exception e) {
+            log.warn("[UserFacade] N+1 non trouvé pour uid: {}", uid);
+        }
+
+        // DPAC
+        User dpacUser = null;
+        try {
+            dpacUser = userService.getDpacUser();
+        } catch (Exception e) {
+            log.warn("[UserFacade] DPAC non trouvé pour uid: {}", uid);
+        }
+
+        // LMR
+        User lmrUser = null;
+        try {
+            lmrUser = userService.getLmrUser();
+        } catch (Exception e) {
+            log.warn("[UserFacade] LMR non trouvé pour uid: {}", uid);
+        }
+
+        // Camunda — uid externalisé dans application.yaml
+        User camundaUser = userService.findByUid(camundaUid).orElse(null);
+        if (camundaUser == null) {
+            log.warn("[UserFacade] utilisateur camunda '{}' non trouvé",
+                camundaUid);
+        }
+
+        // Éligibles au désassignement
+        List<User> eligibles;
+        try {
+            eligibles = userService.getUsersEligibleForUnassignment();
+        } catch (Exception e) {
+            log.warn("[UserFacade] eligibles non trouvés pour uid: {}", uid);
+            eligibles = Collections.emptyList();
+        }
+
+        // Candidats à la réaffectation
+        List<User> candidates;
+        try {
+            candidates = userService
+                .getUsersCandidateToReaffctetionByCurrentUserProfile();
+        } catch (Exception e) {
+            log.warn("[UserFacade] candidats réaffectation non trouvés "
+                + "pour uid: {}", uid);
+            candidates = Collections.emptyList();
+        }
+
+        return UserContextResponse.builder()
+            .currentUser(userMapper.toContextUserInfo(currentUser))
+            .nPlusOne(userMapper.toContextUserInfo(nPlusOne))
+            .dpacUser(userMapper.toContextUserInfo(dpacUser))
+            .lmrUser(userMapper.toContextUserInfo(lmrUser))
+            .camundaUser(userMapper.toContextUserInfo(camundaUser))
+            .usersEligibleForUnassignment(
+                eligibles.stream()
+                    .map(userMapper::toContextUserInfo)
+                    .collect(Collectors.toList())
+            )
+            .usersCandidateToReaffctetionByCurrentUserProfile(
+                candidates.stream()
+                    .map(u -> UserReaffectationDto.builder()
+                        .id(u.getId())
+                        .uid(u.getUid())
+                        .firstName(u.getFirstName())
+                        .lastName(u.getLastName())
+                        .email(u.getEmail())
+                        .profileCode(u.getProfile() != null
+                            ? u.getProfile().getCode() : null)
+                        .agenceNom(u.getAgence() != null
+                            ? u.getAgence().getNom() : null)
+                        .build()
+                    )
+                    .collect(Collectors.toList())
+            )
+            .build();
+    }
+}
+
