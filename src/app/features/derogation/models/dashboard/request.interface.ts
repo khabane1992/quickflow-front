@@ -1,3 +1,97 @@
+package org.com.bnpparibas.irb.qlickflow.security;
+
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.com.bnpparibas.irb.qlickflow.utils.JwtUtils;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.List;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    // ✅ Réutilise ton JwtUtils existant
+    private final JwtUtils jwtUtils;
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String authHeader = request.getHeader("Authorization");
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        try {
+            // ✅ extractSubject parse + vérifie la signature HMAC
+            String uid = jwtUtils.extractSubject(authHeader);
+
+            if (uid != null && !uid.isBlank()) {
+                UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                        uid,      // principal = uid
+                        null,     // credentials
+                        List.of() // roles gérés ailleurs si besoin
+                    );
+                SecurityContextHolder.getContext()
+                    .setAuthentication(authentication);
+
+                log.debug("[JwtFilter] SecurityContext peuplé, uid: {}", uid);
+            } else {
+                log.warn("[JwtFilter] extractSubject → uid null ou vide");
+            }
+
+        } catch (Exception e) {
+            log.error("[JwtFilter] erreur: {}", e.getMessage());
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}
+
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http)
+        throws Exception {
+    return http
+        .csrf(AbstractHttpConfigurer::disable)
+        .httpBasic(AbstractHttpConfigurer::disable)
+        .formLogin(AbstractHttpConfigurer::disable)
+        .sessionManagement(session ->
+            session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+        )
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers(
+                "/v3/api-docs/**",
+                "/swagger-ui/**",
+                "/swagger-ui.html",
+                "/h2-console/**"
+            ).permitAll()
+            .anyRequest().permitAll()
+        )
+        // ✅ Seul ajout
+        .addFilterBefore(
+            jwtAuthenticationFilter,
+            UsernamePasswordAuthenticationFilter.class
+        )
+        .build();
+}
+
+
+
+
 // src/app/features/derogation/models/dashboard/request.interface.ts
 
 export enum DemandsType {
