@@ -1,90 +1,82 @@
-package org.com.bnpparibas.irb.qlickflow.security;
+@Override
+// ✅ PAS de @Transactional ici — chaque appel service gère sa propre tx
+public UserContextResponse getUserContext() {
+    User currentUser = userService.getCurrentUser();
+    String uid = currentUser.getUid();
+    ProfileEnum profileEnum =
+        ProfileEnum.valueOf(currentUser.getProfile().getCode());
 
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.com.bnpparibas.irb.qlickflow.utils.JwtUtils;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
+    log.debug("[UserFacade] getUserContext uid: {} profil: {}",
+        uid, profileEnum);
 
-import java.io.IOException;
-import java.util.List;
-
-@Slf4j
-@Component
-@RequiredArgsConstructor
-public class JwtAuthenticationFilter extends OncePerRequestFilter {
-
-    // ✅ Réutilise ton JwtUtils existant
-    private final JwtUtils jwtUtils;
-
-    @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain)
-            throws ServletException, IOException {
-
-        String authHeader = request.getHeader("Authorization");
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        try {
-            // ✅ extractSubject parse + vérifie la signature HMAC
-            String uid = jwtUtils.extractSubject(authHeader);
-
-            if (uid != null && !uid.isBlank()) {
-                UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                        uid,      // principal = uid
-                        null,     // credentials
-                        List.of() // roles gérés ailleurs si besoin
-                    );
-                SecurityContextHolder.getContext()
-                    .setAuthentication(authentication);
-
-                log.debug("[JwtFilter] SecurityContext peuplé, uid: {}", uid);
-            } else {
-                log.warn("[JwtFilter] extractSubject → uid null ou vide");
-            }
-
-        } catch (Exception e) {
-            log.error("[JwtFilter] erreur: {}", e.getMessage());
-        }
-
-        filterChain.doFilter(request, response);
+    User nPlusOne = null;
+    try {
+        nPlusOne = userService.getNPlusOne(uid);
+    } catch (Exception e) {
+        log.warn("[UserFacade] N+1 non trouvé pour uid: {}", uid);
     }
-}
 
-@Bean
-public SecurityFilterChain securityFilterChain(HttpSecurity http)
-        throws Exception {
-    return http
-        .csrf(AbstractHttpConfigurer::disable)
-        .httpBasic(AbstractHttpConfigurer::disable)
-        .formLogin(AbstractHttpConfigurer::disable)
-        .sessionManagement(session ->
-            session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+    User dpacUser = null;
+    try {
+        dpacUser = userService.getDpacUser();
+    } catch (Exception e) {
+        log.warn("[UserFacade] DPAC non trouvé pour uid: {}", uid);
+    }
+
+    User lmrUser = null;
+    try {
+        lmrUser = userService.getLmrUser();
+    } catch (Exception e) {
+        log.warn("[UserFacade] LMR non trouvé pour uid: {}", uid);
+    }
+
+    User camundaUser = userService.findByUid(camundaUid).orElse(null);
+    if (camundaUser == null) {
+        log.warn("[UserFacade] utilisateur camunda '{}' non trouvé", camundaUid);
+    }
+
+    List<User> eligibles = List.of();
+    try {
+        eligibles = userService.getUsersEligibleForUnassignment();
+    } catch (Exception e) {
+        log.warn("[UserFacade] eligibles non trouvés pour uid: {}", uid);
+    }
+
+    List<User> candidates = List.of();
+    try {
+        candidates = userService
+            .getUsersCandidateToReaffctetionByCurrentUserProfile();
+    } catch (Exception e) {
+        log.warn("[UserFacade] candidats réaffectation non trouvés pour uid: {}",
+            uid);
+    }
+
+    return UserContextResponse.builder()
+        .currentUser(userMapper.toContextUserInfo(currentUser))
+        .nPlusOne(userMapper.toContextUserInfo(nPlusOne))
+        .dpacUser(userMapper.toContextUserInfo(dpacUser))
+        .lmrUser(userMapper.toContextUserInfo(lmrUser))
+        .camundaUser(userMapper.toContextUserInfo(camundaUser))
+        .usersEligibleForUnassignment(
+            eligibles.stream()
+                .map(userMapper::toContextUserInfo)
+                .collect(Collectors.toList())
         )
-        .authorizeHttpRequests(auth -> auth
-            .requestMatchers(
-                "/v3/api-docs/**",
-                "/swagger-ui/**",
-                "/swagger-ui.html",
-                "/h2-console/**"
-            ).permitAll()
-            .anyRequest().permitAll()
-        )
-        // ✅ Seul ajout
-        .addFilterBefore(
-            jwtAuthenticationFilter,
-            UsernamePasswordAuthenticationFilter.class
+        .usersCandidateToReaffctetionByCurrentUserProfile(
+            candidates.stream()
+                .map(u -> UserReaffectationDto.builder()
+                    .id(u.getId())
+                    .uid(u.getUid())
+                    .firstName(u.getFirstName())
+                    .lastName(u.getLastName())
+                    .email(u.getEmail())
+                    .profileCode(u.getProfile() != null
+                        ? u.getProfile().getCode() : null)
+                    .agenceNom(u.getAgence() != null
+                        ? u.getAgence().getNom() : null)
+                    .build()
+                )
+                .collect(Collectors.toList())
         )
         .build();
 }
