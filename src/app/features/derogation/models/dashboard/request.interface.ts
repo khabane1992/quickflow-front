@@ -1,88 +1,162 @@
-@Override
-// ✅ PAS de @Transactional ici — chaque appel service gère sa propre tx
-public UserContextResponse getUserContext() {
-    User currentUser = userService.getCurrentUser();
-    String uid = currentUser.getUid();
-    ProfileEnum profileEnum =
-        ProfileEnum.valueOf(currentUser.getProfile().getCode());
+package com.bnpparibas.irb.qlickflow.mapper;
 
-    log.debug("[UserFacade] getUserContext uid: {} profil: {}",
-        uid, profileEnum);
+import com.bnpparibas.irb.qlickflow.dto.*;
+import com.bnpparibas.irb.qlickflow.dto.UserContextResponse.UserContextUserInfo;
+import com.bnpparibas.irb.qlickflow.entities.habilitation.*;
+import org.mapstruct.*;
 
-    User nPlusOne = null;
-    try {
-        nPlusOne = userService.getNPlusOne(uid);
-    } catch (Exception e) {
-        log.warn("[UserFacade] N+1 non trouvé pour uid: {}", uid);
+@Mapper(componentModel = "spring")
+public interface UserMapper {
+
+    // ===========================
+    // User → UserDTO
+    // ===========================
+
+    @Mapping(target = "profile", source = "profile")
+    @Mapping(target = "agence",  source = "agence")
+    @Mapping(target = "groupe",  source = "groupe")
+    @Mapping(target = "zone",    source = "zone")
+    UserDTO toDTO(User user);
+
+    @Mapping(target = "profile",  ignore = true)
+    @Mapping(target = "agence",   ignore = true)
+    @Mapping(target = "groupe",   ignore = true)
+    @Mapping(target = "zone",     ignore = true)
+    @Mapping(target = "password", ignore = true)
+    User toEntity(UserDTO userDTO);
+
+    // ===========================
+    // User → UserInfoDTO
+    // ===========================
+
+    @Mapping(target = "profileCode",
+             expression = "java(user.getProfile() != null "
+                        + "? user.getProfile().getCode() : null)")
+    @Mapping(target = "profileNom",
+             expression = "java(user.getProfile() != null "
+                        + "? user.getProfile().getNom() : null)")
+    @Mapping(target = "agenceNom",
+             expression = "java(user.getAgence() != null "
+                        + "? user.getAgence().getNom() : null)")
+    UserInfoDTO toInfoDTO(User user);
+
+    // ===========================
+    // Mappings relations
+    // ===========================
+
+    @Mapping(target = "permissions", source = "permissions")
+    ProfileDTO toProfileDTO(Profile profile);
+
+    PermissionDTO toPermissionDTO(Permission permission);
+
+    @Mapping(target = "groupe",          source = "groupe")
+    @Mapping(target = "directoryAgency", source = "directoryAgency")
+    AgenceDTO toAgenceDTO(Agence agence);
+
+    @Mapping(target = "zone",          source = "zone")
+    @Mapping(target = "directorGroup", source = "directorGroup")
+    GroupeDTO toGroupeDTO(Groupe groupe);
+
+    @Mapping(target = "directorZone", source = "directorZone")
+    ZoneDTO toZoneDTO(Zone zone);
+
+    // ===========================
+    // User → UserContextUserInfo
+    // ✅ default method — mapping
+    // manuel pour éviter les
+    // problèmes d'expression
+    // MapStruct avec relations
+    // imbriquées
+    // ===========================
+
+    default UserContextUserInfo toContextUserInfo(User user) {
+        if (user == null) return null;
+
+        // Profile
+        String profileCode = null;
+        String profileNom  = null;
+        if (user.getProfile() != null) {
+            profileCode = user.getProfile().getCode();
+            profileNom  = user.getProfile().getNom();
+        }
+
+        // Agence — données plates
+        UUID    agenceId    = null;
+        String  agenceNom   = null;
+        String  agenceCode  = null;
+        Boolean agenceActif = null;
+        if (user.getAgence() != null) {
+            agenceId    = user.getAgence().getId();
+            agenceNom   = user.getAgence().getNom();
+            agenceCode  = user.getAgence().getCode();
+            agenceActif = user.getAgence().getActif();
+        }
+
+        // Groupe — priorité : user.groupe sinon user.agence.groupe
+        UUID    groupeId    = null;
+        String  groupeNom   = null;
+        Boolean groupeActif = null;
+        Groupe groupe = user.getGroupe() != null
+            ? user.getGroupe()
+            : (user.getAgence() != null
+                ? user.getAgence().getGroupe()
+                : null);
+        if (groupe != null) {
+            groupeId    = groupe.getId();
+            groupeNom   = groupe.getNom();
+            groupeActif = groupe.getActif();
+        }
+
+        // Zone — priorité : user.zone
+        //        sinon user.groupe.zone
+        //        sinon user.agence.groupe.zone
+        UUID    zoneId    = null;
+        String  zoneNom   = null;
+        Boolean zoneActif = null;
+        Zone zone = null;
+        if (user.getZone() != null) {
+            zone = user.getZone();
+        } else if (user.getGroupe() != null
+                && user.getGroupe().getZone() != null) {
+            zone = user.getGroupe().getZone();
+        } else if (user.getAgence() != null
+                && user.getAgence().getGroupe() != null
+                && user.getAgence().getGroupe().getZone() != null) {
+            zone = user.getAgence().getGroupe().getZone();
+        }
+        if (zone != null) {
+            zoneId    = zone.getId();
+            zoneNom   = zone.getNom();
+            zoneActif = zone.getActif();
+        }
+
+        return UserContextUserInfo.builder()
+            .id(user.getId())
+            .uid(user.getUid())
+            .username(user.getUsername())
+            .email(user.getEmail())
+            .firstName(user.getFirstName())
+            .lastName(user.getLastName())
+            .actif(user.getActif())
+            // ✅ profileCode explicitement mappé
+            .profileCode(profileCode)
+            .profileNom(profileNom)
+            // ✅ Agence plate
+            .agenceId(agenceId)
+            .agenceNom(agenceNom)
+            .agenceCode(agenceCode)
+            .agenceActif(agenceActif)
+            // ✅ Groupe plat — résolution hiérarchique
+            .groupeId(groupeId)
+            .groupeNom(groupeNom)
+            .groupeActif(groupeActif)
+            // ✅ Zone plate — résolution hiérarchique
+            .zoneId(zoneId)
+            .zoneNom(zoneNom)
+            .zoneActif(zoneActif)
+            .build();
     }
-
-    User dpacUser = null;
-    try {
-        dpacUser = userService.getDpacUser();
-    } catch (Exception e) {
-        log.warn("[UserFacade] DPAC non trouvé pour uid: {}", uid);
-    }
-
-    User lmrUser = null;
-    try {
-        lmrUser = userService.getLmrUser();
-    } catch (Exception e) {
-        log.warn("[UserFacade] LMR non trouvé pour uid: {}", uid);
-    }
-
-    User camundaUser = userService.findByUid(camundaUid).orElse(null);
-    if (camundaUser == null) {
-        log.warn("[UserFacade] utilisateur camunda '{}' non trouvé", camundaUid);
-    }
-
-    List<User> eligibles = List.of();
-    try {
-        eligibles = userService.getUsersEligibleForUnassignment();
-    } catch (Exception e) {
-        log.warn("[UserFacade] eligibles non trouvés pour uid: {}", uid);
-    }
-
-    List<User> candidates = List.of();
-    try {
-        candidates = userService
-            .getUsersCandidateToReaffctetionByCurrentUserProfile();
-    } catch (Exception e) {
-        log.warn("[UserFacade] candidats réaffectation non trouvés pour uid: {}",
-            uid);
-    }
-
-    return UserContextResponse.builder()
-        .currentUser(userMapper.toContextUserInfo(currentUser))
-        .nPlusOne(userMapper.toContextUserInfo(nPlusOne))
-        .dpacUser(userMapper.toContextUserInfo(dpacUser))
-        .lmrUser(userMapper.toContextUserInfo(lmrUser))
-        .camundaUser(userMapper.toContextUserInfo(camundaUser))
-        .usersEligibleForUnassignment(
-            eligibles.stream()
-                .map(userMapper::toContextUserInfo)
-                .collect(Collectors.toList())
-        )
-        .usersCandidateToReaffctetionByCurrentUserProfile(
-            candidates.stream()
-                .map(u -> UserReaffectationDto.builder()
-                    .id(u.getId())
-                    .uid(u.getUid())
-                    .firstName(u.getFirstName())
-                    .lastName(u.getLastName())
-                    .email(u.getEmail())
-                    .profileCode(u.getProfile() != null
-                        ? u.getProfile().getCode() : null)
-                    .agenceNom(u.getAgence() != null
-                        ? u.getAgence().getNom() : null)
-                    .build()
-                )
-                .collect(Collectors.toList())
-        )
-        .build();
 }
-
-
-
 
 // src/app/features/derogation/models/dashboard/request.interface.ts
 
