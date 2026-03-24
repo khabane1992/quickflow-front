@@ -3,76 +3,113 @@ package com.bnpparibas.irb.qlickflow.mapper;
 import com.bnpparibas.irb.qlickflow.dto.*;
 import com.bnpparibas.irb.qlickflow.dto.UserContextResponse.UserContextUserInfo;
 import com.bnpparibas.irb.qlickflow.entities.habilitation.*;
+import com.bnpparibas.irb.qlickflow.enums.ProfileEnum;
 import org.mapstruct.*;
 
-@Mapper(componentModel = "spring")
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Mapper(
+    componentModel = "spring",
+    uses = {ProfileMapper.class, AgenceMapper.class,
+            GroupeMapper.class, ZoneMapper.class},
+    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
+)
 public interface UserMapper {
 
     // ===========================
     // User → UserDTO
     // ===========================
 
-    @Mapping(target = "profile", source = "profile")
-    @Mapping(target = "agence",  source = "agence")
-    @Mapping(target = "groupe",  source = "groupe")
-    @Mapping(target = "zone",    source = "zone")
+    @Mapping(source = "profile", target = "profile")
+    @Mapping(source = "agence",  target = "agence")
+    @Mapping(source = "groupe",  target = "groupe")
+    @Mapping(source = "zone",    target = "zone")
     UserDTO toDTO(User user);
 
-    @Mapping(target = "profile",  ignore = true)
-    @Mapping(target = "agence",   ignore = true)
-    @Mapping(target = "groupe",   ignore = true)
-    @Mapping(target = "zone",     ignore = true)
-    @Mapping(target = "password", ignore = true)
+    @Mapping(target = "profile",   source = "profile")
+    @Mapping(target = "agence",    source = "agence")
+    @Mapping(target = "groupe",    source = "groupe")
+    @Mapping(target = "zone",      source = "zone")
     User toEntity(UserDTO userDTO);
+
+    List<UserDTO> toDtoList(List<User> users);
+
+    List<User> toEntityList(List<UserDTO> userDTOs);
+
+    @Mapping(target = "id",        ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "profile",   ignore = true)
+    @Mapping(target = "agence",    ignore = true)
+    @Mapping(target = "groupe",    ignore = true)
+    @Mapping(target = "zone",      ignore = true)
+    void updateEntityFromDto(UserDTO userDTO,
+                             @MappingTarget User user);
 
     // ===========================
     // User → UserInfoDTO
     // ===========================
 
-    @Mapping(target = "profileCode",
-             expression = "java(user.getProfile() != null "
-                        + "? user.getProfile().getCode() : null)")
-    @Mapping(target = "profileNom",
-             expression = "java(user.getProfile() != null "
-                        + "? user.getProfile().getNom() : null)")
-    @Mapping(target = "agenceNom",
-             expression = "java(user.getAgence() != null "
-                        + "? user.getAgence().getNom() : null)")
-    UserInfoDTO toInfoDTO(User user);
+    @Mappings({
+        @Mapping(source = "uid",       target = "uid"),
+        @Mapping(source = "username",  target = "username"),
+        @Mapping(source = "email",     target = "email"),
+        @Mapping(source = "firstName", target = "firstName"),
+        @Mapping(source = "lastName",  target = "lastName"),
+        @Mapping(source = "actif",     target = "actif"),
+        @Mapping(source = "profile.name", target = "profile"),
+        @Mapping(source = "agence.nom",   target = "agence"),
+        @Mapping(target = "groupName",
+                 expression = "java(getGroupName(user))"),
+        @Mapping(target = "zoneName",
+                 expression = "java(getZoneName(user))"),
+        @Mapping(target = "managerGroupName",
+                 expression = "java(getManagerGroupName(user))"),
+        @Mapping(target = "managerZoneName",
+                 expression = "java(getManagerZoneName(user))"),
+        @Mapping(target = "managerId",
+                 source = "user",
+                 qualifiedByName = "getManagerId"),
+        @Mapping(target = "managerProfile",
+                 source = "user",
+                 qualifiedByName = "getManagerProfile"),
+        @Mapping(target = "managerFirstName",
+                 source = "user",
+                 qualifiedByName = "getManagerFirstName"),
+        @Mapping(target = "managerLastName",
+                 source = "user",
+                 qualifiedByName = "getManagerLastName")
+    })
+    UserInfoDTO toUserInfoDto(User user);
 
     // ===========================
-    // Mappings relations
+    // User → UserReaffectationDto
     // ===========================
 
-    @Mapping(target = "permissions", source = "permissions")
-    ProfileDTO toProfileDTO(Profile profile);
+    @Mapping(target = "username", source = "username")
+    @Mapping(target = "email",    source = "email")
+    @Mapping(target = "firstName", source = "firstName")
+    @Mapping(target = "lastName",  source = "lastName")
+    @Mapping(target = "agence",    source = "agence")
+    List<UserReaffectationDto> toAffectation(List<User> user);
 
-    PermissionDTO toPermissionDTO(Permission permission);
-
-    @Mapping(target = "groupe",          source = "groupe")
-    @Mapping(target = "directoryAgency", source = "directoryAgency")
-    AgenceDTO toAgenceDTO(Agence agence);
-
-    @Mapping(target = "zone",          source = "zone")
-    @Mapping(target = "directorGroup", source = "directorGroup")
-    GroupeDTO toGroupeDTO(Groupe groupe);
-
-    @Mapping(target = "directorZone", source = "directorZone")
-    ZoneDTO toZoneDTO(Zone zone);
+    default String map(Agence agence) {
+        return agence != null ? agence.getNom() : null;
+    }
 
     // ===========================
     // User → UserContextUserInfo
-    // ✅ default method — mapping
-    // manuel pour éviter les
-    // problèmes d'expression
-    // MapStruct avec relations
-    // imbriquées
+    // ✅ default method — évite
+    // les problèmes MapStruct
+    // avec relations imbriquées
     // ===========================
 
     default UserContextUserInfo toContextUserInfo(User user) {
         if (user == null) return null;
 
-        // Profile
+        // ✅ Profile — null safe
         String profileCode = null;
         String profileNom  = null;
         if (user.getProfile() != null) {
@@ -80,7 +117,7 @@ public interface UserMapper {
             profileNom  = user.getProfile().getNom();
         }
 
-        // Agence — données plates
+        // ✅ Agence — données plates
         UUID    agenceId    = null;
         String  agenceNom   = null;
         String  agenceCode  = null;
@@ -92,7 +129,7 @@ public interface UserMapper {
             agenceActif = user.getAgence().getActif();
         }
 
-        // Groupe — priorité : user.groupe sinon user.agence.groupe
+        // ✅ Groupe — user.groupe sinon user.agence.groupe
         UUID    groupeId    = null;
         String  groupeNom   = null;
         Boolean groupeActif = null;
@@ -107,9 +144,9 @@ public interface UserMapper {
             groupeActif = groupe.getActif();
         }
 
-        // Zone — priorité : user.zone
-        //        sinon user.groupe.zone
-        //        sinon user.agence.groupe.zone
+        // ✅ Zone — user.zone
+        //          sinon user.groupe.zone
+        //          sinon user.agence.groupe.zone
         UUID    zoneId    = null;
         String  zoneNom   = null;
         Boolean zoneActif = null;
@@ -138,23 +175,129 @@ public interface UserMapper {
             .firstName(user.getFirstName())
             .lastName(user.getLastName())
             .actif(user.getActif())
-            // ✅ profileCode explicitement mappé
             .profileCode(profileCode)
             .profileNom(profileNom)
-            // ✅ Agence plate
             .agenceId(agenceId)
             .agenceNom(agenceNom)
             .agenceCode(agenceCode)
             .agenceActif(agenceActif)
-            // ✅ Groupe plat — résolution hiérarchique
             .groupeId(groupeId)
             .groupeNom(groupeNom)
             .groupeActif(groupeActif)
-            // ✅ Zone plate — résolution hiérarchique
             .zoneId(zoneId)
             .zoneNom(zoneNom)
             .zoneActif(zoneActif)
             .build();
+    }
+
+    // ===========================
+    // Helpers existants
+    // ✅ getManager() corrigé
+    //    — null safe sur profile
+    // ===========================
+
+    @Named("getManagerId")
+    default UUID getManagerId(User user) {
+        User manager = getManager(user);
+        return manager != null ? manager.getId() : null;
+    }
+
+    @Named("getManagerFirstName")
+    default String getManagerFirstName(User user) {
+        User manager = getManager(user);
+        return manager != null ? manager.getFirstName() : null;
+    }
+
+    @Named("getManagerProfile")
+    default String getManagerProfile(User user) {
+        User manager = getManager(user);
+        return manager != null
+            && manager.getProfile() != null
+            ? manager.getProfile().getName() : null;
+    }
+
+    @Named("getManagerLastName")
+    default String getManagerLastName(User user) {
+        User manager = getManager(user);
+        return manager != null ? manager.getLastName() : null;
+    }
+
+    default String getGroupName(User user) {
+        if ("DIE".equals(
+                user.getProfile() != null
+                    ? user.getProfile().getName()
+                    : null)) {
+            return Optional.ofNullable(user.getGroupe())
+                .map(Groupe::getNom)
+                .orElse(null);
+        }
+        return null;
+    }
+
+    default String getZoneName(User user) {
+        if ("DZ".equals(
+                user.getProfile() != null
+                    ? user.getProfile().getName()
+                    : null)) {
+            return Optional.ofNullable(user.getZone())
+                .map(Zone::getNom)
+                .orElse(null);
+        }
+        return null;
+    }
+
+    default String getManagerGroupName(User user) {
+        User manager = getManager(user);
+        return manager != null
+            && manager.getGroupe() != null
+            ? manager.getGroupe().getNom() : null;
+    }
+
+    default String getManagerZoneName(User user) {
+        User manager = getManager(user);
+        return manager != null
+            && manager.getZone() != null
+            ? manager.getZone().getNom() : null;
+    }
+
+    /**
+     * ✅ CORRIGÉ — null check sur profile
+     * avant ProfileEnum.valueOf()
+     * C'était la cause du NPE original
+     */
+    default User getManager(User user) {
+        // ✅ Guard — pas de profil → pas de manager
+        if (user == null
+                || user.getProfile() == null
+                || user.getProfile().getCode() == null) {
+            return null;
+        }
+
+        try {
+            return switch (ProfileEnum.valueOf(
+                    user.getProfile().getCode())) {
+                case CONSEILLER ->
+                    user.getAgence() != null
+                        ? user.getAgence().getDirectoryAgency()
+                        : null;
+                case DA ->
+                    user.getAgence() != null
+                    && user.getAgence().getGroupe() != null
+                        ? user.getAgence().getGroupe()
+                              .getDirectorGroup()
+                        : null;
+                case DIE ->
+                    user.getGroupe() != null
+                    && user.getGroupe().getZone() != null
+                        ? user.getGroupe().getZone()
+                              .getDirectorZone()
+                        : null;
+                default -> null;
+            };
+        } catch (IllegalArgumentException e) {
+            // Profil inconnu dans l'enum → pas de manager
+            return null;
+        }
     }
 }
 
