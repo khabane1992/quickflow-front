@@ -1,303 +1,167 @@
-package com.bnpparibas.irb.qlickflow.mapper;
+package com.bnpparibas.irb.qlickflow.config;
 
-import com.bnpparibas.irb.qlickflow.dto.*;
-import com.bnpparibas.irb.qlickflow.dto.UserContextResponse.UserContextUserInfo;
-import com.bnpparibas.irb.qlickflow.entities.habilitation.*;
-import com.bnpparibas.irb.qlickflow.enums.ProfileEnum;
-import org.mapstruct.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration
+    .EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration
+    .EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers
+    .AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.server.resource.authentication
+    .JwtAuthenticationConverter;
+import org.springframework.security.web.SecurityFilterChain;
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
-@Mapper(
-    componentModel = "spring",
-    uses = {ProfileMapper.class, AgenceMapper.class,
-            GroupeMapper.class, ZoneMapper.class},
-    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
-)
-public interface UserMapper {
+@Slf4j
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
+@RequiredArgsConstructor
+public class SecurityConfig {
 
-    // ===========================
-    // User → UserDTO
-    // ===========================
+    @Value("${security.jwt.secret}")
+    private String jwtSecret;
 
-    @Mapping(source = "profile", target = "profile")
-    @Mapping(source = "agence",  target = "agence")
-    @Mapping(source = "groupe",  target = "groupe")
-    @Mapping(source = "zone",    target = "zone")
-    UserDTO toDTO(User user);
-
-    @Mapping(target = "profile",   source = "profile")
-    @Mapping(target = "agence",    source = "agence")
-    @Mapping(target = "groupe",    source = "groupe")
-    @Mapping(target = "zone",      source = "zone")
-    User toEntity(UserDTO userDTO);
-
-    List<UserDTO> toDtoList(List<User> users);
-
-    List<User> toEntityList(List<UserDTO> userDTOs);
-
-    @Mapping(target = "id",        ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    @Mapping(target = "profile",   ignore = true)
-    @Mapping(target = "agence",    ignore = true)
-    @Mapping(target = "groupe",    ignore = true)
-    @Mapping(target = "zone",      ignore = true)
-    void updateEntityFromDto(UserDTO userDTO,
-                             @MappingTarget User user);
-
-    // ===========================
-    // User → UserInfoDTO
-    // ===========================
-
-    @Mappings({
-        @Mapping(source = "uid",       target = "uid"),
-        @Mapping(source = "username",  target = "username"),
-        @Mapping(source = "email",     target = "email"),
-        @Mapping(source = "firstName", target = "firstName"),
-        @Mapping(source = "lastName",  target = "lastName"),
-        @Mapping(source = "actif",     target = "actif"),
-        @Mapping(source = "profile.name", target = "profile"),
-        @Mapping(source = "agence.nom",   target = "agence"),
-        @Mapping(target = "groupName",
-                 expression = "java(getGroupName(user))"),
-        @Mapping(target = "zoneName",
-                 expression = "java(getZoneName(user))"),
-        @Mapping(target = "managerGroupName",
-                 expression = "java(getManagerGroupName(user))"),
-        @Mapping(target = "managerZoneName",
-                 expression = "java(getManagerZoneName(user))"),
-        @Mapping(target = "managerId",
-                 source = "user",
-                 qualifiedByName = "getManagerId"),
-        @Mapping(target = "managerProfile",
-                 source = "user",
-                 qualifiedByName = "getManagerProfile"),
-        @Mapping(target = "managerFirstName",
-                 source = "user",
-                 qualifiedByName = "getManagerFirstName"),
-        @Mapping(target = "managerLastName",
-                 source = "user",
-                 qualifiedByName = "getManagerLastName")
-    })
-    UserInfoDTO toUserInfoDto(User user);
-
-    // ===========================
-    // User → UserReaffectationDto
-    // ===========================
-
-    @Mapping(target = "username", source = "username")
-    @Mapping(target = "email",    source = "email")
-    @Mapping(target = "firstName", source = "firstName")
-    @Mapping(target = "lastName",  source = "lastName")
-    @Mapping(target = "agence",    source = "agence")
-    List<UserReaffectationDto> toAffectation(List<User> user);
-
-    default String map(Agence agence) {
-        return agence != null ? agence.getNom() : null;
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 
-    // ===========================
-    // User → UserContextUserInfo
-    // ✅ default method — évite
-    // les problèmes MapStruct
-    // avec relations imbriquées
-    // ===========================
+    @Bean
+    public JwtEncoder jwtEncoder() {
+        SecretKey secretKey = new SecretKeySpec(
+            jwtSecret.getBytes(StandardCharsets.UTF_8),
+            "HmacSHA256"
+        );
+        return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey));
+    }
 
-    default UserContextUserInfo toContextUserInfo(User user) {
-        if (user == null) return null;
-
-        // ✅ Profile — null safe
-        String profileCode = null;
-        String profileNom  = null;
-        if (user.getProfile() != null) {
-            profileCode = user.getProfile().getCode();
-            profileNom  = user.getProfile().getNom();
-        }
-
-        // ✅ Agence — données plates
-        UUID    agenceId    = null;
-        String  agenceNom   = null;
-        String  agenceCode  = null;
-        Boolean agenceActif = null;
-        if (user.getAgence() != null) {
-            agenceId    = user.getAgence().getId();
-            agenceNom   = user.getAgence().getNom();
-            agenceCode  = user.getAgence().getCode();
-            agenceActif = user.getAgence().getActif();
-        }
-
-        // ✅ Groupe — user.groupe sinon user.agence.groupe
-        UUID    groupeId    = null;
-        String  groupeNom   = null;
-        Boolean groupeActif = null;
-        Groupe groupe = user.getGroupe() != null
-            ? user.getGroupe()
-            : (user.getAgence() != null
-                ? user.getAgence().getGroupe()
-                : null);
-        if (groupe != null) {
-            groupeId    = groupe.getId();
-            groupeNom   = groupe.getNom();
-            groupeActif = groupe.getActif();
-        }
-
-        // ✅ Zone — user.zone
-        //          sinon user.groupe.zone
-        //          sinon user.agence.groupe.zone
-        UUID    zoneId    = null;
-        String  zoneNom   = null;
-        Boolean zoneActif = null;
-        Zone zone = null;
-        if (user.getZone() != null) {
-            zone = user.getZone();
-        } else if (user.getGroupe() != null
-                && user.getGroupe().getZone() != null) {
-            zone = user.getGroupe().getZone();
-        } else if (user.getAgence() != null
-                && user.getAgence().getGroupe() != null
-                && user.getAgence().getGroupe().getZone() != null) {
-            zone = user.getAgence().getGroupe().getZone();
-        }
-        if (zone != null) {
-            zoneId    = zone.getId();
-            zoneNom   = zone.getNom();
-            zoneActif = zone.getActif();
-        }
-
-        return UserContextUserInfo.builder()
-            .id(user.getId())
-            .uid(user.getUid())
-            .username(user.getUsername())
-            .email(user.getEmail())
-            .firstName(user.getFirstName())
-            .lastName(user.getLastName())
-            .actif(user.getActif())
-            .profileCode(profileCode)
-            .profileNom(profileNom)
-            .agenceId(agenceId)
-            .agenceNom(agenceNom)
-            .agenceCode(agenceCode)
-            .agenceActif(agenceActif)
-            .groupeId(groupeId)
-            .groupeNom(groupeNom)
-            .groupeActif(groupeActif)
-            .zoneId(zoneId)
-            .zoneNom(zoneNom)
-            .zoneActif(zoneActif)
+    @Bean
+    public JwtDecoder jwtDecoder() {
+        SecretKey secretKey = new SecretKeySpec(
+            jwtSecret.getBytes(StandardCharsets.UTF_8),
+            "HmacSHA256"
+        );
+        return NimbusJwtDecoder
+            .withSecretKey(secretKey)
+            .macAlgorithm(MacAlgorithm.HS256)
             .build();
     }
 
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http)
+            throws Exception {
+        http
+            .csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(sm ->
+                sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/v1/derog-tarif/auth/**"
+                ).permitAll()
+                .requestMatchers(
+                    "/h2-console/**"
+                ).permitAll()
+                .requestMatchers(
+                    "/v3/api-docs/**",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html"
+                ).permitAll()
+                .anyRequest().authenticated()
+            )
+            .headers(headers ->
+                headers.frameOptions(
+                    org.springframework.security.config.annotation.web
+                        .configurers.HeadersConfigurer
+                        .FrameOptionsConfig::disable)
+            )
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(jwt -> jwt
+                    .jwtAuthenticationConverter(
+                        jwtAuthenticationConverter())
+                )
+                .authenticationEntryPoint((request, response, ex) ->
+                    response.setStatus(
+                        jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED
+                    )
+                )
+            );
+
+        return http.build();
+    }
+
     // ===========================
-    // Helpers existants
-    // ✅ getManager() corrigé
-    //    — null safe sur profile
+    // ✅ Extraction depuis claims
+    // JWT — plus de userRepository
     // ===========================
 
-    @Named("getManagerId")
-    default UUID getManagerId(User user) {
-        User manager = getManager(user);
-        return manager != null ? manager.getId() : null;
+    private JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter =
+            new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(
+            this::extractAuthoritiesFromJwt);
+        return converter;
     }
 
-    @Named("getManagerFirstName")
-    default String getManagerFirstName(User user) {
-        User manager = getManager(user);
-        return manager != null ? manager.getFirstName() : null;
-    }
+    private Collection<GrantedAuthority> extractAuthoritiesFromJwt(
+            Jwt jwt) {
+        List<GrantedAuthority> authorities = new ArrayList<>();
 
-    @Named("getManagerProfile")
-    default String getManagerProfile(User user) {
-        User manager = getManager(user);
-        return manager != null
-            && manager.getProfile() != null
-            ? manager.getProfile().getName() : null;
-    }
-
-    @Named("getManagerLastName")
-    default String getManagerLastName(User user) {
-        User manager = getManager(user);
-        return manager != null ? manager.getLastName() : null;
-    }
-
-    default String getGroupName(User user) {
-        if ("DIE".equals(
-                user.getProfile() != null
-                    ? user.getProfile().getName()
-                    : null)) {
-            return Optional.ofNullable(user.getGroupe())
-                .map(Groupe::getNom)
-                .orElse(null);
-        }
-        return null;
-    }
-
-    default String getZoneName(User user) {
-        if ("DZ".equals(
-                user.getProfile() != null
-                    ? user.getProfile().getName()
-                    : null)) {
-            return Optional.ofNullable(user.getZone())
-                .map(Zone::getNom)
-                .orElse(null);
-        }
-        return null;
-    }
-
-    default String getManagerGroupName(User user) {
-        User manager = getManager(user);
-        return manager != null
-            && manager.getGroupe() != null
-            ? manager.getGroupe().getNom() : null;
-    }
-
-    default String getManagerZoneName(User user) {
-        User manager = getManager(user);
-        return manager != null
-            && manager.getZone() != null
-            ? manager.getZone().getNom() : null;
-    }
-
-    /**
-     * ✅ CORRIGÉ — null check sur profile
-     * avant ProfileEnum.valueOf()
-     * C'était la cause du NPE original
-     */
-    default User getManager(User user) {
-        // ✅ Guard — pas de profil → pas de manager
-        if (user == null
-                || user.getProfile() == null
-                || user.getProfile().getCode() == null) {
-            return null;
+        // ✅ Priorité 1 — profileCode dans les claims
+        String profileCode = jwt.getClaimAsString("profileCode");
+        if (profileCode != null && !profileCode.isBlank()) {
+            authorities.add(
+                new SimpleGrantedAuthority("ROLE_" + profileCode)
+            );
+            log.debug("[SecurityConfig] authority depuis claim "
+                + "profileCode: ROLE_{}", profileCode);
         }
 
-        try {
-            return switch (ProfileEnum.valueOf(
-                    user.getProfile().getCode())) {
-                case CONSEILLER ->
-                    user.getAgence() != null
-                        ? user.getAgence().getDirectoryAgency()
-                        : null;
-                case DA ->
-                    user.getAgence() != null
-                    && user.getAgence().getGroupe() != null
-                        ? user.getAgence().getGroupe()
-                              .getDirectorGroup()
-                        : null;
-                case DIE ->
-                    user.getGroupe() != null
-                    && user.getGroupe().getZone() != null
-                        ? user.getGroupe().getZone()
-                              .getDirectorZone()
-                        : null;
-                default -> null;
-            };
-        } catch (IllegalArgumentException e) {
-            // Profil inconnu dans l'enum → pas de manager
-            return null;
+        // ✅ Priorité 2 — liste permissions dans les claims
+        List<String> permissions =
+            jwt.getClaimAsStringList("permissions");
+        if (permissions != null) {
+            permissions.stream()
+                .filter(p -> p != null && !p.isBlank())
+                .map(SimpleGrantedAuthority::new)
+                .forEach(authorities::add);
+            log.debug("[SecurityConfig] {} permissions extraites "
+                + "du JWT", permissions.size());
         }
+
+        // ✅ Fallback — subject (uid) comme authority
+        if (authorities.isEmpty()) {
+            String subject = jwt.getSubject();
+            log.warn("[SecurityConfig] aucune authority dans les "
+                + "claims JWT pour uid: {}", subject);
+        }
+
+        return authorities;
     }
 }
 
