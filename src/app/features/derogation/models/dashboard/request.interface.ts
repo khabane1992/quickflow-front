@@ -1,169 +1,396 @@
-package com.bnpparibas.irb.qlickflow.config;
+package com.bnpparibas.irb.qlickflow.dtos.mainlevee;
 
+import java.time.LocalDate;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * Interface commune regroupant les champs partagés entre
+ * CreateMainleveeDto, SaveDraftMainleveeDto et UpdateMainleveeDto.
+ */
+public interface MainleveeFieldsDto {
+
+    String getClientSubId();
+
+    String getCin();
+
+    String getAccountNumber();
+
+    String getInitiateur();
+
+    LocalDate getReceptionDate();
+
+    LocalDate getClosedDate();
+
+    String getFirstName();
+
+    String getLastName();
+
+    String getNomAgence();
+
+    String getGroupeAgence();
+
+    String getFullNameDA();
+
+    String getDestinataireExclusif();
+
+    String getImpayeMCI();
+
+    String getImpayeBCC();
+
+    String getImpayeBMCI();
+
+    String getMesureConervatoir();
+
+    String getInsidentPeyment();
+
+    String getActionCommercial();
+
+    String getMotif();
+
+    Set<UUID> getDocumentIds();
+
+    String getJustification();
+}
+
+package com.bnpparibas.irb.qlickflow.mapper.mainlevee;
+
+import com.bnpparibas.irb.qlickflow.dtos.mainlevee.*;
+import com.bnpparibas.irb.qlickflow.entities.mainlevee.*;
+import com.bnpparibas.irb.qlickflow.entities.mainlevee.MainleveeEntity;
+import com.bnpparibas.irb.qlickflow.enums.MainleveeStatus;
+import com.bnpparibas.irb.qlickflow.enums.WfType;
+import com.bnpparibas.irb.qlickflow.service.UserService;
+import com.bnpparibas.irb.qlickflow.wf.WfTask;
+import com.bnpparibas.irb.qlickflow.wf.WfTaskAssignment;
+import com.bnpparibas.irb.qlickflow.common.SequentialBusinessKeyGenerator;
+import com.bnpparibas.irb.qlickflow.model.UserModel;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.config.annotation.method.configuration
-    .EnableMethodSecurity;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration
-    .EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers
-    .AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.server.resource.authentication
-    .JwtAuthenticationConverter;
-import org.springframework.security.web.SecurityFilterChain;
-import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.*;
+import java.util.stream.Stream;
 
-@Slf4j
-@Configuration
-@EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)
+@Component
 @RequiredArgsConstructor
-public class SecurityConfig {
+public class MainleveeMapper {
 
-    @Value("${security.jwt.secret}")
-    private String jwtSecret;
+    private final UserService userService;
+    private final SequentialBusinessKeyGenerator sequentialBusinessKeyGenerator;
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+    // ========================================================================================
+    // toDTO : Entity -> DTO
+    // ========================================================================================
 
-    @Bean
-    public JwtEncoder jwtEncoder() {
-        SecretKey secretKey = new SecretKeySpec(
-            jwtSecret.getBytes(StandardCharsets.UTF_8),
-            "HmacSHA256"
-        );
-        return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey));
-    }
-
-    @Bean
-    public JwtDecoder jwtDecoder() {
-        SecretKey secretKey = new SecretKeySpec(
-            jwtSecret.getBytes(StandardCharsets.UTF_8),
-            "HmacSHA256"
-        );
-        return NimbusJwtDecoder
-            .withSecretKey(secretKey)
-            .macAlgorithm(MacAlgorithm.HS256)
-            .build();
-    }
-
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http)
-            throws Exception {
-        http
-            .csrf(AbstractHttpConfigurer::disable)
-            .sessionManagement(sm ->
-                sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    HttpMethod.POST,
-                    "/api/v1/derog-tarif/auth/**"
-                ).permitAll()
-                .requestMatchers(
-                    "/h2-console/**"
-                ).permitAll()
-                .requestMatchers(
-                    "/v3/api-docs/**",
-                    "/swagger-ui/**",
-                    "/swagger-ui.html"
-                ).permitAll()
-                .anyRequest().authenticated()
-            )
-            .headers(headers ->
-                headers.frameOptions(
-                    org.springframework.security.config.annotation.web
-                        .configurers.HeadersConfigurer
-                        .FrameOptionsConfig::disable)
-            )
-            .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt
-                    .jwtAuthenticationConverter(
-                        jwtAuthenticationConverter())
-                )
-                .authenticationEntryPoint((request, response, ex) ->
-                    response.setStatus(
-                        jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED
-                    )
-                )
-            );
-
-        return http.build();
-    }
-
-    // ===========================
-    // ✅ Extraction depuis claims
-    // JWT — plus de userRepository
-    // ===========================
-
-    private JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtAuthenticationConverter converter =
-            new JwtAuthenticationConverter();
-        converter.setJwtGrantedAuthoritiesConverter(
-            this::extractAuthoritiesFromJwt);
-        return converter;
-    }
-
-    private Collection<GrantedAuthority> extractAuthoritiesFromJwt(
-            Jwt jwt) {
-        List<GrantedAuthority> authorities = new ArrayList<>();
-
-        // ✅ Priorité 1 — profileCode dans les claims
-        String profileCode = jwt.getClaimAsString("profileCode");
-        if (profileCode != null && !profileCode.isBlank()) {
-            authorities.add(
-                new SimpleGrantedAuthority("ROLE_" + profileCode)
-            );
-            log.debug("[SecurityConfig] authority depuis claim "
-                + "profileCode: ROLE_{}", profileCode);
+    public MainleveeDto toDTO(MainleveeEntity entity, UserModel currentUser) {
+        if (entity == null) {
+            return null;
         }
 
-        // ✅ Priorité 2 — liste permissions dans les claims
-        List<String> permissions =
-            jwt.getClaimAsStringList("permissions");
-        if (permissions != null) {
-            permissions.stream()
-                .filter(p -> p != null && !p.isBlank())
-                .map(SimpleGrantedAuthority::new)
-                .forEach(authorities::add);
-            log.debug("[SecurityConfig] {} permissions extraites "
-                + "du JWT", permissions.size());
+        // Mapping des commentaires
+        List<CommentaireDTO> commentaireDTOs = Optional.ofNullable(entity.getCommentaires())
+                .orElse(Collections.emptyList())
+                .stream()
+                .map(comment -> {
+                    UserModel commentAuthor = userService.findById(comment.getUser()).orElse(null);
+                    if (commentAuthor == null) {
+                        return null;
+                    }
+                    return CommentaireDTO.builder()
+                            .id(comment.getId())
+                            .text(comment.getText())
+                            .author(commentAuthor.getFullName())
+                            .profileAuthor(commentAuthor.getProfile() != null ? commentAuthor.getProfile().getName() : null)
+                            .createdAt(comment.getCreatedAt())
+                            .build();
+                })
+                .filter(Objects::nonNull)
+                .toList();
+
+        // Mapping de l'initiateur
+        UserModel initiateur = userService.findById(UUID.fromString(entity.getInitiateurId())).orElse(null);
+        String initiateurId = initiateur != null ? String.valueOf(initiateur.getId()) : null;
+        String ownerName = initiateur != null ? initiateur.getFirstName() + " " + initiateur.getLastName() : null;
+
+        // Mapping de la tâche la plus récente
+        WfTask latestTask = entity.getLatestTask();
+        LocalDate taskReceptionDate = latestTask != null ? latestTask.getCreatedAt().toLocalDate() : null;
+        String responsableName = null;
+        if (latestTask != null && latestTask.getCurrentAssignment() != null) {
+            UserModel responsable = userService.findById(UUID.valueOf(latestTask.getCurrentAssignment().getAssignee())).orElse(null);
+            responsableName = responsable != null ? responsable.getFirstName() + " " + responsable.getLastName() : null;
         }
 
-        // ✅ Fallback — subject (uid) comme authority
-        if (authorities.isEmpty()) {
-            String subject = jwt.getSubject();
-            log.warn("[SecurityConfig] aucune authority dans les "
-                + "claims JWT pour uid: {}", subject);
+        // Mapping des relations OneToMany
+        List<ConcourGrantieDemandDto> concourGrantieDemandeDtos = Optional.ofNullable(entity.getConcourGrantieDemandes())
+                .orElse(Collections.emptyList())
+                .stream()
+                .map(this::mapToConcourGrantieDemandDto)
+                .toList();
+
+        List<EngagementClientDto> engagementClientDtos = Optional.ofNullable(entity.getEngagementClients())
+                .orElse(Collections.emptyList())
+                .stream()
+                .map(this::mapToEngagementClientDto)
+                .toList();
+
+        assert initiateurId != null;
+        return MainleveeDto.builder()
+                .id(entity.getId())
+                .businessKey(entity.getBusinessKey())
+                .clientSubId(entity.getClientSubId())
+                .accountNumber(entity.getAccountNumber())
+                .initiateurId(UUID.fromString(initiateurId))
+                .owner(ownerName)
+                .responsible(responsableName)
+                .nomAgence(entity.getNomAgence())
+                .cin(entity.getCin())
+                .fullNameDA(entity.getFullNameDA())
+                .impayeBCC(entity.getImpayeBCC())
+                .impayeMCI(entity.getImpayeMCI())
+                .impayeBMCI(entity.getImpayeBMCI())
+                .insidentPeyment(entity.getInsidentPeyment())
+                .groupeAgence(entity.getGroupeAgence())
+                .motif(entity.getMotif())
+                .mesureConervatoir(entity.getMesureConervatoir())
+                .actionCommercial(entity.getActionCommercial())
+                .closedDate(entity.getClosedDate())
+                .firstName(entity.getFirstName())
+                .status(entity.getMainleveeStatus())
+                .lastName(entity.getLastName())
+                .destinataireExclusif(entity.getDestinataireExclusif())
+                .receptionDate(taskReceptionDate)
+                .concourGrantieDemandes(concourGrantieDemandeDtos)
+                .engagementClients(engagementClientDtos)
+                .commentaires(commentaireDTOs)
+                .documentIds(new LinkedHashSet<>(entity.getDocumentIds()))
+                .build();
+    }
+
+    // ========================================================================================
+    // Mapping des sous-entités
+    // ========================================================================================
+
+    private ConcourGrantieDemandDto mapToConcourGrantieDemandDto(ConcourGrantieDemande entity) {
+        if (entity == null) {
+            return null;
         }
 
-        return authorities;
+        return ConcourGrantieDemandDto.builder()
+                .id(entity.getId())
+                .natureGrantie(entity.getNatureGrantie())
+                .tfRecRc(entity.getTfRecRc())
+                .concourCouvre(entity.getConcourCouvre())
+                .numeroDossierSab(entity.getNumeroDossierSab())
+                .reliquatConcour(entity.getReliquatConcour())
+                .montantInitialConcour(entity.getMontantInitialConcour())
+                .montantGarantieCovran(entity.getMontantGarantieCovran())
+                .build();
+    }
+
+    private EngagementClientDto mapToEngagementClientDto(EngagementClient entity) {
+        if (entity == null) {
+            return null;
+        }
+
+        return EngagementClientDto.builder()
+                .id(entity.getId())
+                .natureAut(entity.getNatureAut())
+                .montantAut(entity.getMontantAut())
+                .utilisation(entity.getUtilisation())
+                .grantieConstitue(entity.getGrantieConstitue())
+                .montant(entity.getMontant())
+                .build();
+    }
+
+    // ========================================================================================
+    // toDraftEntity : DTO -> nouvelle Entity (brouillon)
+    // ========================================================================================
+
+    public MainleveeEntity toDraftEntity(SaveDraftMainleveeDto dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        UserModel currentUser = userService.getCurrentUser();
+        String currentUserUid = currentUser.getUid();
+        var agence = currentUser.getAgence();
+
+        MainleveeEntity request = MainleveeEntity.builder()
+                .wfType(WfType.MAIN_LEVEE_V1)
+                .businessKey(sequentialBusinessKeyGenerator.generate(WfType.MAIN_LEVEE_V1, "ML-" + currentUserUid))
+                .clientSubId(dto.getClientSubId())
+                .cin(dto.getCin())
+                .accountNumber(dto.getAccountNumber())
+                .initiateurId(String.valueOf(currentUser.getId()))
+                .status(MainleveeStatus.DRAFT.name())
+                .receptionDate(dto.getReceptionDate())
+                .closedDate(dto.getClosedDate())
+                .firstName(dto.getFirstName())
+                .lastName(dto.getLastName())
+                .groupeAgence(dto.getGroupeAgence())
+                .fullNameDA(dto.getFullNameDA())
+                .destinataireExclusif(dto.getDestinataireExclusif())
+                .impayeMCI(dto.getImpayeMCI())
+                .impayeBCC(dto.getImpayeBCC())
+                .impayeBMCI(dto.getImpayeBMCI())
+                .mesureConervatoir(dto.getMesureConervatoir())
+                .insidentPeyment(dto.getInsidentPeyment())
+                .actionCommercial(dto.getActionCommercial())
+                .commentaires(new ArrayList<>())
+                .motif(dto.getMotif())
+                .build();
+
+        if (agence != null) {
+            request.setNomAgence(agence.getNom());
+        }
+
+        // Création de la tâche de brouillon
+        var wfTaskAssignment = WfTaskAssignment.builder()
+                .assignee(currentUserUid)
+                .assignedBy(currentUserUid)
+                .assignedAt(Instant.now())
+                .syncStatus(WfTaskAssignment.SyncStatus.CONFIRMED)
+                .build();
+
+        WfTask draftWfTask = WfTask.builder()
+                .status(WfTask.WfTaskStatus.CREATED)
+                .currentAssignment(wfTaskAssignment)
+                .assignments(Set.of(wfTaskAssignment))
+                .createdAt(OffsetDateTime.now())
+                .name("Draft")
+                .build();
+
+        wfTaskAssignment.setTask(draftWfTask);
+        request.addTask(draftWfTask);
+
+        setJustification(request, currentUser, dto.getJustification());
+
+        return request;
+    }
+
+    // ========================================================================================
+    // Justification
+    // ========================================================================================
+
+    private void setJustification(MainleveeEntity request, UserModel user, String justification) {
+        if (StringUtils.isBlank(justification)) {
+            return;
+        }
+
+        var nouveauCommentaire = Commentaire.builder()
+                .text(justification)
+                .mainlevee(request)
+                .user(user.getId())
+                .build();
+
+        if (!CollectionUtils.isEmpty(request.getCommentaires())) {
+            request.getCommentaires().clear();
+        }
+
+        request.addCommentaire(nouveauCommentaire);
+    }
+
+    // ========================================================================================
+    // updateEntityFromDTO : DTO -> mise à jour d'une Entity existante
+    // ========================================================================================
+
+    /**
+     * Applique les champs communs d'un DTO sur une entité existante.
+     * Méthode extraite pour éviter la duplication entre les différentes variantes d'update.
+     */
+    private void applyCommonFields(MainleveeFieldsDto dto, MainleveeEntity entity) {
+        UserModel currentUser = userService.getCurrentUser();
+
+        entity.setClientSubId(dto.getClientSubId());
+        entity.setCin(dto.getCin());
+        entity.setAccountNumber(dto.getAccountNumber());
+        entity.setInitiateurId(dto.getInitiateur());
+        entity.setReceptionDate(dto.getReceptionDate());
+        entity.setClosedDate(dto.getClosedDate());
+        entity.setFirstName(dto.getFirstName());
+        entity.setLastName(dto.getLastName());
+        entity.setNomAgence(dto.getNomAgence());
+        entity.setGroupeAgence(dto.getGroupeAgence());
+        entity.setFullNameDA(dto.getFullNameDA());
+        entity.setDestinataireExclusif(dto.getDestinataireExclusif());
+        entity.setImpayeMCI(dto.getImpayeMCI());
+        entity.setImpayeBCC(dto.getImpayeBCC());
+        entity.setImpayeBMCI(dto.getImpayeBMCI());
+        entity.setMesureConervatoir(dto.getMesureConervatoir());
+        entity.setInsidentPeyment(dto.getInsidentPeyment());
+        entity.setActionCommercial(dto.getActionCommercial());
+        entity.setMotif(dto.getMotif());
+
+        setDocuments(entity, dto.getDocumentIds());
+        setJustification(entity, currentUser, dto.getJustification());
+    }
+
+    public void updateEntityFromDTO(SendDemandeComplementsDTO dto, MainleveeEntity entity) {
+        if (dto == null || entity == null) {
+            return;
+        }
+        setDocuments(entity, dto.getDocumentIds());
+    }
+
+    public void updateEntityFromDTO(CreateMainleveeDto dto, MainleveeEntity entity) {
+        if (dto == null || entity == null) {
+            return;
+        }
+        applyCommonFields(dto, entity);
+    }
+
+    public void updateDraftEntityFromDTO(SaveDraftMainleveeDto dto, MainleveeEntity entity) {
+        if (dto == null || entity == null) {
+            return;
+        }
+        applyCommonFields(dto, entity);
+    }
+
+    public void updateEntityFromDTO(UpdateMainleveeDto dto, MainleveeEntity entity) {
+        if (dto == null || entity == null) {
+            return;
+        }
+        applyCommonFields(dto, entity);
+    }
+
+    // ========================================================================================
+    // Documents
+    // ========================================================================================
+
+    private static void setDocuments(MainleveeEntity entity, Set<UUID> dto) {
+        if (entity.getDocumentIds() != null) {
+            entity.getDocumentIds().clear();
+            entity.getDocumentIds().addAll(new LinkedHashSet<>(dto));
+        } else {
+            entity.setDocumentIds(new LinkedHashSet<>(dto));
+        }
+    }
+
+    // ========================================================================================
+    // Convenience : liste / single
+    // ========================================================================================
+
+    public List<MainleveeDto> toDTO(List<MainleveeEntity> mainleveeEntityList) {
+        UserModel currentUser = userService.getCurrentUser();
+        return mainleveeEntityList
+                .stream()
+                .map(entity -> toDTO(entity, currentUser))
+                .toList();
+    }
+
+    public MainleveeDto toDTO(MainleveeEntity mainlevee) {
+        UserModel currentUser = userService.getCurrentUser();
+        return toDTO(mainlevee, currentUser);
     }
 }
+
+
 
 // src/app/features/derogation/models/dashboard/request.interface.ts
 
