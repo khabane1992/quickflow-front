@@ -1,392 +1,324 @@
-package com.bnpparibas.irb.qlickflow.dtos.mainlevee;
-
-import java.time.LocalDate;
-import java.util.Set;
-import java.util.UUID;
-
-/**
- * Interface commune regroupant les champs partagés entre
- * CreateMainleveeDto, SaveDraftMainleveeDto et UpdateMainleveeDto.
- */
-public interface MainleveeFieldsDto {
-
-    String getClientSubId();
-
-    String getCin();
-
-    String getAccountNumber();
-
-    String getInitiateur();
-
-    LocalDate getReceptionDate();
-
-    LocalDate getClosedDate();
-
-    String getFirstName();
-
-    String getLastName();
-
-    String getNomAgence();
-
-    String getGroupeAgence();
-
-    String getFullNameDA();
-
-    String getDestinataireExclusif();
-
-    String getImpayeMCI();
-
-    String getImpayeBCC();
-
-    String getImpayeBMCI();
-
-    String getMesureConervatoir();
-
-    String getInsidentPeyment();
-
-    String getActionCommercial();
-
-    String getMotif();
-
-    Set<UUID> getDocumentIds();
-
-    String getJustification();
-}
-
-package com.bnpparibas.irb.qlickflow.mapper.mainlevee;
+package com.bnpparibas.irb.qlickflow.facade.mainlevee.impl;
 
 import com.bnpparibas.irb.qlickflow.dtos.mainlevee.*;
-import com.bnpparibas.irb.qlickflow.entities.mainlevee.*;
-import com.bnpparibas.irb.qlickflow.entities.mainlevee.MainleveeEntity;
 import com.bnpparibas.irb.qlickflow.enums.MainleveeStatus;
-import com.bnpparibas.irb.qlickflow.enums.WfType;
+import com.bnpparibas.irb.qlickflow.facade.mainlevee.MainleveeFacade;
+import com.bnpparibas.irb.qlickflow.service.MainleveeAuthorizationService;
 import com.bnpparibas.irb.qlickflow.service.UserService;
-import com.bnpparibas.irb.qlickflow.wf.WfTask;
-import com.bnpparibas.irb.qlickflow.wf.WfTaskAssignment;
-import com.bnpparibas.irb.qlickflow.common.SequentialBusinessKeyGenerator;
-import com.bnpparibas.irb.qlickflow.model.UserModel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Instant;
+import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
+import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor
-public class MainleveeMapper {
+public class MainleveeFacadeImpl implements MainleveeFacade {
 
+    private final MainleveeAuthorizationService mainLeveeAuthorizationService;
     private final UserService userService;
-    private final SequentialBusinessKeyGenerator sequentialBusinessKeyGenerator;
 
-    // ========================================================================================
-    // toDTO : Entity -> DTO
-    // ========================================================================================
+    // ============================================================
+    // MOCK DATA
+    // ============================================================
 
-    public MainleveeDto toDTO(MainleveeEntity entity, UserModel currentUser) {
-        if (entity == null) {
-            return null;
-        }
+    private static final List<MainleveeDto> MOCK_MAINLEVEES = buildMockData();
 
-        // Mapping des commentaires
-        List<CommentaireDTO> commentaireDTOs = Optional.ofNullable(entity.getCommentaires())
-                .orElse(Collections.emptyList())
-                .stream()
-                .map(comment -> {
-                    UserModel commentAuthor = userService.findById(comment.getUser()).orElse(null);
-                    if (commentAuthor == null) {
-                        return null;
-                    }
-                    return CommentaireDTO.builder()
-                            .id(comment.getId())
-                            .text(comment.getText())
-                            .author(commentAuthor.getFullName())
-                            .profileAuthor(commentAuthor.getProfile() != null ? commentAuthor.getProfile().getName() : null)
-                            .createdAt(comment.getCreatedAt())
-                            .build();
-                })
-                .filter(Objects::nonNull)
-                .toList();
+    private static List<MainleveeDto> buildMockData() {
+        List<MainleveeDto> list = new ArrayList<>();
 
-        // Mapping de l'initiateur
-        UserModel initiateur = userService.findById(UUID.fromString(entity.getInitiateurId())).orElse(null);
-        String initiateurId = initiateur != null ? String.valueOf(initiateur.getId()) : null;
-        String ownerName = initiateur != null ? initiateur.getFirstName() + " " + initiateur.getLastName() : null;
+        // --- Mainlevée 1 : En cours de traitement ---
+        list.add(MainleveeDto.builder()
+                .id(UUID.fromString("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"))
+                .businessKey("ML-001")
+                .clientSubId("CLI001")
+                .cin("BK123456")
+                .accountNumber("0011223344556677")
+                .initiateurId(UUID.fromString("11111111-1111-1111-1111-111111111111"))
+                .owner("Ahmed Bennani")
+                .responsible("Fatima Zahra El Idrissi")
+                .nomAgence("Agence Casa Anfa")
+                .groupeAgence("Casablanca Nord")
+                .fullNameDA("Mohamed Tazi")
+                .destinataireExclusif("Direction Régionale Casa")
+                .firstName("Karim")
+                .lastName("Ouazzani")
+                .status(MainleveeStatus.IN_PROGRESS)
+                .impayeMCI("15000.00")
+                .impayeBCC("8500.00")
+                .impayeBMCI("3200.00")
+                .mesureConervatoir("Saisie conservatoire sur compte")
+                .insidentPeyment("2 incidents en 2024")
+                .actionCommercial("Relance téléphonique effectuée")
+                .motif("Rachat du prêt")
+                .receptionDate(LocalDate.of(2025, 11, 15))
+                .closedDate(null)
+                .documentIds(new LinkedHashSet<>(Set.of(
+                        UUID.fromString("dddddddd-0001-0001-0001-000000000001"),
+                        UUID.fromString("dddddddd-0001-0001-0001-000000000002")
+                )))
+                .concourGrantieDemandes(List.of(
+                        ConcourGrantieDemandDto.builder()
+                                .id(UUID.fromString("cccccccc-0001-0001-0001-000000000001"))
+                                .natureGrantie("Hypothèque")
+                                .tfRecRc("TF-12345/RC-6789")
+                                .concourCouvre("Prêt immobilier")
+                                .numeroDossierSab("SAB-2024-001")
+                                .reliquatConcour("25000.00")
+                                .montantInitialConcour(new BigDecimal("500000.00"))
+                                .montantGarantieCovran(new BigDecimal("450000.00"))
+                                .build(),
+                        ConcourGrantieDemandDto.builder()
+                                .id(UUID.fromString("cccccccc-0001-0001-0001-000000000002"))
+                                .natureGrantie("Nantissement")
+                                .tfRecRc("RC-11111")
+                                .concourCouvre("Crédit de trésorerie")
+                                .numeroDossierSab("SAB-2024-002")
+                                .reliquatConcour("10000.00")
+                                .montantInitialConcour(new BigDecimal("200000.00"))
+                                .montantGarantieCovran(new BigDecimal("180000.00"))
+                                .build()
+                ))
+                .engagementClients(List.of(
+                        EngagementClientDto.builder()
+                                .id(UUID.fromString("eeeeeeee-0001-0001-0001-000000000001"))
+                                .natureAut("Crédit immobilier")
+                                .montantAut(new BigDecimal("500000.00"))
+                                .utilisation("Acquisition résidence principale")
+                                .grantieConstitue("Hypothèque 1er rang")
+                                .montant(new BigDecimal("475000.00"))
+                                .build()
+                ))
+                .commentaires(List.of(
+                        CommentaireDTO.builder()
+                                .id(UUID.fromString("ffffffff-0001-0001-0001-000000000001"))
+                                .text("Dossier complet, en attente de validation par la direction.")
+                                .author("Ahmed Bennani")
+                                .profileAuthor("Conseiller")
+                                .createdAt(LocalDateTime.of(2025, 11, 16, 9, 30))
+                                .build(),
+                        CommentaireDTO.builder()
+                                .id(UUID.fromString("ffffffff-0001-0001-0001-000000000002"))
+                                .text("Pièces justificatives vérifiées. RAS.")
+                                .author("Fatima Zahra El Idrissi")
+                                .profileAuthor("DA")
+                                .createdAt(LocalDateTime.of(2025, 11, 17, 14, 15))
+                                .build()
+                ))
+                .build());
 
-        // Mapping de la tâche la plus récente
-        WfTask latestTask = entity.getLatestTask();
-        LocalDate taskReceptionDate = latestTask != null ? latestTask.getCreatedAt().toLocalDate() : null;
-        String responsableName = null;
-        if (latestTask != null && latestTask.getCurrentAssignment() != null) {
-            UserModel responsable = userService.findById(UUID.valueOf(latestTask.getCurrentAssignment().getAssignee())).orElse(null);
-            responsableName = responsable != null ? responsable.getFirstName() + " " + responsable.getLastName() : null;
-        }
+        // --- Mainlevée 2 : Brouillon ---
+        list.add(MainleveeDto.builder()
+                .id(UUID.fromString("b1febc99-9c0b-4ef8-bb6d-6bb9bd380a12"))
+                .businessKey("ML-002")
+                .clientSubId("CLI002")
+                .cin("BE789012")
+                .accountNumber("0099887766554433")
+                .initiateurId(UUID.fromString("22222222-2222-2222-2222-222222222222"))
+                .owner("Sara Alaoui")
+                .responsible(null)
+                .nomAgence("Agence Rabat Agdal")
+                .groupeAgence("Rabat Centre")
+                .fullNameDA("Youssef Amrani")
+                .destinataireExclusif(null)
+                .firstName("Omar")
+                .lastName("Fassi Fihri")
+                .status(MainleveeStatus.DRAFT)
+                .impayeMCI("0.00")
+                .impayeBCC("0.00")
+                .impayeBMCI("0.00")
+                .mesureConervatoir(null)
+                .insidentPeyment("Aucun")
+                .actionCommercial(null)
+                .motif("Vente du bien")
+                .receptionDate(LocalDate.of(2026, 1, 10))
+                .closedDate(null)
+                .documentIds(new LinkedHashSet<>())
+                .concourGrantieDemandes(List.of(
+                        ConcourGrantieDemandDto.builder()
+                                .id(UUID.fromString("cccccccc-0002-0002-0002-000000000001"))
+                                .natureGrantie("Hypothèque")
+                                .tfRecRc("TF-99999")
+                                .concourCouvre("Prêt habitat")
+                                .numeroDossierSab("SAB-2025-010")
+                                .reliquatConcour("0.00")
+                                .montantInitialConcour(new BigDecimal("350000.00"))
+                                .montantGarantieCovran(new BigDecimal("350000.00"))
+                                .build()
+                ))
+                .engagementClients(List.of())
+                .commentaires(List.of())
+                .build());
 
-        // Mapping des relations OneToMany
-        List<ConcourGrantieDemandDto> concourGrantieDemandeDtos = Optional.ofNullable(entity.getConcourGrantieDemandes())
-                .orElse(Collections.emptyList())
-                .stream()
-                .map(this::mapToConcourGrantieDemandDto)
-                .toList();
+        // --- Mainlevée 3 : Finalisée ---
+        list.add(MainleveeDto.builder()
+                .id(UUID.fromString("550e8400-e29b-41d4-a716-446655440000"))
+                .businessKey("ML-003")
+                .clientSubId("CLI003")
+                .cin("BJ345678")
+                .accountNumber("0055443322110099")
+                .initiateurId(UUID.fromString("33333333-3333-3333-3333-333333333333"))
+                .owner("Nadia Chraibi")
+                .responsible("Hassan Benjelloun")
+                .nomAgence("Agence Marrakech Gueliz")
+                .groupeAgence("Marrakech")
+                .fullNameDA("Rachid Berrada")
+                .destinataireExclusif("Direction Centrale")
+                .firstName("Amine")
+                .lastName("Lahlou")
+                .status(MainleveeStatus.FINALIZED)
+                .impayeMCI("0.00")
+                .impayeBCC("0.00")
+                .impayeBMCI("0.00")
+                .mesureConervatoir("Aucune")
+                .insidentPeyment("Aucun")
+                .actionCommercial("Client fidèle - pas d'action nécessaire")
+                .motif("Prêt échu remboursé")
+                .receptionDate(LocalDate.of(2025, 6, 1))
+                .closedDate(LocalDate.of(2025, 9, 15))
+                .documentIds(new LinkedHashSet<>(Set.of(
+                        UUID.fromString("dddddddd-0003-0003-0003-000000000001")
+                )))
+                .concourGrantieDemandes(List.of(
+                        ConcourGrantieDemandDto.builder()
+                                .id(UUID.fromString("cccccccc-0003-0003-0003-000000000001"))
+                                .natureGrantie("Hypothèque")
+                                .tfRecRc("TF-55555")
+                                .concourCouvre("Prêt personnel")
+                                .numeroDossierSab("SAB-2024-050")
+                                .reliquatConcour("0.00")
+                                .montantInitialConcour(new BigDecimal("150000.00"))
+                                .montantGarantieCovran(new BigDecimal("150000.00"))
+                                .build()
+                ))
+                .engagementClients(List.of(
+                        EngagementClientDto.builder()
+                                .id(UUID.fromString("eeeeeeee-0003-0003-0003-000000000001"))
+                                .natureAut("Crédit consommation")
+                                .montantAut(new BigDecimal("150000.00"))
+                                .utilisation("Travaux")
+                                .grantieConstitue("Hypothèque")
+                                .montant(new BigDecimal("0.00"))
+                                .build()
+                ))
+                .commentaires(List.of(
+                        CommentaireDTO.builder()
+                                .id(UUID.fromString("ffffffff-0003-0003-0003-000000000001"))
+                                .text("Mainlevée signée et envoyée au notaire.")
+                                .author("Hassan Benjelloun")
+                                .profileAuthor("Responsable")
+                                .createdAt(LocalDateTime.of(2025, 9, 15, 11, 0))
+                                .build()
+                ))
+                .build());
 
-        List<EngagementClientDto> engagementClientDtos = Optional.ofNullable(entity.getEngagementClients())
-                .orElse(Collections.emptyList())
-                .stream()
-                .map(this::mapToEngagementClientDto)
-                .toList();
+        // --- Mainlevée 4 : En suivi ---
+        list.add(MainleveeDto.builder()
+                .id(UUID.fromString("550e8400-e29b-41d4-a716-446655440001"))
+                .businessKey("ML-004")
+                .clientSubId("CLI004")
+                .cin("BA901234")
+                .accountNumber("0012345678901234")
+                .initiateurId(UUID.fromString("44444444-4444-4444-4444-444444444444"))
+                .owner("Leila Mansouri")
+                .responsible("Khalid Cherkaoui")
+                .nomAgence("Agence Tanger Centre")
+                .groupeAgence("Tanger")
+                .fullNameDA("Samir Kettani")
+                .destinataireExclusif(null)
+                .firstName("Yassine")
+                .lastName("Hajji")
+                .status(MainleveeStatus.FOLLOW_UP)
+                .impayeMCI("5000.00")
+                .impayeBCC("2000.00")
+                .impayeBMCI("0.00")
+                .mesureConervatoir("Opposition sur compte")
+                .insidentPeyment("1 incident en 2025")
+                .actionCommercial("Rendez-vous planifié le 15/04/2026")
+                .motif("Autres")
+                .receptionDate(LocalDate.of(2026, 2, 20))
+                .closedDate(null)
+                .documentIds(new LinkedHashSet<>(Set.of(
+                        UUID.fromString("dddddddd-0004-0004-0004-000000000001"),
+                        UUID.fromString("dddddddd-0004-0004-0004-000000000002"),
+                        UUID.fromString("dddddddd-0004-0004-0004-000000000003")
+                )))
+                .concourGrantieDemandes(List.of())
+                .engagementClients(List.of(
+                        EngagementClientDto.builder()
+                                .id(UUID.fromString("eeeeeeee-0004-0004-0004-000000000001"))
+                                .natureAut("Découvert autorisé")
+                                .montantAut(new BigDecimal("50000.00"))
+                                .utilisation("Fonds de roulement")
+                                .grantieConstitue("Caution personnelle")
+                                .montant(new BigDecimal("45000.00"))
+                                .build()
+                ))
+                .commentaires(List.of(
+                        CommentaireDTO.builder()
+                                .id(UUID.fromString("ffffffff-0004-0004-0004-000000000001"))
+                                .text("En attente de complément de dossier du client.")
+                                .author("Leila Mansouri")
+                                .profileAuthor("Conseiller")
+                                .createdAt(LocalDateTime.of(2026, 2, 21, 10, 45))
+                                .build()
+                ))
+                .build());
 
-        assert initiateurId != null;
-        return MainleveeDto.builder()
-                .id(entity.getId())
-                .businessKey(entity.getBusinessKey())
-                .clientSubId(entity.getClientSubId())
-                .accountNumber(entity.getAccountNumber())
-                .initiateurId(UUID.fromString(initiateurId))
-                .owner(ownerName)
-                .responsible(responsableName)
-                .nomAgence(entity.getNomAgence())
-                .cin(entity.getCin())
-                .fullNameDA(entity.getFullNameDA())
-                .impayeBCC(entity.getImpayeBCC())
-                .impayeMCI(entity.getImpayeMCI())
-                .impayeBMCI(entity.getImpayeBMCI())
-                .insidentPeyment(entity.getInsidentPeyment())
-                .groupeAgence(entity.getGroupeAgence())
-                .motif(entity.getMotif())
-                .mesureConervatoir(entity.getMesureConervatoir())
-                .actionCommercial(entity.getActionCommercial())
-                .closedDate(entity.getClosedDate())
-                .firstName(entity.getFirstName())
-                .status(entity.getMainleveeStatus())
-                .lastName(entity.getLastName())
-                .destinataireExclusif(entity.getDestinataireExclusif())
-                .receptionDate(taskReceptionDate)
-                .concourGrantieDemandes(concourGrantieDemandeDtos)
-                .engagementClients(engagementClientDtos)
-                .commentaires(commentaireDTOs)
-                .documentIds(new LinkedHashSet<>(entity.getDocumentIds()))
-                .build();
+        return list;
     }
 
-    // ========================================================================================
-    // Mapping des sous-entités
-    // ========================================================================================
+    // ============================================================
+    // MÉTHODES FACADE — MOCK
+    // ============================================================
 
-    private ConcourGrantieDemandDto mapToConcourGrantieDemandDto(ConcourGrantieDemande entity) {
-        if (entity == null) {
-            return null;
-        }
-
-        return ConcourGrantieDemandDto.builder()
-                .id(entity.getId())
-                .natureGrantie(entity.getNatureGrantie())
-                .tfRecRc(entity.getTfRecRc())
-                .concourCouvre(entity.getConcourCouvre())
-                .numeroDossierSab(entity.getNumeroDossierSab())
-                .reliquatConcour(entity.getReliquatConcour())
-                .montantInitialConcour(entity.getMontantInitialConcour())
-                .montantGarantieCovran(entity.getMontantGarantieCovran())
-                .build();
-    }
-
-    private EngagementClientDto mapToEngagementClientDto(EngagementClient entity) {
-        if (entity == null) {
-            return null;
-        }
-
-        return EngagementClientDto.builder()
-                .id(entity.getId())
-                .natureAut(entity.getNatureAut())
-                .montantAut(entity.getMontantAut())
-                .utilisation(entity.getUtilisation())
-                .grantieConstitue(entity.getGrantieConstitue())
-                .montant(entity.getMontant())
-                .build();
-    }
-
-    // ========================================================================================
-    // toDraftEntity : DTO -> nouvelle Entity (brouillon)
-    // ========================================================================================
-
-    public MainleveeEntity toDraftEntity(SaveDraftMainleveeDto dto) {
-        if (dto == null) {
-            return null;
-        }
-
-        UserModel currentUser = userService.getCurrentUser();
-        String currentUserUid = currentUser.getUid();
-        var agence = currentUser.getAgence();
-
-        MainleveeEntity request = MainleveeEntity.builder()
-                .wfType(WfType.MAIN_LEVEE_V1)
-                .businessKey(sequentialBusinessKeyGenerator.generate(WfType.MAIN_LEVEE_V1, "ML-" + currentUserUid))
-                .clientSubId(dto.getClientSubId())
-                .cin(dto.getCin())
-                .accountNumber(dto.getAccountNumber())
-                .initiateurId(String.valueOf(currentUser.getId()))
-                .status(MainleveeStatus.DRAFT.name())
-                .receptionDate(dto.getReceptionDate())
-                .closedDate(dto.getClosedDate())
-                .firstName(dto.getFirstName())
-                .lastName(dto.getLastName())
-                .groupeAgence(dto.getGroupeAgence())
-                .fullNameDA(dto.getFullNameDA())
-                .destinataireExclusif(dto.getDestinataireExclusif())
-                .impayeMCI(dto.getImpayeMCI())
-                .impayeBCC(dto.getImpayeBCC())
-                .impayeBMCI(dto.getImpayeBMCI())
-                .mesureConervatoir(dto.getMesureConervatoir())
-                .insidentPeyment(dto.getInsidentPeyment())
-                .actionCommercial(dto.getActionCommercial())
-                .commentaires(new ArrayList<>())
-                .motif(dto.getMotif())
-                .build();
-
-        if (agence != null) {
-            request.setNomAgence(agence.getNom());
-        }
-
-        // Création de la tâche de brouillon
-        var wfTaskAssignment = WfTaskAssignment.builder()
-                .assignee(currentUserUid)
-                .assignedBy(currentUserUid)
-                .assignedAt(Instant.now())
-                .syncStatus(WfTaskAssignment.SyncStatus.CONFIRMED)
-                .build();
-
-        WfTask draftWfTask = WfTask.builder()
-                .status(WfTask.WfTaskStatus.CREATED)
-                .currentAssignment(wfTaskAssignment)
-                .assignments(Set.of(wfTaskAssignment))
-                .createdAt(OffsetDateTime.now())
-                .name("Draft")
-                .build();
-
-        wfTaskAssignment.setTask(draftWfTask);
-        request.addTask(draftWfTask);
-
-        setJustification(request, currentUser, dto.getJustification());
-
-        return request;
-    }
-
-    // ========================================================================================
-    // Justification
-    // ========================================================================================
-
-    private void setJustification(MainleveeEntity request, UserModel user, String justification) {
-        if (StringUtils.isBlank(justification)) {
-            return;
-        }
-
-        var nouveauCommentaire = Commentaire.builder()
-                .text(justification)
-                .mainlevee(request)
-                .user(user.getId())
-                .build();
-
-        if (!CollectionUtils.isEmpty(request.getCommentaires())) {
-            request.getCommentaires().clear();
-        }
-
-        request.addCommentaire(nouveauCommentaire);
-    }
-
-    // ========================================================================================
-    // updateEntityFromDTO : DTO -> mise à jour d'une Entity existante
-    // ========================================================================================
-
-    /**
-     * Applique les champs communs d'un DTO sur une entité existante.
-     * Méthode extraite pour éviter la duplication entre les différentes variantes d'update.
-     */
-    private void applyCommonFields(MainleveeFieldsDto dto, MainleveeEntity entity) {
-        UserModel currentUser = userService.getCurrentUser();
-
-        entity.setClientSubId(dto.getClientSubId());
-        entity.setCin(dto.getCin());
-        entity.setAccountNumber(dto.getAccountNumber());
-        entity.setInitiateurId(dto.getInitiateur());
-        entity.setReceptionDate(dto.getReceptionDate());
-        entity.setClosedDate(dto.getClosedDate());
-        entity.setFirstName(dto.getFirstName());
-        entity.setLastName(dto.getLastName());
-        entity.setNomAgence(dto.getNomAgence());
-        entity.setGroupeAgence(dto.getGroupeAgence());
-        entity.setFullNameDA(dto.getFullNameDA());
-        entity.setDestinataireExclusif(dto.getDestinataireExclusif());
-        entity.setImpayeMCI(dto.getImpayeMCI());
-        entity.setImpayeBCC(dto.getImpayeBCC());
-        entity.setImpayeBMCI(dto.getImpayeBMCI());
-        entity.setMesureConervatoir(dto.getMesureConervatoir());
-        entity.setInsidentPeyment(dto.getInsidentPeyment());
-        entity.setActionCommercial(dto.getActionCommercial());
-        entity.setMotif(dto.getMotif());
-
-        setDocuments(entity, dto.getDocumentIds());
-        setJustification(entity, currentUser, dto.getJustification());
-    }
-
-    public void updateEntityFromDTO(SendDemandeComplementsDTO dto, MainleveeEntity entity) {
-        if (dto == null || entity == null) {
-            return;
-        }
-        setDocuments(entity, dto.getDocumentIds());
-    }
-
-    public void updateEntityFromDTO(CreateMainleveeDto dto, MainleveeEntity entity) {
-        if (dto == null || entity == null) {
-            return;
-        }
-        applyCommonFields(dto, entity);
-    }
-
-    public void updateDraftEntityFromDTO(SaveDraftMainleveeDto dto, MainleveeEntity entity) {
-        if (dto == null || entity == null) {
-            return;
-        }
-        applyCommonFields(dto, entity);
-    }
-
-    public void updateEntityFromDTO(UpdateMainleveeDto dto, MainleveeEntity entity) {
-        if (dto == null || entity == null) {
-            return;
-        }
-        applyCommonFields(dto, entity);
-    }
-
-    // ========================================================================================
-    // Documents
-    // ========================================================================================
-
-    private static void setDocuments(MainleveeEntity entity, Set<UUID> dto) {
-        if (entity.getDocumentIds() != null) {
-            entity.getDocumentIds().clear();
-            entity.getDocumentIds().addAll(new LinkedHashSet<>(dto));
-        } else {
-            entity.setDocumentIds(new LinkedHashSet<>(dto));
-        }
-    }
-
-    // ========================================================================================
-    // Convenience : liste / single
-    // ========================================================================================
-
-    public List<MainleveeDto> toDTO(List<MainleveeEntity> mainleveeEntityList) {
-        UserModel currentUser = userService.getCurrentUser();
-        return mainleveeEntityList
-                .stream()
-                .map(entity -> toDTO(entity, currentUser))
+    @Override
+    public List<MainleveeDto> getMainleveesToProcess(String filterValue) {
+        return MOCK_MAINLEVEES.stream()
+                .filter(m -> m.getStatus() == MainleveeStatus.IN_PROGRESS)
+                .filter(m -> matchesFilter(m, filterValue))
                 .toList();
     }
 
-    public MainleveeDto toDTO(MainleveeEntity mainlevee) {
-        UserModel currentUser = userService.getCurrentUser();
-        return toDTO(mainlevee, currentUser);
+    @Override
+    public List<MainleveeDto> getFollowUpMainLevees(String filterValue) {
+        return MOCK_MAINLEVEES.stream()
+                .filter(m -> m.getStatus() == MainleveeStatus.FOLLOW_UP)
+                .filter(m -> matchesFilter(m, filterValue))
+                .toList();
+    }
+
+    @Override
+    public List<MainleveeDto> getFinalizedMainLevees(String filterValue) {
+        return MOCK_MAINLEVEES.stream()
+                .filter(m -> m.getStatus() == MainleveeStatus.FINALIZED)
+                .filter(m -> matchesFilter(m, filterValue))
+                .toList();
+    }
+
+    @Override
+    public void saveMainlevee(CreateMainleveeDto dto, MultipartFile[] files) throws IOException {
+        // Mock : ne fait rien, le front reçoit juste un 201
+    }
+
+    // ============================================================
+    // Utilitaire filtre
+    // ============================================================
+
+    private boolean matchesFilter(MainleveeDto m, String filterValue) {
+        if (filterValue == null || filterValue.isBlank()) {
+            return true;
+        }
+        String lower = filterValue.toLowerCase();
+        return (m.getBusinessKey() != null && m.getBusinessKey().toLowerCase().contains(lower))
+                || (m.getCin() != null && m.getCin().toLowerCase().contains(lower))
+                || (m.getLastName() != null && m.getLastName().toLowerCase().contains(lower))
+                || (m.getFirstName() != null && m.getFirstName().toLowerCase().contains(lower))
+                || (m.getClientSubId() != null && m.getClientSubId().toLowerCase().contains(lower));
     }
 }
 
