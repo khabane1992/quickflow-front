@@ -1,328 +1,250 @@
-package com.bnpparibas.irb.qlickflow.facade.mainlevee.impl;
+// ============================================
+// Styles pour les tableaux de demandes
+// ============================================
 
-import com.bnpparibas.irb.qlickflow.dtos.mainlevee.*;
-import com.bnpparibas.irb.qlickflow.enums.MainleveeStatus;
-import com.bnpparibas.irb.qlickflow.facade.mainlevee.MainleveeFacade;
-import com.bnpparibas.irb.qlickflow.service.MainleveeAuthorizationService;
-import com.bnpparibas.irb.qlickflow.service.UserService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.*;
-
-@Component
-@RequiredArgsConstructor
-public class MainleveeFacadeImpl implements MainleveeFacade {
-
-    private final MainleveeAuthorizationService mainLeveeAuthorizationService;
-    private final UserService userService;
-
-    // ============================================================
-    // MOCK DATA
-    // ============================================================
-
-    private static final List<MainleveeDto> MOCK_MAINLEVEES = buildMockData();
-
-    private static List<MainleveeDto> buildMockData() {
-        List<MainleveeDto> list = new ArrayList<>();
-
-        // --- Mainlevée 1 : En cours de traitement ---
-        list.add(MainleveeDto.builder()
-                .id(UUID.fromString("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"))
-                .businessKey("ML-001")
-                .clientSubId("CLI001")
-                .cin("BK123456")
-                .accountNumber("0011223344556677")
-                .initiateurId(UUID.fromString("11111111-1111-1111-1111-111111111111"))
-                .owner("Ahmed Bennani")
-                .responsible("Fatima Zahra El Idrissi")
-                .nomAgence("Agence Casa Anfa")
-                .groupeAgence("Casablanca Nord")
-                .fullNameDA("Mohamed Tazi")
-                .destinataireExclusif("Direction Régionale Casa")
-                .firstName("Karim")
-                .lastName("Ouazzani")
-                .status(MainleveeStatus.IN_PROGRESS)
-                .impayeMCI("15000.00")
-                .impayeBCC("8500.00")
-                .impayeBMCI("3200.00")
-                .mesureConervatoir("Saisie conservatoire sur compte")
-                .insidentPeyment("2 incidents en 2024")
-                .actionCommercial("Relance téléphonique effectuée")
-                .motif("Rachat du prêt")
-                .receptionDate(LocalDate.of(2025, 11, 15))
-                .closedDate(null)
-                .documentIds(new LinkedHashSet<>(Set.of(
-                        UUID.fromString("dddddddd-0001-0001-0001-000000000001"),
-                        UUID.fromString("dddddddd-0001-0001-0001-000000000002")
-                )))
-                .concourGrantieDemandes(List.of(
-                        ConcourGrantieDemandDto.builder()
-                                .id(UUID.fromString("cccccccc-0001-0001-0001-000000000001"))
-                                .natureGrantie("Hypothèque")
-                                .tfRecRc("TF-12345/RC-6789")
-                                .concourCouvre("Prêt immobilier")
-                                .numeroDossierSab("SAB-2024-001")
-                                .reliquatConcour("25000.00")
-                                .montantInitialConcour(new BigDecimal("500000.00"))
-                                .montantGarantieCovran(new BigDecimal("450000.00"))
-                                .build(),
-                        ConcourGrantieDemandDto.builder()
-                                .id(UUID.fromString("cccccccc-0001-0001-0001-000000000002"))
-                                .natureGrantie("Nantissement")
-                                .tfRecRc("RC-11111")
-                                .concourCouvre("Crédit de trésorerie")
-                                .numeroDossierSab("SAB-2024-002")
-                                .reliquatConcour("10000.00")
-                                .montantInitialConcour(new BigDecimal("200000.00"))
-                                .montantGarantieCovran(new BigDecimal("180000.00"))
-                                .build()
-                ))
-                .engagementClients(List.of(
-                        EngagementClientDto.builder()
-                                .id(UUID.fromString("eeeeeeee-0001-0001-0001-000000000001"))
-                                .natureAut("Crédit immobilier")
-                                .montantAut(new BigDecimal("500000.00"))
-                                .utilisation("Acquisition résidence principale")
-                                .grantieConstitue("Hypothèque 1er rang")
-                                .montant(new BigDecimal("475000.00"))
-                                .build()
-                ))
-                .commentaires(List.of(
-                        CommentaireDTO.builder()
-                                .id(UUID.fromString("ffffffff-0001-0001-0001-000000000001"))
-                                .text("Dossier complet, en attente de validation par la direction.")
-                                .author("Ahmed Bennani")
-                                .profileAuthor("Conseiller")
-                                .createdAt(LocalDateTime.of(2025, 11, 16, 9, 30))
-                                .build(),
-                        CommentaireDTO.builder()
-                                .id(UUID.fromString("ffffffff-0001-0001-0001-000000000002"))
-                                .text("Pièces justificatives vérifiées. RAS.")
-                                .author("Fatima Zahra El Idrissi")
-                                .profileAuthor("DA")
-                                .createdAt(LocalDateTime.of(2025, 11, 17, 14, 15))
-                                .build()
-                ))
-                .build());
-
-        // --- Mainlevée 2 : Brouillon ---
-        list.add(MainleveeDto.builder()
-                .id(UUID.fromString("b1febc99-9c0b-4ef8-bb6d-6bb9bd380a12"))
-                .businessKey("ML-002")
-                .clientSubId("CLI002")
-                .cin("BE789012")
-                .accountNumber("0099887766554433")
-                .initiateurId(UUID.fromString("22222222-2222-2222-2222-222222222222"))
-                .owner("Sara Alaoui")
-                .responsible(null)
-                .nomAgence("Agence Rabat Agdal")
-                .groupeAgence("Rabat Centre")
-                .fullNameDA("Youssef Amrani")
-                .destinataireExclusif(null)
-                .firstName("Omar")
-                .lastName("Fassi Fihri")
-                .status(MainleveeStatus.DRAFT)
-                .impayeMCI("0.00")
-                .impayeBCC("0.00")
-                .impayeBMCI("0.00")
-                .mesureConervatoir(null)
-                .insidentPeyment("Aucun")
-                .actionCommercial(null)
-                .motif("Vente du bien")
-                .receptionDate(LocalDate.of(2026, 1, 10))
-                .closedDate(null)
-                .documentIds(new LinkedHashSet<>())
-                .concourGrantieDemandes(List.of(
-                        ConcourGrantieDemandDto.builder()
-                                .id(UUID.fromString("cccccccc-0002-0002-0002-000000000001"))
-                                .natureGrantie("Hypothèque")
-                                .tfRecRc("TF-99999")
-                                .concourCouvre("Prêt habitat")
-                                .numeroDossierSab("SAB-2025-010")
-                                .reliquatConcour("0.00")
-                                .montantInitialConcour(new BigDecimal("350000.00"))
-                                .montantGarantieCovran(new BigDecimal("350000.00"))
-                                .build()
-                ))
-                .engagementClients(List.of())
-                .commentaires(List.of())
-                .build());
-
-        // --- Mainlevée 3 : Finalisée ---
-        list.add(MainleveeDto.builder()
-                .id(UUID.fromString("550e8400-e29b-41d4-a716-446655440000"))
-                .businessKey("ML-003")
-                .clientSubId("CLI003")
-                .cin("BJ345678")
-                .accountNumber("0055443322110099")
-                .initiateurId(UUID.fromString("33333333-3333-3333-3333-333333333333"))
-                .owner("Nadia Chraibi")
-                .responsible("Hassan Benjelloun")
-                .nomAgence("Agence Marrakech Gueliz")
-                .groupeAgence("Marrakech")
-                .fullNameDA("Rachid Berrada")
-                .destinataireExclusif("Direction Centrale")
-                .firstName("Amine")
-                .lastName("Lahlou")
-                .status(MainleveeStatus.FINALIZED)
-                .impayeMCI("0.00")
-                .impayeBCC("0.00")
-                .impayeBMCI("0.00")
-                .mesureConervatoir("Aucune")
-                .insidentPeyment("Aucun")
-                .actionCommercial("Client fidèle - pas d'action nécessaire")
-                .motif("Prêt échu remboursé")
-                .receptionDate(LocalDate.of(2025, 6, 1))
-                .closedDate(LocalDate.of(2025, 9, 15))
-                .documentIds(new LinkedHashSet<>(Set.of(
-                        UUID.fromString("dddddddd-0003-0003-0003-000000000001")
-                )))
-                .concourGrantieDemandes(List.of(
-                        ConcourGrantieDemandDto.builder()
-                                .id(UUID.fromString("cccccccc-0003-0003-0003-000000000001"))
-                                .natureGrantie("Hypothèque")
-                                .tfRecRc("TF-55555")
-                                .concourCouvre("Prêt personnel")
-                                .numeroDossierSab("SAB-2024-050")
-                                .reliquatConcour("0.00")
-                                .montantInitialConcour(new BigDecimal("150000.00"))
-                                .montantGarantieCovran(new BigDecimal("150000.00"))
-                                .build()
-                ))
-                .engagementClients(List.of(
-                        EngagementClientDto.builder()
-                                .id(UUID.fromString("eeeeeeee-0003-0003-0003-000000000001"))
-                                .natureAut("Crédit consommation")
-                                .montantAut(new BigDecimal("150000.00"))
-                                .utilisation("Travaux")
-                                .grantieConstitue("Hypothèque")
-                                .montant(new BigDecimal("0.00"))
-                                .build()
-                ))
-                .commentaires(List.of(
-                        CommentaireDTO.builder()
-                                .id(UUID.fromString("ffffffff-0003-0003-0003-000000000001"))
-                                .text("Mainlevée signée et envoyée au notaire.")
-                                .author("Hassan Benjelloun")
-                                .profileAuthor("Responsable")
-                                .createdAt(LocalDateTime.of(2025, 9, 15, 11, 0))
-                                .build()
-                ))
-                .build());
-
-        // --- Mainlevée 4 : En suivi ---
-        list.add(MainleveeDto.builder()
-                .id(UUID.fromString("550e8400-e29b-41d4-a716-446655440001"))
-                .businessKey("ML-004")
-                .clientSubId("CLI004")
-                .cin("BA901234")
-                .accountNumber("0012345678901234")
-                .initiateurId(UUID.fromString("44444444-4444-4444-4444-444444444444"))
-                .owner("Leila Mansouri")
-                .responsible("Khalid Cherkaoui")
-                .nomAgence("Agence Tanger Centre")
-                .groupeAgence("Tanger")
-                .fullNameDA("Samir Kettani")
-                .destinataireExclusif(null)
-                .firstName("Yassine")
-                .lastName("Hajji")
-                .status(MainleveeStatus.FOLLOW_UP)
-                .impayeMCI("5000.00")
-                .impayeBCC("2000.00")
-                .impayeBMCI("0.00")
-                .mesureConervatoir("Opposition sur compte")
-                .insidentPeyment("1 incident en 2025")
-                .actionCommercial("Rendez-vous planifié le 15/04/2026")
-                .motif("Autres")
-                .receptionDate(LocalDate.of(2026, 2, 20))
-                .closedDate(null)
-                .documentIds(new LinkedHashSet<>(Set.of(
-                        UUID.fromString("dddddddd-0004-0004-0004-000000000001"),
-                        UUID.fromString("dddddddd-0004-0004-0004-000000000002"),
-                        UUID.fromString("dddddddd-0004-0004-0004-000000000003")
-                )))
-                .concourGrantieDemandes(List.of())
-                .engagementClients(List.of(
-                        EngagementClientDto.builder()
-                                .id(UUID.fromString("eeeeeeee-0004-0004-0004-000000000001"))
-                                .natureAut("Découvert autorisé")
-                                .montantAut(new BigDecimal("50000.00"))
-                                .utilisation("Fonds de roulement")
-                                .grantieConstitue("Caution personnelle")
-                                .montant(new BigDecimal("45000.00"))
-                                .build()
-                ))
-                .commentaires(List.of(
-                        CommentaireDTO.builder()
-                                .id(UUID.fromString("ffffffff-0004-0004-0004-000000000001"))
-                                .text("En attente de complément de dossier du client.")
-                                .author("Leila Mansouri")
-                                .profileAuthor("Conseiller")
-                                .createdAt(LocalDateTime.of(2026, 2, 21, 10, 45))
-                                .build()
-                ))
-                .build());
-
-        return list;
-    }
-
-    // ============================================================
-    // MÉTHODES FACADE — MOCK
-    // ============================================================
-
-    @Override
-    public List<MainleveeDto> getMainleveesToProcess(String filterValue) {
-        return MOCK_MAINLEVEES.stream()
-                .filter(m -> m.getStatus() == MainleveeStatus.IN_PROGRESS)
-                .filter(m -> matchesFilter(m, filterValue))
-                .toList();
-    }
-
-    @Override
-    public List<MainleveeDto> getFollowUpMainLevees(String filterValue) {
-        return MOCK_MAINLEVEES.stream()
-                .filter(m -> m.getStatus() == MainleveeStatus.FOLLOW_UP)
-                .filter(m -> matchesFilter(m, filterValue))
-                .toList();
-    }
-
-    @Override
-    public List<MainleveeDto> getFinalizedMainLevees(String filterValue) {
-        return MOCK_MAINLEVEES.stream()
-                .filter(m -> m.getStatus() == MainleveeStatus.FINALIZED)
-                .filter(m -> matchesFilter(m, filterValue))
-                .toList();
-    }
-
-    @Override
-    public void saveMainlevee(CreateMainleveeDto dto, MultipartFile[] files) throws IOException {
-        // Mock : ne fait rien, le front reçoit juste un 201
-    }
-
-    // ============================================================
-    // Utilitaire filtre
-    // ============================================================
-
-    private boolean matchesFilter(MainleveeDto m, String filterValue) {
-        if (filterValue == null || filterValue.isBlank()) {
-            return true;
-        }
-        String lower = filterValue.toLowerCase();
-        return (m.getBusinessKey() != null && m.getBusinessKey().toLowerCase().contains(lower))
-                || (m.getCin() != null && m.getCin().toLowerCase().contains(lower))
-                || (m.getLastName() != null && m.getLastName().toLowerCase().contains(lower))
-                || (m.getFirstName() != null && m.getFirstName().toLowerCase().contains(lower))
-                || (m.getClientSubId() != null && m.getClientSubId().toLowerCase().contains(lower));
-    }
+.requests-table th {
+  color: #00965E;
+  text-align: center;
+  //background-color: red;
+  font-size: 7px;
+  width: 100%;
 }
 
+.requests-table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  margin: 0 auto;
+  font-size: 15px;
+  table-layout: fixed !important;
+  box-sizing: border-box;
 
+  @media (max-width: 768px) {
+    .requests-table {
+      display: block;
+    }
+
+    .requests-table thead,
+    .requests-table tbody {
+      display: block;
+      width: 100%;
+    }
+
+    .requests-table th,
+    .requests-table td {
+      display: block;
+      width: 100%;
+    }
+
+    .requests-table th {
+      background-color: #f0f0f0;
+      padding: 10px;
+    }
+
+    .requests-table td {
+      padding: 10px;
+    }
+
+    .request-type {
+      flex-direction: column;
+    }
+
+    .percentage-icon {
+      margin-bottom: 10px;
+    }
+
+    .user-info {
+      flex-direction: column;
+    }
+
+    .status-text {
+      flex-direction: column;
+    }
+
+    .action-btn {
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .requests-table th,
+    .requests-table td {
+      padding: 5px;
+    }
+
+    .request-type {
+      flex-direction: column;
+    }
+
+    .percentage-icon {
+      margin-bottom: 5px;
+    }
+
+    .user-info {
+      flex-direction: column;
+    }
+
+    .status-text {
+      flex-direction: column;
+    }
+
+    .action-btn {
+      padding: 5px 10px;
+    }
+  }
+}
+
+// ============================================
+// Styles globaux th / td
+// ============================================
+
+th {
+  position: sticky;
+  top: 0;
+  background-color: #f0f0f0;
+  padding: 8px;
+  font-weight: 700;
+  width: calc(100% / 8);
+  margin: 10px;
+  color: #00965E;
+  font-size: 12px;
+  border-bottom: 2px solid $border-color;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  @media (max-width: 768px) {
+    padding: 12px 6px;
+    font-size: 11px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 10px 4px;
+    font-size: 10px;
+  }
+}
+
+td {
+  padding: 10px 8px;
+  border-bottom: 1px solid $border-light;
+  vertical-align: middle;    // corrigé: "center" n'est pas une valeur valide
+  text-align: center;        // corrigé: "horiz-align" n'existe pas en CSS
+  overflow: hidden;
+  font-weight: 700;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+
+  @media (max-width: 768px) {
+    padding: 12px 6px;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  @media (max-width: 480px) {
+    padding: 10px 4px;
+    font-size: 10px;
+  }
+}
+
+// ============================================
+// Composants internes des cellules
+// ============================================
+
+.request-type {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+
+  @media (max-width: 760px) {
+    flex-direction: column;
+    gap: 2px;
+    text-align: center;
+  }
+}
+
+// ============================================
+// Largeur des colonnes (table-layout: fixed)
+// ============================================
+
+.requests-table th,
+.requests-table td {
+  width: 12.5%;
+  text-align: left;
+  //column-gap: 100px;
+  //background-color: red;
+}
+
+// ============================================
+// FORCE anti-débordement sur tous les éléments
+// ============================================
+
+.derogation-container,
+.section-container,
+.table-container,
+.requests-table,
+.requests-table *,
+.section-header,
+.search-box {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+// ============================================
+// Ellipsis pour textes longs (FIX principal)
+// ============================================
+
+.requests-table td {
+  overflow: hidden;            // ✅ corrigé : était "visible" → empêchait l'ellipsis
+  text-overflow: ellipsis;
+  white-space: nowrap;         // ✅ ajouté : nécessaire pour l'ellipsis
+  max-width: 0;                // ✅ ajouté : force le respect de width avec table-layout: fixed
+
+  @media (max-width: 768px) {
+    max-width: none;           // Permet wrap sur mobile
+    white-space: normal;
+    word-break: break-word;
+  }
+}
+
+// ============================================
+// Lignes du tableau
+// ============================================
+
+.table-row {
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #f8f9fa;
+  }
+}
+
+// ============================================
+// Conteneur du tableau (scroll horizontal)
+// ============================================
+
+.table-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+
+  &::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 2px;
+  }
+}
 
 // src/app/features/derogation/models/dashboard/request.interface.ts
 
