@@ -1,3 +1,35 @@
+@Test
+void stage_savesValidFile() {
+    // Given
+    MultipartFile f = new MockMultipartFile(
+            "file", "doc.pdf", "application/pdf", "hello".getBytes());
+
+    when(documentProperties.allowedMimeToExt())
+            .thenReturn(Map.of("application/pdf", "pdf"));
+
+    when(documentExtensionResolver.resolve(any(MultipartFile.class)))
+            .thenReturn("pdf");
+
+    // storeAndHash prend 3 args : (UUID, MultipartFile, String)
+    when(documentStorageService.storeAndHash(
+            any(UUID.class), any(MultipartFile.class), any(String.class)))
+            .thenReturn(new StoreAndHashResult(
+                    new StoredObject("storage/key/1", "/absolute/path/1"),
+                    "abc123hash"));
+
+    // When
+    AttachmentResult result = service.stageDocument(f, "user-1");
+
+    // Then
+    assertThat(result.getStatus()).isEqualTo(DocumentStatus.STAGED.name());
+    assertThat(result.getOriginalFileName()).isEqualTo("doc.pdf");
+    assertThat(result.getSha256()).isEqualTo("abc123hash");
+    verify(documentRepository).save(any(DocumentEntity.class));
+}
+
+
+
+
 package com.bnpparibas.irb.qlickflow.documents.service;
 
 import org.junit.jupiter.api.BeforeEach;
