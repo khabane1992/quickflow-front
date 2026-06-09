@@ -1,3908 +1,887 @@
-// ============================================
-// Styles pour les tableaux de demandes
-// ============================================
-
-.requests-table th {
-  color: #00965E;
-  text-align: center;
-  //background-color: red;
-  font-size: 7px;
-  width: 100%;
-}
-
-.requests-table {
-  width: 100%;
-  max-width: 100%;
-  border-collapse: collapse;
-  margin: 0 auto;
-  font-size: 15px;
-  table-layout: fixed !important;
-  box-sizing: border-box;
-
-  @media (max-width: 768px) {
-    .requests-table {
-      display: block;
-    }
-
-    .requests-table thead,
-    .requests-table tbody {
-      display: block;
-      width: 100%;
-    }
-
-    .requests-table th,
-    .requests-table td {
-      display: block;
-      width: 100%;
-    }
-
-    .requests-table th {
-      background-color: #f0f0f0;
-      padding: 10px;
-    }
-
-    .requests-table td {
-      padding: 10px;
-    }
-
-    .request-type {
-      flex-direction: column;
-    }
-
-    .percentage-icon {
-      margin-bottom: 10px;
-    }
-
-    .user-info {
-      flex-direction: column;
-    }
-
-    .status-text {
-      flex-direction: column;
-    }
-
-    .action-btn {
-      width: 100%;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .requests-table th,
-    .requests-table td {
-      padding: 5px;
-    }
-
-    .request-type {
-      flex-direction: column;
-    }
-
-    .percentage-icon {
-      margin-bottom: 5px;
-    }
-
-    .user-info {
-      flex-direction: column;
-    }
-
-    .status-text {
-      flex-direction: column;
-    }
-
-    .action-btn {
-      padding: 5px 10px;
-    }
-  }
-}
-
-// ============================================
-// Styles globaux th / td
-// ============================================
-
-th {
-  position: sticky;
-  top: 0;
-  background-color: #f0f0f0;
-  padding: 8px;
-  font-weight: 700;
-  width: calc(100% / 8);
-  margin: 10px;
-  color: #00965E;
-  font-size: 12px;
-  border-bottom: 2px solid $border-color;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  @media (max-width: 768px) {
-    padding: 12px 6px;
-    font-size: 11px;
-  }
-
-  @media (max-width: 480px) {
-    padding: 10px 4px;
-    font-size: 10px;
-  }
-}
-
-td {
-  padding: 10px 8px;
-  border-bottom: 1px solid $border-light;
-  vertical-align: middle;    // corrigé: "center" n'est pas une valeur valide
-  text-align: center;        // corrigé: "horiz-align" n'existe pas en CSS
-  overflow: hidden;
-  font-weight: 700;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  width: 100%;
-
-  @media (max-width: 768px) {
-    padding: 12px 6px;
-    white-space: normal;
-    word-break: break-word;
-  }
-
-  @media (max-width: 480px) {
-    padding: 10px 4px;
-    font-size: 10px;
-  }
-}
-
-// ============================================
-// Composants internes des cellules
-// ============================================
-
-.request-type {
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-
-  @media (max-width: 760px) {
-    flex-direction: column;
-    gap: 2px;
-    text-align: center;
-  }
-}
-
-// ============================================
-// Largeur des colonnes (table-layout: fixed)
-// ============================================
-
-.requests-table th,
-.requests-table td {
-  width: 12.5%;
-  text-align: left;
-  //column-gap: 100px;
-  //background-color: red;
-}
-
-// ============================================
-// FORCE anti-débordement sur tous les éléments
-// ============================================
-
-.derogation-container,
-.section-container,
-.table-container,
-.requests-table,
-.requests-table *,
-.section-header,
-.search-box {
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-}
-
-// ============================================
-// Ellipsis pour textes longs (FIX principal)
-// ============================================
-
-.requests-table td {
-  overflow: hidden;            // ✅ corrigé : était "visible" → empêchait l'ellipsis
-  text-overflow: ellipsis;
-  white-space: nowrap;         // ✅ ajouté : nécessaire pour l'ellipsis
-  max-width: 0;                // ✅ ajouté : force le respect de width avec table-layout: fixed
-
-  @media (max-width: 768px) {
-    max-width: none;           // Permet wrap sur mobile
-    white-space: normal;
-    word-break: break-word;
-  }
-}
-
-// ============================================
-// Lignes du tableau
-// ============================================
-
-.table-row {
-  transition: background-color 0.2s ease;
-
-  &:hover {
-    background-color: #f8f9fa;
-  }
-}
-
-// ============================================
-// Conteneur du tableau (scroll horizontal)
-// ============================================
-
-.table-container {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: visible;
-  -webkit-overflow-scrolling: touch;
-  box-sizing: border-box;
-
-  &::-webkit-scrollbar {
-    height: 4px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #f1f1f1;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 2px;
-  }
-}
-
-// src/app/features/derogation/models/dashboard/request.interface.ts
-
-export enum DemandsType {
-  TO_PROCESS = 'TO_PROCESS',
-  PENDING_VALIDATION = 'PENDING_VALIDATION',
-  PROCESSED = 'PROCESSED',
-  ALL = 'ALL'
-}
-
-export enum DerogationStatus {
-  DRAFT = 'DRAFT',
-  PENDING = 'PENDING',
-  TO_PROCESS = 'TO_PROCESS',
-  IN_REVIEW = 'IN_REVIEW',
-  PENDING_VALIDATION = 'PENDING_VALIDATION',
-  APPROVED = 'APPROVED',
-  REJECTED = 'REJECTED',
-  IMPLEMENTED = 'IMPLEMENTED',
-  CANCELLED = 'CANCELLED',
-  PROCESSED = 'PROCESSED'
-}
-
-export enum DerogationType {
-  NAVIGATION_LOGICIELS = 'NAVIGATION_LOGICIELS',
-  DROIT_DIFFUSION = 'DROIT_DIFFUSION',
-  DONNEES_TIERS = 'DONNEES_TIERS',
-  TARIFF = 'TARIFF',
-  LIMIT = 'LIMIT',
-  COMMISSION = 'COMMISSION',
-  PROCEDURE = 'PROCEDURE',
-  OTHER = 'OTHER'
-}
-
-export interface DashboardRequestDTO {
-  id: number;
-  createdAt: string;
-  requestType: string;
-  clientName: string;
-  sabClientId: string;
-  owner: string;
-  responsable: string;
-  agency: string;
-  proposedStatus: string;
-  status: DerogationStatus;
-  derogationType: DerogationType;
-  derogationValue: number;
-  proposedEffectiveDate: string;
-  proposedEndDate: string;
-  daysPending: number;
-  actions: string;
-}
-
-// Interface pour les statistiques du dashboard
-export interface DashboardStats {
-  totalRequests: number;
-  pendingRequests: number;
-  inReviewRequests: number;
-  approvedRequests: number;
-  rejectedRequests: number;
-  draftRequests: number;
-  averageProcessingTime: number;
-  totalValue: number;
-}
-
-// Interface pour les filtres de recherche
-export interface SearchFilters {
-  status?: DerogationStatus;
-  derogationType?: DerogationType;
-  agency?: string;
-  owner?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  minValue?: number;
-  maxValue?: number;
-}
-
-// Interface pour les paramètres de pagination
-export interface PaginationParams {
-  page: number;
-  size: number;
-  sortBy?: string;
-  sortDirection?: 'asc' | 'desc';
-}
-
-// Interface pour les actions sur les demandes
-export interface DemandAction {
-  type: 'APPROVE' | 'REJECT' | 'PROCESS' | 'VIEW' | 'EDIT' | 'DELETE';
-  demandId: string;
-  comments?: string;
-  reason?: string;
-}
-
-// Interface pour la création d'une nouvelle demande
-export interface CreateDemandRequest {
-  requestType: string;
-  clientName: string;
-  sabClientId: string;
-  owner: string;
-  responsable: string;
-  agency: string;
-  derogationType: DerogationType;
-  derogationValue: number;
-  proposedEffectiveDate: string;
-  proposedEndDate: string;
-  comments?: string;
-  attachments?: File[];
-}
-
-// Interface pour la mise à jour d'une demande
-export interface UpdateDemandRequest {
-  id: number;
-  status?: DerogationStatus;
-  comments?: string;
-  proposedEffectiveDate?: string;
-  proposedEndDate?: string;
-  derogationValue?: number;
-}
-
-
-
-
-
--- ============================================================
--- Script d'insertion des données: Zones, Groupes, Agences
--- Organisation: Zone -> Groupe -> Agence
--- ============================================================
-
--- ============================================================
--- INSERTION DES ZONES
--- ============================================================
-
-INSERT INTO zones (id, nom, actif, director_zone_id, created_at, updated_at)
-SELECT 'c0d994d3-2df1-411f-5b20-feea5ed2d43e', 'Zone Casa Ouest', TRUE, NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM zones WHERE id = 'c0d994d3-2df1-411f-5b20-feea5ed2d43e');
-
-INSERT INTO zones (id, nom, actif, director_zone_id, created_at, updated_at)
-SELECT '930022c6-f63b-8b91-4565-0995d1a14fcc', 'Zone Casa Nord', TRUE, NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM zones WHERE id = '930022c6-f63b-8b91-4565-0995d1a14fcc');
-
-INSERT INTO zones (id, nom, actif, director_zone_id, created_at, updated_at)
-SELECT 'de1b3f8b-4189-c5f3-221e-9e9e35bd095e', 'Zone Casa Centre', TRUE, NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM zones WHERE id = 'de1b3f8b-4189-c5f3-221e-9e9e35bd095e');
-
-INSERT INTO zones (id, nom, actif, director_zone_id, created_at, updated_at)
-SELECT '20cd916d-4781-0c47-db80-2b73e3de03ba', 'Région Sud', TRUE, NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM zones WHERE id = '20cd916d-4781-0c47-db80-2b73e3de03ba');
-
-INSERT INTO zones (id, nom, actif, director_zone_id, created_at, updated_at)
-SELECT 'd984e25d-c0bf-6210-bbcf-b141df34e493', 'Région Rabat-Nord', TRUE, NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM zones WHERE id = 'd984e25d-c0bf-6210-bbcf-b141df34e493');
-
-INSERT INTO zones (id, nom, actif, director_zone_id, created_at, updated_at)
-SELECT '9a02aa5e-0b50-f9b6-94f0-a917bbaea473', 'Région Est', TRUE, NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM zones WHERE id = '9a02aa5e-0b50-f9b6-94f0-a917bbaea473');
-
--- ============================================================
--- INSERTION DES GROUPES
--- ============================================================
-
--- Zone Casa Ouest
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '89b16937-9589-6d08-4da9-c6439ff9f5f8', 'Groupe Casa Sud', TRUE, 'c0d994d3-2df1-411f-5b20-feea5ed2d43e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '89b16937-9589-6d08-4da9-c6439ff9f5f8');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '37db3dff-e35f-2b53-f67f-2d441567e1fd', 'Groupe CIL', TRUE, 'c0d994d3-2df1-411f-5b20-feea5ed2d43e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '37db3dff-e35f-2b53-f67f-2d441567e1fd');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '48b1ddf2-3bda-c947-1633-40db93772d23', 'Groupe La Colline', TRUE, 'c0d994d3-2df1-411f-5b20-feea5ed2d43e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '48b1ddf2-3bda-c947-1633-40db93772d23');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT 'f596e52d-c33d-2e2b-8007-74853580e261', 'Groupe Maarif', TRUE, 'c0d994d3-2df1-411f-5b20-feea5ed2d43e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = 'f596e52d-c33d-2e2b-8007-74853580e261');
-
-
--- Zone Casa Nord
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '20eafbca-bf8e-ad7a-89cd-f587afbc9191', 'Groupe Ain Sebaa', TRUE, '930022c6-f63b-8b91-4565-0995d1a14fcc', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '20eafbca-bf8e-ad7a-89cd-f587afbc9191');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '1d920784-defb-4ee1-0e7f-ca93f250cf83', 'Groupe Cite Djemaa', TRUE, '930022c6-f63b-8b91-4565-0995d1a14fcc', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '1d920784-defb-4ee1-0e7f-ca93f250cf83');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '5e956ea6-1fb2-cedd-2aee-4e8049c4823f', 'Groupe Mohammedia', TRUE, '930022c6-f63b-8b91-4565-0995d1a14fcc', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '5e956ea6-1fb2-cedd-2aee-4e8049c4823f');
-
-
--- Zone Casa Centre
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', 'Groupe Casa Centre', TRUE, 'de1b3f8b-4189-c5f3-221e-9e9e35bd095e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', 'Groupe Casa Franceville', TRUE, 'de1b3f8b-4189-c5f3-221e-9e9e35bd095e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '8457c1f3-3c3c-52a3-9fdb-355f90a37f76');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '8f4e88b3-c4d7-f801-fb22-17c365168bfb', 'Groupe Casa Panoramique', TRUE, 'de1b3f8b-4189-c5f3-221e-9e9e35bd095e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '8f4e88b3-c4d7-f801-fb22-17c365168bfb');
-
-
--- Région Sud
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '0a86e145-e9ab-8498-bc5f-b3d79a427dd9', 'Groupe Sud', TRUE, '20cd916d-4781-0c47-db80-2b73e3de03ba', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '0a86e145-e9ab-8498-bc5f-b3d79a427dd9');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '3dbd6847-d201-8261-1bff-f49243ee7385', 'Groupe Marrakech Ouest', TRUE, '20cd916d-4781-0c47-db80-2b73e3de03ba', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '3dbd6847-d201-8261-1bff-f49243ee7385');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '53490755-ebd5-2bef-bc0d-cb4bcdc5cd4f', 'Groupe Marrakech Extention', TRUE, '20cd916d-4781-0c47-db80-2b73e3de03ba', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '53490755-ebd5-2bef-bc0d-cb4bcdc5cd4f');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '9b059b14-c0da-06c4-140d-bee0e398fce3', 'Groupe Marrakech Centre', TRUE, '20cd916d-4781-0c47-db80-2b73e3de03ba', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '9b059b14-c0da-06c4-140d-bee0e398fce3');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT 'c3ef6cf3-751c-6622-9d43-8d7768ae7ff6', 'Groupe Agadir Centre', TRUE, '20cd916d-4781-0c47-db80-2b73e3de03ba', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = 'c3ef6cf3-751c-6622-9d43-8d7768ae7ff6');
-
-
--- Région Rabat-Nord
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '3bc2dd6e-dd1a-0c5d-ea97-99690fc59238', 'Groupe Tétouan', TRUE, 'd984e25d-c0bf-6210-bbcf-b141df34e493', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '3bc2dd6e-dd1a-0c5d-ea97-99690fc59238');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', 'Groupe Tanger', TRUE, 'd984e25d-c0bf-6210-bbcf-b141df34e493', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '02cdbfd2-3e3c-b562-15a1-e657f8513c6d');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '3f9834a8-224c-5da9-4567-d966457bec46', 'Groupe Salé Kénitra', TRUE, 'd984e25d-c0bf-6210-bbcf-b141df34e493', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '3f9834a8-224c-5da9-4567-d966457bec46');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '9d39c07a-8ba0-e4da-8873-62eef33b7ff1', 'Groupe Rabat Souissi', TRUE, 'd984e25d-c0bf-6210-bbcf-b141df34e493', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '9d39c07a-8ba0-e4da-8873-62eef33b7ff1');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '712940d2-dfb4-c065-dd56-fa60489b4d3b', 'Groupe Rabat Centre', TRUE, 'd984e25d-c0bf-6210-bbcf-b141df34e493', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '712940d2-dfb4-c065-dd56-fa60489b4d3b');
-
-
--- Région Est
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT 'd93070fb-9c10-d31d-58cd-49d0e966df2b', 'Groupe Fès', TRUE, '9a02aa5e-0b50-f9b6-94f0-a917bbaea473', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = 'd93070fb-9c10-d31d-58cd-49d0e966df2b');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT 'b36187d4-0510-ebb1-0a06-b75f0f467740', 'Groupe Meknès', TRUE, '9a02aa5e-0b50-f9b6-94f0-a917bbaea473', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = 'b36187d4-0510-ebb1-0a06-b75f0f467740');
-
-INSERT INTO groupes (id, nom, actif, zone_id, director_group_id, created_at, updated_at)
-SELECT '1d310338-72fa-9af5-bb90-66c3876e4618', 'Groupe Oujda-Nador', TRUE, '9a02aa5e-0b50-f9b6-94f0-a917bbaea473', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM groupes WHERE id = '1d310338-72fa-9af5-bb90-66c3876e4618');
-
-
--- ============================================================
--- INSERTION DES AGENCES
--- ============================================================
-
--- Zone Casa Ouest > Groupe Casa Sud
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '6fbcb228-4822-dbd1-d8de-2490246ecb7d', 'DAR BOUAAZA', '1422', TRUE, '89b16937-9589-6d08-4da9-c6439ff9f5f8', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '6fbcb228-4822-dbd1-d8de-2490246ecb7d');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '8e03b705-3b65-fa49-705d-66d2e10e3d2e', 'CASA ERRAHMA', '1405', TRUE, '89b16937-9589-6d08-4da9-c6439ff9f5f8', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '8e03b705-3b65-fa49-705d-66d2e10e3d2e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '788de748-86db-6044-0548-4a95d80a8f1a', 'SIDI BENNOUR', '1396', TRUE, '89b16937-9589-6d08-4da9-c6439ff9f5f8', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '788de748-86db-6044-0548-4a95d80a8f1a');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'fbfa9fb4-7618-e9b8-2879-b4480395395c', 'HAD SOUALEM', '1344', TRUE, '89b16937-9589-6d08-4da9-c6439ff9f5f8', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'fbfa9fb4-7618-e9b8-2879-b4480395395c');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '15a4f997-3136-4f15-8118-271dc12ec70b', 'AZEMMOUR', '1237', TRUE, '89b16937-9589-6d08-4da9-c6439ff9f5f8', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '15a4f997-3136-4f15-8118-271dc12ec70b');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'a67b1daa-0a19-1d42-88bc-a186ce1da300', 'EL JADIDA ROUTE DE MARRAKECH', '1271', TRUE, '89b16937-9589-6d08-4da9-c6439ff9f5f8', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a67b1daa-0a19-1d42-88bc-a186ce1da300');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '23c97b2a-f86f-c788-3f5d-747e59b109bf', 'EL JADIDA R.S.BOUZID', '1202', TRUE, '89b16937-9589-6d08-4da9-c6439ff9f5f8', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '23c97b2a-f86f-c788-3f5d-747e59b109bf');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '5e3424e1-a215-f835-ec93-84bc57e1afe8', 'EL JADIDA MOHAMED V', '1305', TRUE, '89b16937-9589-6d08-4da9-c6439ff9f5f8', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '5e3424e1-a215-f835-ec93-84bc57e1afe8');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'a5c0ff91-49cf-6444-71b8-dcdf6953eb7a', 'EL JADIDA', '1011', TRUE, '89b16937-9589-6d08-4da9-c6439ff9f5f8', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a5c0ff91-49cf-6444-71b8-dcdf6953eb7a');
-
--- Zone Casa Ouest > Groupe CIL
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '448008e6-f049-76b9-04c3-1882d175f2f9', 'CASA CIL', '1074', TRUE, '37db3dff-e35f-2b53-f67f-2d441567e1fd', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '448008e6-f049-76b9-04c3-1882d175f2f9');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'ed1b5bde-ac0d-b942-3aba-8902e4a47bf8', 'CASA GHANDI', '1091', TRUE, '37db3dff-e35f-2b53-f67f-2d441567e1fd', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'ed1b5bde-ac0d-b942-3aba-8902e4a47bf8');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f3e442f1-bb25-03a2-bec4-49c481ea7179', 'CASA BEAUSEJOUR', '1067', TRUE, '37db3dff-e35f-2b53-f67f-2d441567e1fd', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f3e442f1-bb25-03a2-bec4-49c481ea7179');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '59c5c862-99aa-5d95-5aa2-761e02d96850', 'CASA JARDINS D''ANFA', '1099', TRUE, '37db3dff-e35f-2b53-f67f-2d441567e1fd', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '59c5c862-99aa-5d95-5aa2-761e02d96850');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f06b0b74-0631-9278-87ae-eb10c2ca037f', 'CASA AVIATIONS', '1098', TRUE, '37db3dff-e35f-2b53-f67f-2d441567e1fd', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f06b0b74-0631-9278-87ae-eb10c2ca037f');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '06e93bf8-7438-2486-64ec-63df104ad227', 'CASA HAY HASSANI', '1094', TRUE, '37db3dff-e35f-2b53-f67f-2d441567e1fd', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '06e93bf8-7438-2486-64ec-63df104ad227');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '4e48b9bb-423c-2fa8-00a9-15bbcf9964bc', 'CASA OUM ERRABII', '1172', TRUE, '37db3dff-e35f-2b53-f67f-2d441567e1fd', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '4e48b9bb-423c-2fa8-00a9-15bbcf9964bc');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'caa2cb9b-a42a-85ee-74d8-cce9144d0cbf', 'CASA MAZOLA', '1232', TRUE, '37db3dff-e35f-2b53-f67f-2d441567e1fd', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'caa2cb9b-a42a-85ee-74d8-cce9144d0cbf');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '1106ca68-79a2-a445-b63c-4bd433e9d24f', 'CASA YACOUB EL MANSOUR', '1131', TRUE, '37db3dff-e35f-2b53-f67f-2d441567e1fd', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '1106ca68-79a2-a445-b63c-4bd433e9d24f');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '891284f1-42f3-cdd3-ea90-43c87d95c92e', 'CASA IBN SINA', '1234', TRUE, '37db3dff-e35f-2b53-f67f-2d441567e1fd', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '891284f1-42f3-cdd3-ea90-43c87d95c92e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '4c1dd58e-4a8d-9db8-9de3-7dcfd9a5ab4a', 'CASA HAY ESSALAM', '1293', TRUE, '37db3dff-e35f-2b53-f67f-2d441567e1fd', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '4c1dd58e-4a8d-9db8-9de3-7dcfd9a5ab4a');
-
--- Zone Casa Ouest > Groupe La Colline
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'e720e1ec-7858-87fa-ea72-03ab08fb7bc6', 'CASA LA COLLINE', '1147', TRUE, '48b1ddf2-3bda-c947-1633-40db93772d23', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'e720e1ec-7858-87fa-ea72-03ab08fb7bc6');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '9c9f405c-1f1f-dbc8-8bb5-44b3ecb7bd2a', 'CASA HAY AMINE-SIDI MAAROUF', '1159', TRUE, '48b1ddf2-3bda-c947-1633-40db93772d23', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '9c9f405c-1f1f-dbc8-8bb5-44b3ecb7bd2a');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'aaf44554-f902-e832-2638-fda67d4dca26', 'CASA OULFA', '1072', TRUE, '48b1ddf2-3bda-c947-1633-40db93772d23', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'aaf44554-f902-e832-2638-fda67d4dca26');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'd10d8813-fd15-33ad-d221-8d384a6fc3dc', 'CASANEARSHORE', '1279', TRUE, '48b1ddf2-3bda-c947-1633-40db93772d23', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'd10d8813-fd15-33ad-d221-8d384a6fc3dc');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '81d7722a-9f25-7452-350d-312919f48645', 'CASA ROND POINT CHAHDIA', '1181', TRUE, '48b1ddf2-3bda-c947-1633-40db93772d23', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '81d7722a-9f25-7452-350d-312919f48645');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '3cedd11f-3345-9753-e136-3ea7ea66b262', 'CASA MANDAROUNA', '1282', TRUE, '48b1ddf2-3bda-c947-1633-40db93772d23', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '3cedd11f-3345-9753-e136-3ea7ea66b262');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'e8277908-9993-aa28-a1d2-aff13b4af403', 'CASA LES ORANGERS', '1283', TRUE, '48b1ddf2-3bda-c947-1633-40db93772d23', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'e8277908-9993-aa28-a1d2-aff13b4af403');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'ab3b1f43-827f-d6c1-6d88-61c927e486d4', 'SIDI MAAROUF METRO', '1353', TRUE, '48b1ddf2-3bda-c947-1633-40db93772d23', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'ab3b1f43-827f-d6c1-6d88-61c927e486d4');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '9409a971-4ef9-0018-ee89-a262848bafc4', 'CASA NASSIM', '1324', TRUE, '48b1ddf2-3bda-c947-1633-40db93772d23', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '9409a971-4ef9-0018-ee89-a262848bafc4');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'a38a0b76-0206-1b51-27bc-f38b8b1d4fb5', 'CASA ZOUBEIR', '1229', TRUE, '48b1ddf2-3bda-c947-1633-40db93772d23', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a38a0b76-0206-1b51-27bc-f38b8b1d4fb5');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '3cba2106-f53c-f946-542a-133be8e8236d', 'CASA OUED SEBOU', '1222', TRUE, '48b1ddf2-3bda-c947-1633-40db93772d23', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '3cba2106-f53c-f946-542a-133be8e8236d');
-
--- Zone Casa Ouest > Groupe Maarif
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '81354aff-b8e9-a374-c830-da058eb8888d', 'CASA VAL D''ANFA', '1120', TRUE, 'f596e52d-c33d-2e2b-8007-74853580e261', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '81354aff-b8e9-a374-c830-da058eb8888d');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'c45d0754-76d8-2fc0-12ba-c505e4d36326', 'CASA MAARIF MOSQUEE', '1087', TRUE, 'f596e52d-c33d-2e2b-8007-74853580e261', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'c45d0754-76d8-2fc0-12ba-c505e4d36326');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'aaa2d5cb-ec1a-6e27-a630-61add7bef3bb', 'CASA MAARIF', '1007', TRUE, 'f596e52d-c33d-2e2b-8007-74853580e261', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'aaa2d5cb-ec1a-6e27-a630-61add7bef3bb');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'c2403441-830f-1a3a-ddf1-453e29d86868', 'CASA ZERKTOUNI TWIN CENTER', '1100', TRUE, 'f596e52d-c33d-2e2b-8007-74853580e261', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'c2403441-830f-1a3a-ddf1-453e29d86868');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '0ee0920b-1a5f-9c45-8d22-4232788c220e', 'CASA ROND POINT DES SPORTS', '1134', TRUE, 'f596e52d-c33d-2e2b-8007-74853580e261', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '0ee0920b-1a5f-9c45-8d22-4232788c220e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '37b1cae6-03e7-a6f1-11bd-73a1f770fb3c', 'CASA RACINE', '1173', TRUE, 'f596e52d-c33d-2e2b-8007-74853580e261', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '37b1cae6-03e7-a6f1-11bd-73a1f770fb3c');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '57a869e3-3fc0-985c-22fa-1fe862170a7e', 'CASA NORMANDIE', '1802', TRUE, 'f596e52d-c33d-2e2b-8007-74853580e261', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '57a869e3-3fc0-985c-22fa-1fe862170a7e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '64122873-43f5-06d7-9622-a6fc26e84737', 'CASA AHMED CHARSI', '1262', TRUE, 'f596e52d-c33d-2e2b-8007-74853580e261', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '64122873-43f5-06d7-9622-a6fc26e84737');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '6d60f652-36b4-0639-f4e2-9638b29b304a', 'CASA AL FORAT', '1287', TRUE, 'f596e52d-c33d-2e2b-8007-74853580e261', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '6d60f652-36b4-0639-f4e2-9638b29b304a');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f765377e-ffec-9ddb-d8bf-b80071d20c17', 'CASA BORGOGNE', '1161', TRUE, 'f596e52d-c33d-2e2b-8007-74853580e261', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f765377e-ffec-9ddb-d8bf-b80071d20c17');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '58fa2c34-12ee-3c04-44e3-603dca6894b9', 'CASA ATTABARI', '1220', TRUE, 'f596e52d-c33d-2e2b-8007-74853580e261', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '58fa2c34-12ee-3c04-44e3-603dca6894b9');
-
--- Zone Casa Nord > Groupe Ain Sebaa
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '2ab9fb52-eea9-00e4-f47e-108669d5ba68', 'CASA LA GIRONDE', '1004', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '2ab9fb52-eea9-00e4-f47e-108669d5ba68');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'e3d006ff-8998-0662-2b33-3993c16906cc', 'CASA EMILE ZOLA', '1140', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'e3d006ff-8998-0662-2b33-3993c16906cc');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '8ce7ad35-7b08-c6f3-dcf6-c44585233c86', 'CASA GARE', '1003', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '8ce7ad35-7b08-c6f3-dcf6-c44585233c86');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'c1ea6897-63fd-3f7f-d6ec-974b8550d432', 'CASA AMBASSADEUR BEN AICHA', '1249', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'c1ea6897-63fd-3f7f-d6ec-974b8550d432');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'ac5017f9-dede-1289-b4ee-4b09eeec42ff', 'CASA ZENATA', '1075', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'ac5017f9-dede-1289-b4ee-4b09eeec42ff');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '75ef5580-9510-b1aa-9b63-ba04abf678b7', 'CASA FOUARAT', '1089', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '75ef5580-9510-b1aa-9b63-ba04abf678b7');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'c8c3dd1f-f60b-c6b5-707d-64850fe0f1dc', 'CASA AIN BORJA', '1088', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'c8c3dd1f-f60b-c6b5-707d-64850fe0f1dc');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '4fc746a0-202d-921d-bbbe-a8ab4568f526', 'CASA AÏN SEBAÂ', '1080', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '4fc746a0-202d-921d-bbbe-a8ab4568f526');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'dcb485f7-2071-c0c9-0d55-b04d6b2f8f03', 'CASA FERNAND COSMOS', '1347', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'dcb485f7-2071-c0c9-0d55-b04d6b2f8f03');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '39cf0a4d-2949-79dd-a818-d38ffe9b4cef', 'CASA QOD''S NAKHIL', '1044', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '39cf0a4d-2949-79dd-a818-d38ffe9b4cef');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'ddc9b315-9c76-e9ee-796e-c8fc00f721e7', 'CASA SIDI BERNOUSSI', '1160', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'ddc9b315-9c76-e9ee-796e-c8fc00f721e7');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'd676ff2e-0f88-a7f1-c9a4-a57f93559f72', 'CASA TIZI OUSLI', '1377', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'd676ff2e-0f88-a7f1-c9a4-a57f93559f72');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '36c972fd-e2ca-c5ee-8aad-d933fd902d28', 'CASA AL QODS', '1169', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '36c972fd-e2ca-c5ee-8aad-d933fd902d28');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'd91fd19e-38fb-b444-ce10-ae4532577067', 'CASA AL HAMD', '1055', TRUE, '20eafbca-bf8e-ad7a-89cd-f587afbc9191', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'd91fd19e-38fb-b444-ce10-ae4532577067');
-
--- Zone Casa Nord > Groupe Cite Djemaa
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f8c871c8-d3fb-6b4d-fb61-706ee1c03c60', 'CASA LE NIL', '1097', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f8c871c8-d3fb-6b4d-fb61-706ee1c03c60');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '56ee3ae2-1cd0-6bf9-08c4-151b055a9260', 'CASA IFRIQUIA', '1250', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '56ee3ae2-1cd0-6bf9-08c4-151b055a9260');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'a371cb7e-793b-2828-c98d-677e39284f2b', 'CASA IBNOU LWALID', '1363', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a371cb7e-793b-2828-c98d-677e39284f2b');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'db658264-8f21-1dd5-e776-258cdcdac64e', 'CASA MAKDAD LAHRIZI', '1162', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'db658264-8f21-1dd5-e776-258cdcdac64e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'a86fb0eb-2c8e-f6b0-d30b-9805cf8ef8f9', 'CASA AL MOUAHIDINE', '1438', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a86fb0eb-2c8e-f6b0-d30b-9805cf8ef8f9');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f0c6f23e-0d91-2b80-5c75-142fd14eddf6', 'CASA SADRI', '1065', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f0c6f23e-0d91-2b80-5c75-142fd14eddf6');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'c16a05ba-c171-df6e-8c8a-23de949a3487', 'CASA AKID ALLAM', '1156', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'c16a05ba-c171-df6e-8c8a-23de949a3487');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '13e363c6-06e8-f519-8c5a-727cf8f7d395', 'CASA JAOUHARA', '1062', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '13e363c6-06e8-f519-8c5a-727cf8f7d395');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'ef48b1a9-1682-8b62-4672-5f2a30215f36', 'CASA HAY ESSALAMA', '1186', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'ef48b1a9-1682-8b62-4672-5f2a30215f36');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'a2648782-1edb-3cc2-a9df-33f29c0f0a07', 'CASA FALAH', '1416', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2648782-1edb-3cc2-a9df-33f29c0f0a07');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'a3d9772c-681d-f180-1210-f9e7bf0d9dec', 'CASA ABDELKADER SAHRAOUI', '1286', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a3d9772c-681d-f180-1210-f9e7bf0d9dec');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f301e2ff-8af8-9b21-da1f-543b038d21f3', 'CASA ANASSI', '1382', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f301e2ff-8af8-9b21-da1f-543b038d21f3');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '845f5cd7-b463-03ba-fc69-840b7d752cc1', 'CASA AL ADDARISSA', '1430', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '845f5cd7-b463-03ba-fc69-840b7d752cc1');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f41b6781-ad9a-bc8e-e37f-7afd902be0b8', 'CASA OUED EDDAHAB', '1151', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f41b6781-ad9a-bc8e-e37f-7afd902be0b8');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'fcb8651b-9a7c-0826-e0b5-6510188cff86', 'CASA CITE DJEMAA', '1084', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'fcb8651b-9a7c-0826-e0b5-6510188cff86');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '0a27c5e9-8944-17f4-caf5-0eceb2cca5b2', 'CASA SALMIA', '1066', TRUE, '1d920784-defb-4ee1-0e7f-ca93f250cf83', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '0a27c5e9-8944-17f4-caf5-0eceb2cca5b2');
-
--- Zone Casa Nord > Groupe Mohammedia
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '99b88f6d-7b67-cac5-3cfd-c85d6d21923e', 'MOHAMMEDIA SUCC', '1010', TRUE, '5e956ea6-1fb2-cedd-2aee-4e8049c4823f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '99b88f6d-7b67-cac5-3cfd-c85d6d21923e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'c6f819a1-7d91-2cce-15da-013fb8935b94', 'MOHAMMEDIA KASBA', '1121', TRUE, '5e956ea6-1fb2-cedd-2aee-4e8049c4823f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'c6f819a1-7d91-2cce-15da-013fb8935b94');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '6bc8e340-25a9-c275-d3ba-fa5cec99a431', 'MOHAMMEDIA HASSAN II', '1257', TRUE, '5e956ea6-1fb2-cedd-2aee-4e8049c4823f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '6bc8e340-25a9-c275-d3ba-fa5cec99a431');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f758682a-e38d-46c3-4f5a-99f2d2dce31b', 'MOHAMMEDIA ANFA', '1213', TRUE, '5e956ea6-1fb2-cedd-2aee-4e8049c4823f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f758682a-e38d-46c3-4f5a-99f2d2dce31b');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '29691f3a-bd1c-3343-57ab-f20881492254', 'MOHAMMEDIA EL ALIA', '1152', TRUE, '5e956ea6-1fb2-cedd-2aee-4e8049c4823f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '29691f3a-bd1c-3343-57ab-f20881492254');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '663c8f4a-829b-d947-6146-a1b50abdc7d6', 'TIT MELLIL', '1374', TRUE, '5e956ea6-1fb2-cedd-2aee-4e8049c4823f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '663c8f4a-829b-d947-6146-a1b50abdc7d6');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '76946e2e-b4a8-a0e8-3c0a-64dc159b12e7', 'BENSLIMANE', '1313', TRUE, '5e956ea6-1fb2-cedd-2aee-4e8049c4823f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '76946e2e-b4a8-a0e8-3c0a-64dc159b12e7');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '3b96e7b1-e175-f5fa-1e7e-08aa329e6645', 'BOUZNIKA', '1410', TRUE, '5e956ea6-1fb2-cedd-2aee-4e8049c4823f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '3b96e7b1-e175-f5fa-1e7e-08aa329e6645');
-
--- Zone Casa Centre > Groupe Casa Centre
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'b37dd372-8e73-4f2d-b01f-e383d93ba879', 'CASA LALLA YACOUT', '1002', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'b37dd372-8e73-4f2d-b01f-e383d93ba879');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '9b315bc4-646c-d288-54fa-8cb53934c577', 'CASA HASSAN II', '1095', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '9b315bc4-646c-d288-54fa-8cb53934c577');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'cd7e11e3-e6fb-d44a-1b1c-3917c23c31ba', 'CASA MERS SULTAN', '1081', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'cd7e11e3-e6fb-d44a-1b1c-3917c23c31ba');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'cd7a37e8-3c03-6237-ab77-9314aa90adbc', 'CASA LIBERTE', '1153', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'cd7a37e8-3c03-6237-ab77-9314aa90adbc');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f34e7212-0885-957e-1e18-a7bbfb5ac934', 'CASA MOHAMED V', '1104', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f34e7212-0885-957e-1e18-a7bbfb5ac934');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'd1dafa56-5149-4985-4283-b0ea5f51dfcd', 'CASA ANFA', '1077', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'd1dafa56-5149-4985-4283-b0ea5f51dfcd');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'bf703aab-947f-cc9e-bf6a-18a0edaab957', 'CASA FAR', '1076', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'bf703aab-947f-cc9e-bf6a-18a0edaab957');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'c84be1d6-e035-3d78-ea2a-b6a35b6e751f', 'CASA MLY SMAIL', '1008', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'c84be1d6-e035-3d78-ea2a-b6a35b6e751f');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '6068e88e-65fe-74d7-855a-f1d3fc66d9f9', 'CASA MLAY YOUSSEF', '1103', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '6068e88e-65fe-74d7-855a-f1d3fc66d9f9');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'bf1dbb72-2c2b-0543-dbac-868b6ae87343', 'CASA RUE D''ALGER', '1096', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'bf1dbb72-2c2b-0543-dbac-868b6ae87343');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'd9545048-cc20-13cc-8bbb-164a271bdc38', 'CASA AL KHANSAA', '1157', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'd9545048-cc20-13cc-8bbb-164a271bdc38');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'd7494522-a03f-cb9d-998c-bea510581eb7', 'CASA ZIRAOUI', '1083', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'd7494522-a03f-cb9d-998c-bea510581eb7');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '76206380-2915-b06c-126f-591a37966e9b', 'CASA GAUTHIER', '1109', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '76206380-2915-b06c-126f-591a37966e9b');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'ffdc31e8-9174-c183-7923-5db8ed354686', 'DERB OMAR', '1216', TRUE, 'a99ccc31-f4b0-3a09-3dd3-848d14622f4e', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'ffdc31e8-9174-c183-7923-5db8ed354686');
-
--- Zone Casa Centre > Groupe Casa Franceville
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'fd4adf46-07a7-0b67-cdd1-5318fd70b18b', 'CASA SUD', '1180', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'fd4adf46-07a7-0b67-cdd1-5318fd70b18b');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '930e7360-1ee1-ba7d-9b4d-c64ca32b6ea4', 'CASA SIDI MAAROUF', '1006', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '930e7360-1ee1-ba7d-9b4d-c64ca32b6ea4');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '63407716-b4c4-1c4a-5f55-8e800abf97ef', 'CASA ZERKTOUNI', '1086', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '63407716-b4c4-1c4a-5f55-8e800abf97ef');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '9099628c-1c65-2311-85fe-3bd3fd1b9d31', 'CASA 2 MARS MECHOUAR', '1093', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '9099628c-1c65-2311-85fe-3bd3fd1b9d31');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '5b3ca265-8b13-af86-4f53-bbbe2741b4ab', 'CASA ABDELMOUMEM', '1139', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '5b3ca265-8b13-af86-4f53-bbbe2741b4ab');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '4610bf06-013c-cbc6-83d8-be6d0e9801e0', 'CASA PALMIERS', '1090', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '4610bf06-013c-cbc6-83d8-be6d0e9801e0');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '9109278a-4ed7-d7a6-87a1-8a51c94b80bb', 'CASA OASIS', '1092', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '9109278a-4ed7-d7a6-87a1-8a51c94b80bb');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '8fd21273-b715-e9c2-226e-7c66e3b74f67', 'CASA VAL FLEURI', '1195', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '8fd21273-b715-e9c2-226e-7c66e3b74f67');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f42430cf-051f-d280-6100-be835c69254c', 'CASA France VILLE', '1431', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f42430cf-051f-d280-6100-be835c69254c');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'ae713b91-dbc5-5ff8-ea7e-824cdd6b6600', 'CASA DRISSIA', '1085', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'ae713b91-dbc5-5ff8-ea7e-824cdd6b6600');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '33b960cf-8c06-444d-09e4-a6b6333395ba', 'CASA 2 MARS', '1108', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '33b960cf-8c06-444d-09e4-a6b6333395ba');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '612fdc40-7ece-f433-4bff-232cfe4e81a6', 'CASA DERB TOLBA', '1005', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '612fdc40-7ece-f433-4bff-232cfe4e81a6');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '7c808c49-230f-5fda-5e0b-251c973907ca', 'CASA BD DE SEBTA', '1245', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '7c808c49-230f-5fda-5e0b-251c973907ca');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'bb63d007-d8ec-b871-aea1-157e34e2b74f', 'CASA DERB KABIR', '1265', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'bb63d007-d8ec-b871-aea1-157e34e2b74f');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '33de3381-a850-2407-b85c-15961fe162a6', 'CASA EL FIDA', '1158', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '33de3381-a850-2407-b85c-15961fe162a6');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'e9a9f464-752f-eec8-e32d-020299c1ad8b', 'CASA HAY EL FARAH', '1215', TRUE, '8457c1f3-3c3c-52a3-9fdb-355f90a37f76', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'e9a9f464-752f-eec8-e32d-020299c1ad8b');
-
--- Zone Casa Centre > Groupe Casa Panoramique
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f6909cb6-4be5-111b-d5da-2febace9d77a', 'CASA AIN CHOCK', '1191', TRUE, '8f4e88b3-c4d7-f801-fb22-17c365168bfb', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f6909cb6-4be5-111b-d5da-2febace9d77a');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '66e5001c-c9f7-ebea-7911-68ee72c79fb2', 'CASA JNANE CALIFORNIE', '1429', TRUE, '8f4e88b3-c4d7-f801-fb22-17c365168bfb', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '66e5001c-c9f7-ebea-7911-68ee72c79fb2');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'dad8869b-5701-4c65-e879-a33d56e5a2d4', 'CASA CALIFORNIE', '1174', TRUE, '8f4e88b3-c4d7-f801-fb22-17c365168bfb', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'dad8869b-5701-4c65-e879-a33d56e5a2d4');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'b370ff50-daf4-96e1-dd48-b9736926e9c0', 'OULED SALEH', '1361', TRUE, '8f4e88b3-c4d7-f801-fb22-17c365168bfb', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'b370ff50-daf4-96e1-dd48-b9736926e9c0');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '6b51325c-5e98-7fba-a355-f14c95e09540', 'CASA PANORAMIQUE', '1427', TRUE, '8f4e88b3-c4d7-f801-fb22-17c365168bfb', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '6b51325c-5e98-7fba-a355-f14c95e09540');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '2cfaf75b-1a4f-4a6d-9164-6e267af683e2', 'CASA M''SALLAH', '1071', TRUE, '8f4e88b3-c4d7-f801-fb22-17c365168bfb', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '2cfaf75b-1a4f-4a6d-9164-6e267af683e2');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'c7e3698a-b45f-9aba-75de-78af20386e47', 'CASA HAY MOULAY ABDELLAH', '1164', TRUE, '8f4e88b3-c4d7-f801-fb22-17c365168bfb', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'c7e3698a-b45f-9aba-75de-78af20386e47');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'c4e84ef4-a084-0b61-1b6f-efb6fe36f020', 'BERRECHID', '1210', TRUE, '8f4e88b3-c4d7-f801-fb22-17c365168bfb', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'c4e84ef4-a084-0b61-1b6f-efb6fe36f020');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'ce4c3070-76c0-0dce-e29f-879202d4cc1c', 'BERRECHID ROUTE DU SUD', '1362', TRUE, '8f4e88b3-c4d7-f801-fb22-17c365168bfb', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'ce4c3070-76c0-0dce-e29f-879202d4cc1c');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'd3105b0c-38d6-6708-51b7-07aeac9cecee', 'SETTAT', '1019', TRUE, '8f4e88b3-c4d7-f801-fb22-17c365168bfb', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'd3105b0c-38d6-6708-51b7-07aeac9cecee');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'a1dc184f-c143-a6f1-7d9c-2222db88e5e6', 'BERRECHID RTE DE CASA', '1020', TRUE, '8f4e88b3-c4d7-f801-fb22-17c365168bfb', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a1dc184f-c143-a6f1-7d9c-2222db88e5e6');
-
--- Région Sud > Groupe Sud
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'df6b53ea-40f9-f217-6d03-bcb80978f8a5', 'TIZNIT', '1048', TRUE, '0a86e145-e9ab-8498-bc5f-b3d79a427dd9', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'df6b53ea-40f9-f217-6d03-bcb80978f8a5');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '64f0cf6a-d519-6179-c355-e52874e24dbe', 'AIT MELLOUL', '1046', TRUE, '0a86e145-e9ab-8498-bc5f-b3d79a427dd9', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '64f0cf6a-d519-6179-c355-e52874e24dbe');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '28eb0b7f-45dd-aacb-c8cf-7e0d223f83bb', 'INEZGANE MD V', '1013', TRUE, '0a86e145-e9ab-8498-bc5f-b3d79a427dd9', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '28eb0b7f-45dd-aacb-c8cf-7e0d223f83bb');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '454ca409-8d58-5bf7-0d18-7306f2656b5f', 'OULED TEIMA', '1014', TRUE, '0a86e145-e9ab-8498-bc5f-b3d79a427dd9', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '454ca409-8d58-5bf7-0d18-7306f2656b5f');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'b49d61e9-10f2-ff00-2f8e-f244873a7b5f', 'TAROUDANT JNANE', '1228', TRUE, '0a86e145-e9ab-8498-bc5f-b3d79a427dd9', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'b49d61e9-10f2-ff00-2f8e-f244873a7b5f');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '844e63ee-a78e-cc8c-bf76-72933127e01d', 'AGADIR TIKIWINE', '1206', TRUE, '0a86e145-e9ab-8498-bc5f-b3d79a427dd9', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '844e63ee-a78e-cc8c-bf76-72933127e01d');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '0d90ac6d-8a3c-7f4e-2419-d54aca8e0f69', 'LAÂYOUNE', '1450', TRUE, '0a86e145-e9ab-8498-bc5f-b3d79a427dd9', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '0d90ac6d-8a3c-7f4e-2419-d54aca8e0f69');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'b6740717-8fc3-fb6b-8da7-1b281ef43812', 'TAROUDANT', '1045', TRUE, '0a86e145-e9ab-8498-bc5f-b3d79a427dd9', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'b6740717-8fc3-fb6b-8da7-1b281ef43812');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '19750e3b-8275-3979-5f0c-9b2c446936d8', 'DAKHLA', '1449', TRUE, '0a86e145-e9ab-8498-bc5f-b3d79a427dd9', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '19750e3b-8275-3979-5f0c-9b2c446936d8');
-
--- Région Sud > Groupe Marrakech Ouest
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '6220f51e-6b55-0415-2f6d-b6c9b06f91a9', 'ESSAOUIRA', '1235', TRUE, '3dbd6847-d201-8261-1bff-f49243ee7385', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '6220f51e-6b55-0415-2f6d-b6c9b06f91a9');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '0291d284-894b-1364-1ecd-994f191b2f8c', 'MARRAKECH TARGA', '1268', TRUE, '3dbd6847-d201-8261-1bff-f49243ee7385', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '0291d284-894b-1364-1ecd-994f191b2f8c');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '2dc13cff-41c8-59d5-c34e-eac043e6faf7', 'MARRAKECH MASSIRA', '1231', TRUE, '3dbd6847-d201-8261-1bff-f49243ee7385', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '2dc13cff-41c8-59d5-c34e-eac043e6faf7');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '6ce4ac7a-a423-3da1-d233-b81dfc303918', 'SAFI PLATEAU', '1133', TRUE, '3dbd6847-d201-8261-1bff-f49243ee7385', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '6ce4ac7a-a423-3da1-d233-b81dfc303918');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'ba34bc48-cdb1-562b-4b94-f5b0bf1c668a', 'MARRAKECH M''HAMID', '1358', TRUE, '3dbd6847-d201-8261-1bff-f49243ee7385', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'ba34bc48-cdb1-562b-4b94-f5b0bf1c668a');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '2455aed5-eb36-9f8b-2a4b-bd632636fd22', 'SAFI', '1021', TRUE, '3dbd6847-d201-8261-1bff-f49243ee7385', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '2455aed5-eb36-9f8b-2a4b-bd632636fd22');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '6fb46754-8efd-cc3c-3d5e-615fb52bac6e', 'MARRECH MOULAY ABDELLAH', '1198', TRUE, '3dbd6847-d201-8261-1bff-f49243ee7385', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '6fb46754-8efd-cc3c-3d5e-615fb52bac6e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'cba041ec-bae7-e170-e251-f5dabf8aadb9', 'MARRAKECH ASSWAK ASSALAM', '1141', TRUE, '3dbd6847-d201-8261-1bff-f49243ee7385', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'cba041ec-bae7-e170-e251-f5dabf8aadb9');
-
--- Région Sud > Groupe Marrakech Extention
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'fba8c6d9-b16e-4ab5-05cf-8836b4f26d55', 'BENI MELLAL', '1026', TRUE, '53490755-ebd5-2bef-bc0d-cb4bcdc5cd4f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'fba8c6d9-b16e-4ab5-05cf-8836b4f26d55');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'bc1851e5-5578-0083-b4fe-e294860ecfc2', 'OUED ZEM', '1025', TRUE, '53490755-ebd5-2bef-bc0d-cb4bcdc5cd4f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'bc1851e5-5578-0083-b4fe-e294860ecfc2');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '43ad7e93-1905-2d92-d40b-333ef8b3cf40', 'SEBT OULED NEMMA', '1207', TRUE, '53490755-ebd5-2bef-bc0d-cb4bcdc5cd4f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '43ad7e93-1905-2d92-d40b-333ef8b3cf40');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'dc216e94-0134-aad5-fffb-91c9ba76647e', 'BENI MELLAL ROUTE DE MARRAKECH', '1226', TRUE, '53490755-ebd5-2bef-bc0d-cb4bcdc5cd4f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'dc216e94-0134-aad5-fffb-91c9ba76647e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'e5da76b4-2283-f240-6a88-fdba88feefa1', 'FQUIH BENSALAH', '1204', TRUE, '53490755-ebd5-2bef-bc0d-cb4bcdc5cd4f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'e5da76b4-2283-f240-6a88-fdba88feefa1');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '500d0908-417f-3545-35c8-90b98dc3f5c3', 'KALAAT SERAGHNA', '1260', TRUE, '53490755-ebd5-2bef-bc0d-cb4bcdc5cd4f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '500d0908-417f-3545-35c8-90b98dc3f5c3');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '038c3b36-ec64-d3c4-4fc7-e48ce0021ef5', 'TINGHIR', '1434', TRUE, '53490755-ebd5-2bef-bc0d-cb4bcdc5cd4f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '038c3b36-ec64-d3c4-4fc7-e48ce0021ef5');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f220f554-c8e7-d625-ef67-b4a92c5392b4', 'OUARZAZATE', '1138', TRUE, '53490755-ebd5-2bef-bc0d-cb4bcdc5cd4f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f220f554-c8e7-d625-ef67-b4a92c5392b4');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '2b411015-1036-2585-77d1-3ba2b9ba875a', 'KHOURIBGA', '1028', TRUE, '53490755-ebd5-2bef-bc0d-cb4bcdc5cd4f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '2b411015-1036-2585-77d1-3ba2b9ba875a');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '191821ab-b817-4b36-5dd9-49024f16f3e5', 'KHOURIBGA ZALLAGA', '1236', TRUE, '53490755-ebd5-2bef-bc0d-cb4bcdc5cd4f', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '191821ab-b817-4b36-5dd9-49024f16f3e5');
-
--- Région Sud > Groupe Marrakech Centre
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '4fade7f5-58b9-9dc0-8c39-1fbd0cbb4bd1', 'MARRAKECH GUELIZ', '1106', TRUE, '9b059b14-c0da-06c4-140d-bee0e398fce3', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '4fade7f5-58b9-9dc0-8c39-1fbd0cbb4bd1');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '11bdf6b9-46be-90e0-c9a2-c87c34f054f6', 'MARRAKECH MOHAMMED V', '1300', TRUE, '9b059b14-c0da-06c4-140d-bee0e398fce3', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '11bdf6b9-46be-90e0-c9a2-c87c34f054f6');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '0b44e78e-fa57-aee3-9923-2b2825907167', 'MARRECH VICTOR HUGO', '1200', TRUE, '9b059b14-c0da-06c4-140d-bee0e398fce3', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '0b44e78e-fa57-aee3-9923-2b2825907167');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'd0d7cd8f-81f7-075c-ec40-9e95312ad33a', 'MARRAKECH ROUTE D''AGADIR', '1184', TRUE, '9b059b14-c0da-06c4-140d-bee0e398fce3', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'd0d7cd8f-81f7-075c-ec40-9e95312ad33a');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '497c5fa4-3685-341a-8e64-537391178a22', 'MARRAKECH SUCCURSALE', '1018', TRUE, '9b059b14-c0da-06c4-140d-bee0e398fce3', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '497c5fa4-3685-341a-8e64-537391178a22');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'a9e00c46-43bf-f4f2-bed1-46158c7cabad', 'MARRAKECH MEDINA', '1017', TRUE, '9b059b14-c0da-06c4-140d-bee0e398fce3', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a9e00c46-43bf-f4f2-bed1-46158c7cabad');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'c0d1065a-a7ad-c30b-d439-946c8cb0805b', 'MARRAKECH ALLAL EL F', '1111', TRUE, '9b059b14-c0da-06c4-140d-bee0e398fce3', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'c0d1065a-a7ad-c30b-d439-946c8cb0805b');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'e335bf45-1630-895d-bb62-f49489a025b6', 'MARRAKECH SOUNBOULA', '1027', TRUE, '9b059b14-c0da-06c4-140d-bee0e398fce3', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'e335bf45-1630-895d-bb62-f49489a025b6');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '340593e0-be60-3ca3-e80c-8f00ac4e93f0', 'MARRAKECH ESSAADA', '1223', TRUE, '9b059b14-c0da-06c4-140d-bee0e398fce3', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '340593e0-be60-3ca3-e80c-8f00ac4e93f0');
-
--- Région Sud > Groupe Agadir Centre
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'e0975a6a-f94b-a495-62ef-20ab84dfa043', 'AGADIR KETTANI', '1012', TRUE, 'c3ef6cf3-751c-6622-9d43-8d7768ae7ff6', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'e0975a6a-f94b-a495-62ef-20ab84dfa043');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '6f07def8-b555-2d1d-23c2-60f9b2782ca8', 'AGADIR HASSAN II', '1047', TRUE, 'c3ef6cf3-751c-6622-9d43-8d7768ae7ff6', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '6f07def8-b555-2d1d-23c2-60f9b2782ca8');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'd5e21480-4102-91c5-a433-942e6a9f7497', 'AGADIR MOHAMED VI', '1294', TRUE, 'c3ef6cf3-751c-6622-9d43-8d7768ae7ff6', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'd5e21480-4102-91c5-a433-942e6a9f7497');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'fa4d287b-bb96-674c-af5b-9014b18ab1c0', 'AGADIR FEDDYA', '1144', TRUE, 'c3ef6cf3-751c-6622-9d43-8d7768ae7ff6', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'fa4d287b-bb96-674c-af5b-9014b18ab1c0');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '21b64787-9b46-ad65-a0d7-544096f2b038', 'AGADIR SALAM', '1205', TRUE, 'c3ef6cf3-751c-6622-9d43-8d7768ae7ff6', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '21b64787-9b46-ad65-a0d7-544096f2b038');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f47ab098-5ba7-8950-4310-eeb35a2c9129', 'AGADIR TILDI', '1145', TRUE, 'c3ef6cf3-751c-6622-9d43-8d7768ae7ff6', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f47ab098-5ba7-8950-4310-eeb35a2c9129');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '4002fb11-ff2c-4202-c405-2b3a1972929e', 'AGADIR AL MENZEH', '1230', TRUE, 'c3ef6cf3-751c-6622-9d43-8d7768ae7ff6', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '4002fb11-ff2c-4202-c405-2b3a1972929e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'b897a442-f5d2-69dd-ca53-a34217999081', 'AGADIR BOUABID', '1175', TRUE, 'c3ef6cf3-751c-6622-9d43-8d7768ae7ff6', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'b897a442-f5d2-69dd-ca53-a34217999081');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '882c4c81-6dc3-91bf-fe63-be11e57bbe35', 'AGADIR AZIZIA', '1039', TRUE, 'c3ef6cf3-751c-6622-9d43-8d7768ae7ff6', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '882c4c81-6dc3-91bf-fe63-be11e57bbe35');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f8ef15f6-a8bc-9960-168d-04b36bbdaad6', 'AGADIR DCHEIRA', '1199', TRUE, 'c3ef6cf3-751c-6622-9d43-8d7768ae7ff6', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f8ef15f6-a8bc-9960-168d-04b36bbdaad6');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'eb6ba6ac-8da4-e6ff-c109-910c2856f74f', 'AGADIR ANNAHDA', '1253', TRUE, 'c3ef6cf3-751c-6622-9d43-8d7768ae7ff6', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'eb6ba6ac-8da4-e6ff-c109-910c2856f74f');
-
--- Région Rabat-Nord > Groupe Tétouan
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '08752982-44ea-4589-6495-3a86c24fcff7', 'TETOUAN SAFIR', '1122', TRUE, '3bc2dd6e-dd1a-0c5d-ea97-99690fc59238', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '08752982-44ea-4589-6495-3a86c24fcff7');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '11232b82-f0af-8ed9-4ea8-a49cffecf56f', 'CHEFCHAOUEN', '1225', TRUE, '3bc2dd6e-dd1a-0c5d-ea97-99690fc59238', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '11232b82-f0af-8ed9-4ea8-a49cffecf56f');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '877dfe1c-441c-0d8e-9e9b-1a16ec5796e5', 'TETOUAN', '1038', TRUE, '3bc2dd6e-dd1a-0c5d-ea97-99690fc59238', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '877dfe1c-441c-0d8e-9e9b-1a16ec5796e5');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '092346b3-d33c-96d8-3a74-5d2139a1a658', 'TANGER IBN BATOUTA', '1154', TRUE, '3bc2dd6e-dd1a-0c5d-ea97-99690fc59238', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '092346b3-d33c-96d8-3a74-5d2139a1a658');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '3375205e-b513-ad5f-3faa-c483ebd5baae', 'TETOUAN FAR', '1308', TRUE, '3bc2dd6e-dd1a-0c5d-ea97-99690fc59238', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '3375205e-b513-ad5f-3faa-c483ebd5baae');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'd991a886-caa0-bbb7-bdfa-ea1e74e87d6e', 'LARACHE', '1061', TRUE, '3bc2dd6e-dd1a-0c5d-ea97-99690fc59238', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'd991a886-caa0-bbb7-bdfa-ea1e74e87d6e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'fd4ed68b-e399-696d-bd54-47120ff5100a', 'ASILAH', '1251', TRUE, '3bc2dd6e-dd1a-0c5d-ea97-99690fc59238', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'fd4ed68b-e399-696d-bd54-47120ff5100a');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'e11c4617-a179-454e-72a4-0dcab9f40da5', 'MARTIL', '1224', TRUE, '3bc2dd6e-dd1a-0c5d-ea97-99690fc59238', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'e11c4617-a179-454e-72a4-0dcab9f40da5');
-
--- Région Rabat-Nord > Groupe Tanger
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '6ae61508-dab3-9e37-4cf8-6ac11540c325', 'TANGER SUCCURSALE', '1063', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '6ae61508-dab3-9e37-4cf8-6ac11540c325');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'c8bbe00a-421b-63ac-b2c9-8a9d91d4eeb6', 'TANGER PASTEUR', '1299', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'c8bbe00a-421b-63ac-b2c9-8a9d91d4eeb6');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '0ea49e8f-8ef2-32e0-1336-0c758966daa8', 'TANGER P.F.', '1037', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '0ea49e8f-8ef2-32e0-1336-0c758966daa8');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '0d2f0f46-669b-9ed7-08dd-f82d8867be60', 'TANGER VAL FLEURI', '1171', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '0d2f0f46-669b-9ed7-08dd-f82d8867be60');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '82eccfa6-9b87-af35-b3f4-e4d772eb90e0', 'TANGER MOHAMED V', '1130', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '82eccfa6-9b87-af35-b3f4-e4d772eb90e0');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'beb91770-e8c9-b3a5-9fd6-b14b709fb335', 'TANGER PCE DU KOWEIT', '1042', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'beb91770-e8c9-b3a5-9fd6-b14b709fb335');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '0ab155c7-6670-bcef-cb8a-39172ba940ec', 'TANGER AIN KTIOUET', '1064', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '0ab155c7-6670-bcef-cb8a-39172ba940ec');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '54a1c7ac-9038-2b2d-2d4d-17898d1dddb9', 'TANGER MY YOUSSEF', '1209', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '54a1c7ac-9038-2b2d-2d4d-17898d1dddb9');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '08695174-ed38-f4c9-73e3-04441aa21aea', 'TANGER MOHAMED VI', '1170', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '08695174-ed38-f4c9-73e3-04441aa21aea');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'c38123d1-23f1-3f7f-02f8-0ad3bf4b1948', 'TANGER RTE DE TETOUAN', '1246', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'c38123d1-23f1-3f7f-02f8-0ad3bf4b1948');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '7aafbb3c-764f-56fc-ea4b-d0881130db2e', 'TANGER CORNICHE', '1211', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '7aafbb3c-764f-56fc-ea4b-d0881130db2e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '51496c3e-435a-00de-e42d-f0328647b9b5', 'TANGER DRISSIA', '1079', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '51496c3e-435a-00de-e42d-f0328647b9b5');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '8d1d604a-9ea0-a3db-720e-930cb2a094b0', 'TANGER PLACE OUED MAKHAZINE', '1327', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '8d1d604a-9ea0-a3db-720e-930cb2a094b0');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'cc1f43ec-65d6-8e4e-6baa-37e75b240715', 'TANGER CITY CENTER', '1413', TRUE, '02cdbfd2-3e3c-b562-15a1-e657f8513c6d', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'cc1f43ec-65d6-8e4e-6baa-37e75b240715');
-
--- Région Rabat-Nord > Groupe Salé Kénitra
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'b0551cf6-3ab9-fb5e-000f-b9d388bee3da', 'KENITRA SUCCURSALE', '1034', TRUE, '3f9834a8-224c-5da9-4567-d966457bec46', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'b0551cf6-3ab9-fb5e-000f-b9d388bee3da');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '157d8135-1b6f-9a35-6e2f-a719c398aff4', 'KENITRA VN', '1069', TRUE, '3f9834a8-224c-5da9-4567-d966457bec46', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '157d8135-1b6f-9a35-6e2f-a719c398aff4');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '157cba43-6978-925b-e206-d3799945282f', 'SALE', '1041', TRUE, '3f9834a8-224c-5da9-4567-d966457bec46', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '157cba43-6978-925b-e206-d3799945282f');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'bb1f2c13-7035-9461-8139-7a79016011a3', 'KENITRA MEDINA', '1059', TRUE, '3f9834a8-224c-5da9-4567-d966457bec46', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'bb1f2c13-7035-9461-8139-7a79016011a3');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '5a97168f-46cf-ded3-9732-e57afd5c1698', 'SALE MOHAMED V', '1183', TRUE, '3f9834a8-224c-5da9-4567-d966457bec46', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '5a97168f-46cf-ded3-9732-e57afd5c1698');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '0c24a61f-6931-10d4-c68b-a034e50db851', 'SALE HAY SALAM', '1394', TRUE, '3f9834a8-224c-5da9-4567-d966457bec46', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '0c24a61f-6931-10d4-c68b-a034e50db851');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'b4868fb1-c44e-572c-eb31-ce24bbd331e0', 'SALE TABRIQUET', '1126', TRUE, '3f9834a8-224c-5da9-4567-d966457bec46', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'b4868fb1-c44e-572c-eb31-ce24bbd331e0');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '87e3b786-8352-03a5-b346-fcbc40dbf025', 'KENITRA MED DIOURI', '1411', TRUE, '3f9834a8-224c-5da9-4567-d966457bec46', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '87e3b786-8352-03a5-b346-fcbc40dbf025');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '751c4379-98ef-2254-cfa3-5318f374c3e9', 'SIDI SLIMANE', '1035', TRUE, '3f9834a8-224c-5da9-4567-d966457bec46', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '751c4379-98ef-2254-cfa3-5318f374c3e9');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'a8893cbf-d4a7-034d-1111-6fa117ba4f71', 'SALE RTE DE KENITRA', '1201', TRUE, '3f9834a8-224c-5da9-4567-d966457bec46', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a8893cbf-d4a7-034d-1111-6fa117ba4f71');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'd3c60172-c2cb-87a6-3875-ab7a322d156a', 'SALA AL JADIDA', '1057', TRUE, '3f9834a8-224c-5da9-4567-d966457bec46', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'd3c60172-c2cb-87a6-3875-ab7a322d156a');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'a9db184b-b8d7-0527-a006-582f045b084f', 'TIFLET', '1426', TRUE, '3f9834a8-224c-5da9-4567-d966457bec46', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a9db184b-b8d7-0527-a006-582f045b084f');
-
--- Région Rabat-Nord > Groupe Rabat Souissi
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '92ee4a36-d98c-09ed-ca08-3b579317c20a', 'RABAT SUCCURSALE', '1070', TRUE, '9d39c07a-8ba0-e4da-8873-62eef33b7ff1', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '92ee4a36-d98c-09ed-ca08-3b579317c20a');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '4dc694dd-8427-dbe3-8010-337282a04b9b', 'RABAT HAY RYAD', '1127', TRUE, '9d39c07a-8ba0-e4da-8873-62eef33b7ff1', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '4dc694dd-8427-dbe3-8010-337282a04b9b');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '6ad76138-1f0a-6b10-5a82-e1eec9a3d7cb', 'RABAT 16 NOVEMBRE', '1124', TRUE, '9d39c07a-8ba0-e4da-8873-62eef33b7ff1', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '6ad76138-1f0a-6b10-5a82-e1eec9a3d7cb');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '78fb30c2-0984-4131-04c1-e155fdb90798', 'RABAT SOUISSI', '1123', TRUE, '9d39c07a-8ba0-e4da-8873-62eef33b7ff1', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '78fb30c2-0984-4131-04c1-e155fdb90798');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '1c2f365e-0d82-8c14-1495-ffeb40e759d0', 'TEMARA', '1058', TRUE, '9d39c07a-8ba0-e4da-8873-62eef33b7ff1', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '1c2f365e-0d82-8c14-1495-ffeb40e759d0');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'b47bac36-8720-c313-8886-dcbfa5d92b5b', 'RYAD NAKHIL', '1214', TRUE, '9d39c07a-8ba0-e4da-8873-62eef33b7ff1', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'b47bac36-8720-c313-8886-dcbfa5d92b5b');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'aca4de8d-746b-743e-9702-502abf217dba', 'TEMARA HASSAN II', '1176', TRUE, '9d39c07a-8ba0-e4da-8873-62eef33b7ff1', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'aca4de8d-746b-743e-9702-502abf217dba');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '50cbbb90-eafc-269c-06df-9ae38516b091', 'RABAT EL MENZEH', '1177', TRUE, '9d39c07a-8ba0-e4da-8873-62eef33b7ff1', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '50cbbb90-eafc-269c-06df-9ae38516b091');
-
--- Région Rabat-Nord > Groupe Rabat Centre
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '253f3ee9-3333-c5ab-81cf-f3a24c919c9a', 'RABAT HASSAN II', '1033', TRUE, '712940d2-dfb4-c065-dd56-fa60489b4d3b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '253f3ee9-3333-c5ab-81cf-f3a24c919c9a');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '45d71f26-970a-ed9a-f5a8-2c4d0aa6fed5', 'RABAT VN', '1032', TRUE, '712940d2-dfb4-c065-dd56-fa60489b4d3b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '45d71f26-970a-ed9a-f5a8-2c4d0aa6fed5');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'ace5e3d3-c4c7-380f-b506-9a3b884e4b66', 'RABAT AGDAL', '1043', TRUE, '712940d2-dfb4-c065-dd56-fa60489b4d3b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'ace5e3d3-c4c7-380f-b506-9a3b884e4b66');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '69c0a085-673f-1770-f224-5329254f0ad2', 'RABAT AV ABTAL', '1309', TRUE, '712940d2-dfb4-c065-dd56-fa60489b4d3b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '69c0a085-673f-1770-f224-5329254f0ad2');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '67ca21c0-c713-1388-e47f-56d1bdb7885f', 'RABAT ABA', '1040', TRUE, '712940d2-dfb4-c065-dd56-fa60489b4d3b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '67ca21c0-c713-1388-e47f-56d1bdb7885f');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'edef68b5-0ea4-c7c5-5c36-5dd390a346f3', 'RABAT OUDAYA', '1194', TRUE, '712940d2-dfb4-c065-dd56-fa60489b4d3b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'edef68b5-0ea4-c7c5-5c36-5dd390a346f3');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '8078bd80-2e9f-025a-7a53-425ee1a3bddf', 'RABAT TOUR HASSAN', '1125', TRUE, '712940d2-dfb4-c065-dd56-fa60489b4d3b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '8078bd80-2e9f-025a-7a53-425ee1a3bddf');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '9e54de88-6fc8-61d1-3825-2921fc9ddaee', 'RABAT MAMOUNIA', '1110', TRUE, '712940d2-dfb4-c065-dd56-fa60489b4d3b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '9e54de88-6fc8-61d1-3825-2921fc9ddaee');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '17f2ce9b-db97-b452-be84-09b815bfcd7e', 'RABAT MADAGASCAR', '1441', TRUE, '712940d2-dfb4-c065-dd56-fa60489b4d3b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '17f2ce9b-db97-b452-be84-09b815bfcd7e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '4626463d-ba94-3e2f-3ade-32e5059ed23d', 'RABAT P. LUMUMBA', '1372', TRUE, '712940d2-dfb4-c065-dd56-fa60489b4d3b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '4626463d-ba94-3e2f-3ade-32e5059ed23d');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '90e233c5-08d9-6af6-8972-55625a88d9ab', 'RABAT 7° ART', '1298', TRUE, '712940d2-dfb4-c065-dd56-fa60489b4d3b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '90e233c5-08d9-6af6-8972-55625a88d9ab');
-
--- Région Est > Groupe Fès
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '0b961cf9-40bd-b103-5385-150086d81026', 'FES SUCCURSALE', '1056', TRUE, 'd93070fb-9c10-d31d-58cd-49d0e966df2b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '0b961cf9-40bd-b103-5385-150086d81026');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '29b7b292-a073-d27b-e462-30ae293e1b06', 'FES VN', '1015', TRUE, 'd93070fb-9c10-d31d-58cd-49d0e966df2b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '29b7b292-a073-d27b-e462-30ae293e1b06');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '391c6a8d-6d37-aac1-d628-78425cebc9f1', 'FES ANAS', '1107', TRUE, 'd93070fb-9c10-d31d-58cd-49d0e966df2b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '391c6a8d-6d37-aac1-d628-78425cebc9f1');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '59fe9704-c850-c2a8-ce5a-669c7e923ea3', 'FES MOULAY RACHID', '1312', TRUE, 'd93070fb-9c10-d31d-58cd-49d0e966df2b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '59fe9704-c850-c2a8-ce5a-669c7e923ea3');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '622054b4-5b98-2394-4ed6-f7a43d366972', 'FES ALLAL BEN ABDELLAH', '1227', TRUE, 'd93070fb-9c10-d31d-58cd-49d0e966df2b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '622054b4-5b98-2394-4ed6-f7a43d366972');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'e3f04365-ac0a-5a6e-e9f7-55ae7f4f3799', 'FES ABOU OUBEIDA', '1135', TRUE, 'd93070fb-9c10-d31d-58cd-49d0e966df2b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'e3f04365-ac0a-5a6e-e9f7-55ae7f4f3799');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'e0815427-2fbe-4307-0795-75d7cca27a9e', 'FES SAISS', '1301', TRUE, 'd93070fb-9c10-d31d-58cd-49d0e966df2b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'e0815427-2fbe-4307-0795-75d7cca27a9e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'a0bda21b-3b5f-0e55-1b56-274731143ecc', 'FES NARJISS', '1219', TRUE, 'd93070fb-9c10-d31d-58cd-49d0e966df2b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a0bda21b-3b5f-0e55-1b56-274731143ecc');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'd090b117-729b-8e1b-ce0e-16445cd89b83', 'TAZA', '1136', TRUE, 'd93070fb-9c10-d31d-58cd-49d0e966df2b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'd090b117-729b-8e1b-ce0e-16445cd89b83');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '179cf0ba-0cea-38c3-161f-5ec5a311e775', 'TAOUNATE', '1274', TRUE, 'd93070fb-9c10-d31d-58cd-49d0e966df2b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '179cf0ba-0cea-38c3-161f-5ec5a311e775');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'f909674e-89d4-a611-de09-27e7460d79a4', 'SEFROU', '1359', TRUE, 'd93070fb-9c10-d31d-58cd-49d0e966df2b', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'f909674e-89d4-a611-de09-27e7460d79a4');
-
--- Région Est > Groupe Meknès
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'fa175c76-39bf-ffe6-4ee4-e10a08e5b13b', 'MEKNES VN', '1022', TRUE, 'b36187d4-0510-ebb1-0a06-b75f0f467740', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'fa175c76-39bf-ffe6-4ee4-e10a08e5b13b');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '249fb979-e9e3-88f3-f663-1dd4dacb4181', 'MIDELT', '1024', TRUE, 'b36187d4-0510-ebb1-0a06-b75f0f467740', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '249fb979-e9e3-88f3-f663-1dd4dacb4181');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '6563b53c-e757-b289-1a53-996abd50e789', 'MEKNES NEHRU', '1303', TRUE, 'b36187d4-0510-ebb1-0a06-b75f0f467740', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '6563b53c-e757-b289-1a53-996abd50e789');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '2818c5b4-92fc-c1e4-a07e-7658f623d288', 'MEKNES PLAISANCE', '1051', TRUE, 'b36187d4-0510-ebb1-0a06-b75f0f467740', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '2818c5b4-92fc-c1e4-a07e-7658f623d288');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '3490253f-84b4-7867-dc94-a42e9a414dfe', 'MEKNES BAB MANSOUR', '1115', TRUE, 'b36187d4-0510-ebb1-0a06-b75f0f467740', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '3490253f-84b4-7867-dc94-a42e9a414dfe');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'ce7f3264-c493-8e59-e2b0-c25b41d20b5e', 'MEKNES SIDI SAID', '1196', TRUE, 'b36187d4-0510-ebb1-0a06-b75f0f467740', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'ce7f3264-c493-8e59-e2b0-c25b41d20b5e');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'e8d90b40-94cb-635a-043d-072ae4cc21d8', 'ERRACHIDIA', '1166', TRUE, 'b36187d4-0510-ebb1-0a06-b75f0f467740', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'e8d90b40-94cb-635a-043d-072ae4cc21d8');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'bb62f3b2-b555-8892-12c6-81b4197d4dbb', 'SIDI KACEM', '1218', TRUE, 'b36187d4-0510-ebb1-0a06-b75f0f467740', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'bb62f3b2-b555-8892-12c6-81b4197d4dbb');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '2b5b3ab3-abe1-f4db-8337-c36729c487f9', 'MEKNES MARJANE', '1203', TRUE, 'b36187d4-0510-ebb1-0a06-b75f0f467740', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '2b5b3ab3-abe1-f4db-8337-c36729c487f9');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '59781f37-e271-809a-8ccd-02ce5843ce05', 'KHEMISSAT', '1329', TRUE, 'b36187d4-0510-ebb1-0a06-b75f0f467740', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '59781f37-e271-809a-8ccd-02ce5843ce05');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '8ef46353-68fe-35ed-25e3-9e9e39358551', 'KHENIFRA', '1273', TRUE, 'b36187d4-0510-ebb1-0a06-b75f0f467740', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '8ef46353-68fe-35ed-25e3-9e9e39358551');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '35a26f6f-771a-a7c4-bc8b-bb230e52c062', 'AZROU', '1399', TRUE, 'b36187d4-0510-ebb1-0a06-b75f0f467740', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '35a26f6f-771a-a7c4-bc8b-bb230e52c062');
-
--- Région Est > Groupe Oujda-Nador
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'ee920770-1d6e-f777-0243-aeee067a6f97', 'OUJDA', '1029', TRUE, '1d310338-72fa-9af5-bb90-66c3876e4618', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'ee920770-1d6e-f777-0243-aeee067a6f97');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '6409dba6-434a-38ac-6926-1277938c1653', 'GUERCIF', '1379', TRUE, '1d310338-72fa-9af5-bb90-66c3876e4618', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '6409dba6-434a-38ac-6926-1277938c1653');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'df4d04a3-1b54-bf0a-1361-9a8041efbcd0', 'NADOR', '1031', TRUE, '1d310338-72fa-9af5-bb90-66c3876e4618', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'df4d04a3-1b54-bf0a-1361-9a8041efbcd0');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '8a41d3ea-477d-eac8-cdcd-c874b1b0b0a3', 'BERKANE', '1030', TRUE, '1d310338-72fa-9af5-bb90-66c3876e4618', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '8a41d3ea-477d-eac8-cdcd-c874b1b0b0a3');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '67a63280-fe4e-94c6-bc58-1aff3e103ced', 'OUJDA MOHAMED V', '1302', TRUE, '1d310338-72fa-9af5-bb90-66c3876e4618', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '67a63280-fe4e-94c6-bc58-1aff3e103ced');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '59edf4ce-013e-8655-c952-bcad562444bb', 'NADOR OULED MIMOUN', '1132', TRUE, '1d310338-72fa-9af5-bb90-66c3876e4618', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '59edf4ce-013e-8655-c952-bcad562444bb');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '7cb3d2eb-3b53-f6bf-60bd-b376b3c98c8b', 'AL HOCEIMA', '1128', TRUE, '1d310338-72fa-9af5-bb90-66c3876e4618', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '7cb3d2eb-3b53-f6bf-60bd-b376b3c98c8b');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '0e4a6fcd-4161-d6fb-937a-ec5457630ef2', 'DRIOUECH', '1424', TRUE, '1d310338-72fa-9af5-bb90-66c3876e4618', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '0e4a6fcd-4161-d6fb-937a-ec5457630ef2');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'ac6e2110-d2b0-d455-78ff-81cb9fbf78a9', 'OUJDA LAZARET', '1375', TRUE, '1d310338-72fa-9af5-bb90-66c3876e4618', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'ac6e2110-d2b0-d455-78ff-81cb9fbf78a9');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT '27a47f33-7303-e3f7-ec63-ee106552a07c', 'MONT ARRUIT', '1179', TRUE, '1d310338-72fa-9af5-bb90-66c3876e4618', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = '27a47f33-7303-e3f7-ec63-ee106552a07c');
-
-INSERT INTO agences (id, nom, code, actif, groupe_id, director_agency_id, created_at, updated_at)
-SELECT 'a2b05bbe-5105-0613-9cae-057cd51e42c0', 'TAOURIRT', '1189', TRUE, '1d310338-72fa-9af5-bb90-66c3876e4618', NULL, NOW(), NOW()
-WHERE NOT EXISTS (SELECT 1 FROM agences WHERE id = 'a2b05bbe-5105-0613-9cae-057cd51e42c0');
-
-
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserContextDTO {
-
-    private String uid;
-    private String username;
-    private String firstName;
-    private String lastName;
-    private Boolean actif;
-
-    private UserInfo currentUser;
-    private UserInfo nPlusOne;
-    private UserInfo camundaUser;
-    private UserInfo dpacUser;
-    private UserInfo lmrUser;
-    private Set<UserInfo> usersEligibleForUnassignment = new HashSet<>();
-
-    // ✅ Getters commodité depuis currentUser
-    public String getProfileCode() {
-        return currentUser != null && currentUser.getProfile() != null
-                ? currentUser.getProfile().getCode() : null;
-    }
-    public String getProfileName() {
-        return currentUser != null && currentUser.getProfile() != null
-                ? currentUser.getProfile().getName() : null;
-    }
-    public AgenceInfo getAgence() {
-        return currentUser != null ? currentUser.getAgence() : null;
-    }
-    public GroupeInfo getGroupe() {
-        return currentUser != null ? currentUser.getGroupe() : null;
-    }
-    public ZoneInfo getZone() {
-        return currentUser != null ? currentUser.getZone() : null;
-    }
-
-    // =========================================================
-    // UserInfo
-    // =========================================================
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class UserInfo {
-        private UUID id;
-        private String uid;
-        private String username;
-        private String email;
-        private String firstName;
-        private String lastName;
-        private Boolean actif;
-        private ProfileInfo profile;
-        private AgenceInfo agence;
-        private GroupeInfo groupe;
-        private ZoneInfo zone;
-    }
-
-    // =========================================================
-    // ProfileInfo
-    // =========================================================
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ProfileInfo {
-        private UUID id;
-        private String code;
-        private String name;
-    }
-
-    // =========================================================
-    // AgenceInfo — tous les champs
-    // =========================================================
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class AgenceInfo {
-        private UUID id;
-        private String nom;
-        private String code;
-        private Boolean actif;
-        private GroupeInfo groupe;           // agence appartient à un groupe
-        private UserInfo directoryAgency;    // directeur agence
-    }
-
-    // =========================================================
-    // GroupeInfo — tous les champs
-    // =========================================================
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class GroupeInfo {
-        private UUID id;
-        private String nom;
-        private Boolean actif;
-        private ZoneInfo zone;              // groupe appartient à une zone
-        private UserInfo directorGroup;     // directeur groupe
-    }
-
-    // =========================================================
-    // ZoneInfo — tous les champs
-    // =========================================================
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ZoneInfo {
-        private UUID id;
-        private String nom;
-        private Boolean actif;
-        private UserInfo directorZone;      // directeur zone
-    }
-}
-
-// ✅ UserInfo → UserModel
-private UserModel mapToUserModel(UserContextDTO.UserInfo info) {
-    if (info == null) return null;
-
-    return UserModel.builder()
-            .id(info.getId())
-            .uid(info.getUid())
-            .username(info.getUsername())
-            .email(info.getEmail())
-            .firstName(info.getFirstName())
-            .lastName(info.getLastName())
-            .actif(info.getActif())
-            .profileCode(info.getProfile() != null
-                    ? info.getProfile().getCode() : null)
-            .profileName(info.getProfile() != null
-                    ? info.getProfile().getName() : null)
-            .agence(mapToAgenceModel(info.getAgence()))
-            .groupe(mapToGroupeModel(info.getGroupe()))
-            .zone(mapToZoneModel(info.getZone()))
-            .build();
-}
-
-// ✅ AgenceInfo → AgenceModel
-private UserModel.AgenceModel mapToAgenceModel(
-        UserContextDTO.AgenceInfo agence) {
-    if (agence == null) return null;
-
-    return UserModel.AgenceModel.builder()
-            .id(agence.getId())
-            .nom(agence.getNom())
-            .code(agence.getCode())
-            .actif(agence.getActif())
-            .groupe(mapToGroupeModel(agence.getGroupe()))
-            .directoryAgency(mapToUserModel(agence.getDirectoryAgency()))
-            .build();
-}
-
-// ✅ GroupeInfo → GroupeModel
-private UserModel.GroupeModel mapToGroupeModel(
-        UserContextDTO.GroupeInfo groupe) {
-    if (groupe == null) return null;
-
-    return UserModel.GroupeModel.builder()
-            .id(groupe.getId())
-            .nom(groupe.getNom())
-            .actif(groupe.getActif())
-            .zone(mapToZoneModel(groupe.getZone()))
-            .directorGroup(mapToUserModel(groupe.getDirectorGroup()))
-            .build();
-}
-
-// ✅ ZoneInfo → ZoneModel
-private UserModel.ZoneModel mapToZoneModel(
-        UserContextDTO.ZoneInfo zone) {
-    if (zone == null) return null;
-
-    return UserModel.ZoneModel.builder()
-            .id(zone.getId())
-            .nom(zone.getNom())
-            .actif(zone.getActif())
-            .directorZone(mapToUserModel(zone.getDirectorZone()))
-            .build();
-}
-
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserModel {
-
-    private UUID id;
-    private String uid;
-    private String username;
-    private String email;
-    private String firstName;
-    private String lastName;
-    private Boolean actif;
-    private String profileCode;
-    private String profileName;
-    private AgenceModel agence;
-    private GroupeModel groupe;
-    private ZoneModel zone;
-
-    public ProfileModel getProfile() {
-        if (profileCode == null && profileName == null) return null;
-        return new ProfileModel(profileCode, profileName);
-    }
-
-    // =========================================================
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ProfileModel {
-        private String code;
-        private String name;
-    }
-
-    // =========================================================
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class AgenceModel {
-        private UUID id;
-        private String nom;
-        private String code;
-        private Boolean actif;
-        private GroupeModel groupe;
-        private UserModel directoryAgency;  // ✅ directeur agence
-    }
-
-    // =========================================================
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class GroupeModel {
-        private UUID id;
-        private String nom;
-        private Boolean actif;
-        private ZoneModel zone;
-        private UserModel directorGroup;    // ✅ directeur groupe
-    }
-
-    // =========================================================
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ZoneModel {
-        private UUID id;
-        private String nom;
-        private Boolean actif;
-        private UserModel directorZone;     // ✅ directeur zone
-    }
-}
-
-
-package com.bnpparibas.irb.qlickflow.dto;
-
-import lombok.*;
+package com.bnpparibas.irb.qlickflow.documents.service;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
-@Data @Builder @NoArgsConstructor @AllArgsConstructor
-public class UserContextUserInfo {
-    private UUID id;
-    private String uid;
-    private String username;
-    private String email;
-    private String firstName;
-    private String lastName;
-    private Boolean actif;
-    private String profileCode;
-    private String profileNom;
-    // Agence — données plates, pas de UserDTO imbriqué
-    private UUID agenceId;
-    private String agenceNom;
-    private String agenceCode;
-    // Groupe
-    private UUID groupeId;
-    private String groupeNom;
-    // Zone
-    private UUID zoneId;
-    private String zoneNom;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * Tests unitaires (Mockito) pour DocumentAttachmentService.
+ * Objectif : couvrir CHAQUE branche (lignes + branches Jacoco).
+ *
+ * commitAttachments : skip (ATTACHED + même owner) / throw (status != STAGED) / succès STAGED
+ * detachAttachments : count mismatch throw / skip (STAGED + orphan) / ATTACHED->DETACHED /
+ *                     QUARANTINED|DELETED throw / fallthrough throw
+ * stageDocument -> saveDocument : file vide / trop gros / mime non supporté /
+ *                  filename null / chemin nominal
+ *
+ * ⚠️ ADAPTER : noms exacts de DocumentEntity (suppose @Data @Builder), DocumentStatus,
+ * DocumentProperties.allowedMimeToExt(), DocumentExtensionResolver.resolve(...),
+ * StoreAndHashResult / StoredObject, AttachmentResult.
+ */
+@ExtendWith(MockitoExtension.class)
+class DocumentAttachmentServiceTest {
+
+    @Mock DocumentRepository documentRepository;
+    @Mock DocumentProperties documentProperties;
+    @Mock DocumentStorageService documentStorageService;
+    @Mock DocumentExtensionResolver documentExtensionResolver;
+
+    @InjectMocks DocumentAttachmentService service;
+
+    private DocumentEntity doc(UUID id, DocumentStatus status, String ownerRef) {
+        return DocumentEntity.builder()
+                .id(id)
+                .status(status)
+                .ownerRef(ownerRef)
+                .createdBy("user-1")
+                .build();
+    }
+
+    // =================== commitAttachments ===================
+
+    @Test
+    void commit_attachesStagedDocument() {
+        UUID id = UUID.randomUUID();
+        DocumentEntity staged = doc(id, DocumentStatus.STAGED, null);
+
+        when(documentRepository.findAllByOwnerRef("OWNER-1")).thenReturn(List.of());
+        when(documentRepository.findAllByIdForUpdate(List.of(id))).thenReturn(List.of(staged));
+
+        List<UUID> result = service.commitAttachments("OWNER-1", List.of(id), "user-1", "corr-1");
+
+        assertThat(result).containsExactly(id);
+        assertThat(staged.getStatus()).isEqualTo(DocumentStatus.ATTACHED);
+        assertThat(staged.getOwnerRef()).isEqualTo("OWNER-1");
+    }
+
+    @Test
+    void commit_skipsAlreadyAttachedToSameOwner() {
+        // existingAttachments contient déjà ce doc => filtré, donc findAllByIdForUpdate
+        // reçoit une liste vide. On vérifie l'idempotence (aucun changement, retour vide).
+        UUID id = UUID.randomUUID();
+        DocumentEntity attached = doc(id, DocumentStatus.ATTACHED, "OWNER-1");
+
+        when(documentRepository.findAllByOwnerRef("OWNER-1")).thenReturn(List.of(attached));
+        when(documentRepository.findAllByIdForUpdate(List.of())).thenReturn(List.of());
+
+        List<UUID> result = service.commitAttachments("OWNER-1", List.of(id), "user-1", "corr-1");
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void commit_continueWhenDocAlreadyAttachedSameOwnerInFetched() {
+        // Cas où findAllByIdForUpdate renvoie quand même un doc ATTACHED au même owner
+        // => branche `continue` (status ATTACHED && ownerRef.equals)
+        UUID id = UUID.randomUUID();
+        DocumentEntity attached = doc(id, DocumentStatus.ATTACHED, "OWNER-1");
+
+        when(documentRepository.findAllByOwnerRef("OWNER-1")).thenReturn(List.of());
+        when(documentRepository.findAllByIdForUpdate(List.of(id))).thenReturn(List.of(attached));
+
+        List<UUID> result = service.commitAttachments("OWNER-1", List.of(id), "user-1", "corr-1");
+
+        // doc sauté mais toujours renvoyé dans la projection finale des ids
+        assertThat(result).containsExactly(id);
+        assertThat(attached.getStatus()).isEqualTo(DocumentStatus.ATTACHED);
+    }
+
+    @Test
+    void commit_throwsWhenStatusNotStaged() {
+        UUID id = UUID.randomUUID();
+        DocumentEntity detached = doc(id, DocumentStatus.DETACHED, "OTHER");
+
+        when(documentRepository.findAllByOwnerRef("OWNER-1")).thenReturn(List.of());
+        when(documentRepository.findAllByIdForUpdate(List.of(id))).thenReturn(List.of(detached));
+
+        assertThatThrownBy(() ->
+                service.commitAttachments("OWNER-1", List.of(id), "user-1", "corr-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot be attached");
+    }
+
+    // =================== detachAttachments ===================
+
+    @Test
+    void detach_throwsWhenSomeDocumentsNotFound() {
+        UUID id1 = UUID.randomUUID();
+        UUID id2 = UUID.randomUUID();
+        // demande 2, repo n'en renvoie qu'1 => mismatch
+        when(documentRepository.findAllById(List.of(id1, id2)))
+                .thenReturn(List.of(doc(id1, DocumentStatus.ATTACHED, "OWNER-1")));
+
+        assertThatThrownBy(() ->
+                service.detachAttachments(List.of(id1, id2), "user-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not found");
+    }
+
+    @Test
+    void detach_skipsStagedOrphan() {
+        UUID id = UUID.randomUUID();
+        DocumentEntity stagedOrphan = doc(id, DocumentStatus.STAGED, null);
+        when(documentRepository.findAllById(List.of(id))).thenReturn(List.of(stagedOrphan));
+
+        List<UUID> result = service.detachAttachments(List.of(id), "user-1");
+
+        // sauté (continue) mais inclus dans la projection finale
+        assertThat(result).containsExactly(id);
+        assertThat(stagedOrphan.getStatus()).isEqualTo(DocumentStatus.STAGED);
+    }
+
+    @Test
+    void detach_detachesAttached() {
+        UUID id = UUID.randomUUID();
+        DocumentEntity attached = doc(id, DocumentStatus.ATTACHED, "OWNER-1");
+        when(documentRepository.findAllById(List.of(id))).thenReturn(List.of(attached));
+
+        List<UUID> result = service.detachAttachments(List.of(id), "user-1");
+
+        assertThat(result).containsExactly(id);
+        assertThat(attached.getStatus()).isEqualTo(DocumentStatus.DETACHED);
+        assertThat(attached.getOwnerRef()).isNull();
+    }
+
+    @Test
+    void detach_throwsWhenQuarantined() {
+        UUID id = UUID.randomUUID();
+        DocumentEntity q = doc(id, DocumentStatus.QUARANTINED, "OWNER-1");
+        when(documentRepository.findAllById(List.of(id))).thenReturn(List.of(q));
+
+        assertThatThrownBy(() -> service.detachAttachments(List.of(id), "user-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cannot be detached");
+    }
+
+    @Test
+    void detach_throwsWhenDeleted() {
+        UUID id = UUID.randomUUID();
+        DocumentEntity del = doc(id, DocumentStatus.DELETED, "OWNER-1");
+        when(documentRepository.findAllById(List.of(id))).thenReturn(List.of(del));
+
+        assertThatThrownBy(() -> service.detachAttachments(List.of(id), "user-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cannot be detached");
+    }
+
+    @Test
+    void detach_throwsOnFallthroughStatus() {
+        // status qui ne matche aucun if explicite (ex: DETACHED) => throw final
+        UUID id = UUID.randomUUID();
+        DocumentEntity already = doc(id, DocumentStatus.DETACHED, null);
+        when(documentRepository.findAllById(List.of(id))).thenReturn(List.of(already));
+
+        assertThatThrownBy(() -> service.detachAttachments(List.of(id), "user-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cannot be detached");
+    }
+
+    // =================== stageDocument -> saveDocument ===================
+
+    private MultipartFile file(byte[] content, String name, String contentType) {
+        return new MockMultipartFile("file", name, contentType, content);
+    }
+
+    @Test
+    void stage_savesValidFile() {
+        MultipartFile f = file("hello".getBytes(), "doc.pdf", "application/pdf");
+
+        when(documentProperties.allowedMimeToExt())
+                .thenReturn(Map.of("application/pdf", "pdf"));
+        when(documentExtensionResolver.resolve(any())).thenReturn("pdf");
+        when(documentStorageService.storeAndHash(any(), any(), any()))
+                .thenReturn(new StoreAndHashResult(
+                        new StoredObject("storage/key/1"), "abc123hash"));
+
+        AttachmentResult result = service.stageDocument(f, "user-1");
+
+        assertThat(result.getStatus()).isEqualTo(DocumentStatus.STAGED.name());
+        assertThat(result.getOriginalFileName()).isEqualTo("doc.pdf");
+        assertThat(result.getSha256()).isEqualTo("abc123hash");
+        verify(documentRepository).save(any(DocumentEntity.class));
+    }
+
+    @Test
+    void stage_throwsWhenFileEmpty() {
+        MultipartFile empty = file(new byte[0], "doc.pdf", "application/pdf");
+
+        assertThatThrownBy(() -> service.stageDocument(empty, "user-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("empty");
+    }
+
+    @Test
+    void stage_throwsWhenFileTooLarge() {
+        // MAX_SIZE_BYTES = 10MB ; on dépasse
+        byte[] big = new byte[11 * 1024 * 1024];
+        MultipartFile huge = file(big, "doc.pdf", "application/pdf");
+
+        assertThatThrownBy(() -> service.stageDocument(huge, "user-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("too large");
+    }
+
+    @Test
+    void stage_throwsWhenContentTypeUnsupported() {
+        MultipartFile f = file("data".getBytes(), "doc.exe", "application/x-msdownload");
+
+        when(documentProperties.allowedMimeToExt())
+                .thenReturn(Map.of("application/pdf", "pdf")); // pas le bon type
+
+        assertThatThrownBy(() -> service.stageDocument(f, "user-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unsupported content type");
+    }
+
+    @Test
+    void stage_handlesNullOriginalFilename() {
+        // filename null => branche ternaire "unknown"
+        MultipartFile f = new MockMultipartFile(
+                "file", null, "application/pdf", "data".getBytes());
+
+        when(documentProperties.allowedMimeToExt())
+                .thenReturn(Map.of("application/pdf", "pdf"));
+        when(documentExtensionResolver.resolve(any())).thenReturn("pdf");
+        when(documentStorageService.storeAndHash(any(), any(), any()))
+                .thenReturn(new StoreAndHashResult(
+                        new StoredObject("storage/key/2"), "hash2"));
+
+        AttachmentResult result = service.stageDocument(f, "user-1");
+
+        assertThat(result.getOriginalFileName()).isEqualTo("unknown");
+    }
 }
-package com.bnpparibas.irb.qlickflow.dto;
 
-import lombok.*;
-import java.util.List;
+package com.bnpparibas.irb.qlickflow.documents.service;
 
-@Data @Builder @NoArgsConstructor @AllArgsConstructor
-public class UserContextResponse {
-    // Utilisateur courant + ses utilisateurs liés
-    private UserContextUserInfo currentUser;
-    private UserContextUserInfo nPlusOne;
-    private UserContextUserInfo dpacUser;
-    private UserContextUserInfo lmrUser;
-    private UserContextUserInfo camundaUser;
-    // Listes
-    private List<UserContextUserInfo> usersEligibleForUnassignment;
-    private List<UserReaffectationDto> usersCandidateToReaffctetionByCurrentUserProfile;
-}
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-package com.bnpparibas.irb.qlickflow.mapper;
-
-import com.bnpparibas.irb.qlickflow.dto.*;
-import com.bnpparibas.irb.qlickflow.entities.habilitation.User;
-import org.mapstruct.*;
-
-@Mapper(componentModel = "spring")
-public interface UserMapper {
-
-    // ... mappings existants ...
-
-    @Mapping(target = "profileCode",
-             expression = "java(user.getProfile() != null ? user.getProfile().getCode() : null)")
-    @Mapping(target = "profileNom",
-             expression = "java(user.getProfile() != null ? user.getProfile().getNom() : null)")
-    @Mapping(target = "agenceId",
-             expression = "java(user.getAgence() != null ? user.getAgence().getId() : null)")
-    @Mapping(target = "agenceNom",
-             expression = "java(user.getAgence() != null ? user.getAgence().getNom() : null)")
-    @Mapping(target = "agenceCode",
-             expression = "java(user.getAgence() != null ? user.getAgence().getCode() : null)")
-    @Mapping(target = "groupeId",
-             expression = "java(user.getGroupe() != null ? user.getGroupe().getId() : null)")
-    @Mapping(target = "groupeNom",
-             expression = "java(user.getGroupe() != null ? user.getGroupe().getNom() : null)")
-    @Mapping(target = "zoneId",
-             expression = "java(user.getZone() != null ? user.getZone().getId() : null)")
-    @Mapping(target = "zoneNom",
-             expression = "java(user.getZone() != null ? user.getZone().getNom() : null)")
-    UserContextUserInfo toContextUserInfo(User user);
-}
-
-@Override
-@Transactional(readOnly = true)
-public UserContextResponse getUserContext() {
-    User currentUser = userService.getCurrentUser();
-    String uid = currentUser.getUid();
-    ProfileEnum profileEnum =
-        ProfileEnum.valueOf(currentUser.getProfile().getCode());
-
-    // N+1 — isolé, ne bloque pas le reste
-    User nPlusOne = null;
-    try {
-        nPlusOne = userService.getNPlusOne(uid);
-    } catch (Exception e) {
-        log.warn("N+1 non trouvé pour uid: {}", uid);
-    }
-
-    // DPAC
-    User dpacUser = null;
-    try {
-        dpacUser = userService.getDpacUser();
-    } catch (Exception e) {
-        log.warn("DPAC non trouvé pour uid: {}", uid);
-    }
-
-    // LMR
-    User lmrUser = null;
-    try {
-        lmrUser = userService.getLmrUser();
-    } catch (Exception e) {
-        log.warn("LMR non trouvé pour uid: {}", uid);
-    }
-
-    // Camunda — uid technique configurable
-    User camundaUser = userService.findByUid(camundaUid).orElse(null);
-
-    // Éligibles au désassignement
-    List<User> eligibles;
-    try {
-        eligibles = userService.getUsersEligibleForUnassignment();
-    } catch (Exception e) {
-        log.warn("Eligibles non trouvés pour uid: {}", uid);
-        eligibles = Collections.emptyList();
-    }
-
-    // Candidats à la réaffectation
-    List<User> candidates;
-    try {
-        candidates =
-            userService.getUsersCandidateToReaffctetionByCurrentUserProfile();
-    } catch (Exception e) {
-        log.warn("Candidats réaffectation non trouvés pour uid: {}", uid);
-        candidates = Collections.emptyList();
-    }
-
-    return UserContextResponse.builder()
-        .currentUser(userMapper.toContextUserInfo(currentUser))
-        .nPlusOne(userMapper.toContextUserInfo(nPlusOne))
-        .dpacUser(userMapper.toContextUserInfo(dpacUser))
-        .lmrUser(userMapper.toContextUserInfo(lmrUser))
-        .camundaUser(userMapper.toContextUserInfo(camundaUser))
-        .usersEligibleForUnassignment(
-            eligibles.stream()
-                .map(userMapper::toContextUserInfo)
-                .collect(Collectors.toList())
-        )
-        .usersCandidateToReaffctetionByCurrentUserProfile(
-            candidates.stream()
-                .map(u -> UserReaffectationDto.builder()
-                    .id(u.getId())
-                    .uid(u.getUid())
-                    .firstName(u.getFirstName())
-                    .lastName(u.getLastName())
-                    .email(u.getEmail())
-                    .profileCode(u.getProfile() != null
-                        ? u.getProfile().getCode() : null)
-                    .agenceNom(u.getAgence() != null
-                        ? u.getAgence().getNom() : null)
-                    .build()
-                )
-                .collect(Collectors.toList())
-        )
-        .build();
-}
-package com.bnpparibas.irb.qlickflow.controller;
-
-import com.bnpparibas.irb.qlickflow.dto.UserDTO;
-import com.bnpparibas.irb.qlickflow.dto.UserInfoDTO;
-import com.bnpparibas.irb.qlickflow.dto.UserReaffectationDto;
-import com.bnpparibas.irb.qlickflow.facade.UserFacade;
-import com.bnpparibas.irb.qlickflow.response.ApiResponse;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@RestController
-@RequestMapping("/api/v1/users")
-@RequiredArgsConstructor
-@Slf4j
-public class UserController {
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
 
-    private final UserFacade userFacade;
+/**
+ * Tests unitaires purs (Mockito) pour DocumentQueryService.
+ * Couvre : getDocumentsByOwnerRef, getDocumentsByIds, getEntityOrThrow,
+ * getDocumentsById, et la projection toDto (via les retours).
+ *
+ * ⚠️ ADAPTER : les imports de DocumentEntity / DocumentStatus / DocumentRepository
+ * selon vos packages réels. Hypothèse : DocumentEntity est @Data @Builder.
+ */
+@ExtendWith(MockitoExtension.class)
+class DocumentQueryServiceTest {
 
-    // ✅ GET /api/v1/users/{id}
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<UserDTO>> getUserById(
-            @Parameter(description = "User ID") @PathVariable UUID id) {
-        Optional<UserDTO> user = userFacade.findById(id);
-        return getApiResponseResponseEntity(user);
-    }
+    @Mock
+    DocumentRepository documentRepository;
 
-    // ✅ POST /api/v1/users
-    @PostMapping
-    public ResponseEntity<ApiResponse<UserDTO>> createUser(
-            @RequestBody UserDTO userDTO) {
-        try {
-            UserDTO createdUser = userFacade.createUser(userDTO);
-            ApiResponse<UserDTO> response = ApiResponse.<UserDTO>builder()
-                .data(createdUser)
-                .message("User created successfully")
-                .success(true)
+    @InjectMocks
+    DocumentQueryService service;
+
+    // --- Helper pour fabriquer une entité complète ---
+    private DocumentEntity entity(UUID id) {
+        return DocumentEntity.builder()
+                .id(id)
+                .ownerRef("OWNER-1")
+                .originalFileName("file.pdf")
+                .contentType("application/pdf")
+                .size(123L)
+                .status(DocumentStatus.ATTACHED)
+                .createdBy("user-1")
+                .createdAt(OffsetDateTime.now())
+                .attachedAt(OffsetDateTime.now())
+                .storageKey("storage/key/1")
                 .build();
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (Exception e) {
-            ApiResponse<UserDTO> errorResponse = ApiResponse.<UserDTO>builder()
-                .message(e.getMessage())
-                .success(false)
-                .build();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
-        }
     }
 
-    // ✅ GET /api/v1/users/user-info/{currentUserUid}
-    @GetMapping("/user-info/{currentUserUid}")
-    public ResponseEntity<ApiResponse<UserInfoDTO>> getUserInfo(
-            @Parameter(description = "User ID") @PathVariable String currentUserUid) {
-        Optional<UserInfoDTO> userInfo = userFacade.getUserInfo(currentUserUid);
-        return userInfo
-            .map(userInfoDTO -> ResponseEntity.ok(ApiResponse.success(userInfoDTO)))
-            .orElseGet(() -> ResponseEntity.notFound().build());
+    // ============ getDocumentsByOwnerRef ============
+
+    @Test
+    void getDocumentsByOwnerRef_returnsMappedDtos() {
+        UUID id = UUID.randomUUID();
+        when(documentRepository.findAllByOwnerRef("OWNER-1"))
+                .thenReturn(List.of(entity(id)));
+
+        List<DocumentDto> result = service.getDocumentsByOwnerRef("OWNER-1");
+
+        assertThat(result).hasSize(1);
+        DocumentDto dto = result.get(0);
+        assertThat(dto.id()).isEqualTo(id);
+        assertThat(dto.ownerRef()).isEqualTo("OWNER-1");
+        assertThat(dto.originalFileName()).isEqualTo("file.pdf");
+        assertThat(dto.contentType()).isEqualTo("application/pdf");
+        assertThat(dto.size()).isEqualTo(123L);
+        assertThat(dto.status()).isEqualTo("ATTACHED");
+        assertThat(dto.storageKey()).isEqualTo("storage/key/1");
     }
 
-    // ✅ GET /api/v1/users/uid/{uid}
-    @GetMapping("/uid/{uid}")
-    @Operation(summary = "Get user by uid", description = "Retrieves a user by their uid")
-    public ResponseEntity<ApiResponse<UserDTO>> getUserByUid(
-            @Parameter(description = "UID") @PathVariable String uid) {
-        Optional<UserDTO> user = userFacade.findByUid(uid);
-        return getApiResponseResponseEntity(user);
+    @Test
+    void getDocumentsByOwnerRef_emptyWhenNoneFound() {
+        when(documentRepository.findAllByOwnerRef("OWNER-X")).thenReturn(List.of());
+
+        assertThat(service.getDocumentsByOwnerRef("OWNER-X")).isEmpty();
     }
 
-    // ✅ GET /api/v1/users/email/{email}
-    @GetMapping("/email/{email}")
-    public ResponseEntity<ApiResponse<UserDTO>> getUserByEmail(
-            @Parameter(description = "Email") @PathVariable String email) {
-        Optional<UserDTO> user = userFacade.findByEmail(email);
-        return getApiResponseResponseEntity(user);
+    // ============ getDocumentsByIds ============
+
+    @Test
+    void getDocumentsByIds_returnsMappedDtos() {
+        UUID id = UUID.randomUUID();
+        List<UUID> ids = List.of(id);
+        when(documentRepository.findAllById(ids)).thenReturn(List.of(entity(id)));
+
+        List<DocumentDto> result = service.getDocumentsByIds(ids);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).id()).isEqualTo(id);
     }
 
-    // ✅ GET /api/v1/users (getAllActiveUsers)
-    @GetMapping
-    @Operation(summary = "Get all active users", description = "Retrieves all active users")
-    public ResponseEntity<ApiResponse<List<UserDTO>>> getAllActiveUsers() {
-        List<UserDTO> users = userFacade.findAllActiveUsers();
-        ApiResponse<List<UserDTO>> response = ApiResponse.<List<UserDTO>>builder()
-            .data(users)
-            .message("Active users retrieved successfully")
-            .success(true)
-            .build();
-        return ResponseEntity.ok(response);
+    @Test
+    void getDocumentsByIds_emptyWhenNoneFound() {
+        when(documentRepository.findAllById(List.of())).thenReturn(List.of());
+
+        assertThat(service.getDocumentsByIds(List.of())).isEmpty();
     }
 
-    // ✅ POST /api/v1/users/{userId}/assign-profile/{profileId}
-    @PostMapping("/{userId}/assign-profile/{profileId}")
-    public ResponseEntity<ApiResponse<UserDTO>> assignProfileToUser(
-            @Parameter(description = "User ID") @PathVariable UUID userId,
-            @Parameter(description = "Profile ID") @PathVariable UUID profileId) {
-        UserDTO updatedUser = userFacade.assignProfileToUser(userId, profileId);
-        ApiResponse<UserDTO> response = ApiResponse.<UserDTO>builder()
-            .data(updatedUser)
-            .message("Profile assigned to user successfully")
-            .success(true)
-            .build();
-        return ResponseEntity.ok(response);
+    // ============ getEntityOrThrow ============
+
+    @Test
+    void getEntityOrThrow_returnsDtoWhenPresent() {
+        UUID id = UUID.randomUUID();
+        when(documentRepository.findById(id)).thenReturn(Optional.of(entity(id)));
+
+        DocumentDto dto = service.getEntityOrThrow(id.toString());
+
+        assertThat(dto.id()).isEqualTo(id);
     }
 
-    // ✅ GET /api/v1/users/admin-profiles
-    @GetMapping("/admin-profiles")
-    public ResponseEntity<ApiResponse<Page<UserDTO>>> getUsersWithAdminProfiles(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<UserDTO> users = userFacade.findAllUsersByProfileCode(pageable);
-        ApiResponse<Page<UserDTO>> resp = ApiResponse.<Page<UserDTO>>builder()
-            .data(users)
-            .message("Users with Admin Profiles retrieved successfully")
-            .success(true)
-            .build();
-        return ResponseEntity.ok(resp);
+    @Test
+    void getEntityOrThrow_throwsWhenAbsent() {
+        UUID id = UUID.randomUUID();
+        when(documentRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getEntityOrThrow(id.toString()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Document not found");
     }
 
-    // ✅ GET /api/v1/users/non-admin-profiles
-    @GetMapping("/non-admin-profiles")
-    public ResponseEntity<ApiResponse<Page<UserDTO>>> getUsersWithNonAdminProfiles(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<UserDTO> users = userFacade.findAllUsersByNonAdminProfileCode(pageable);
-        ApiResponse<Page<UserDTO>> resp = ApiResponse.<Page<UserDTO>>builder()
-            .data(users)
-            .message("Users with Non Admin Profiles retrieved successfully")
-            .success(true)
-            .build();
-        return ResponseEntity.ok(resp);
+    // ============ getDocumentsById ============
+
+    @Test
+    void getDocumentsById_returnsDtoWhenPresent() {
+        UUID id = UUID.randomUUID();
+        when(documentRepository.findById(id)).thenReturn(Optional.of(entity(id)));
+
+        DocumentDto dto = service.getDocumentsById(id.toString());
+
+        assertThat(dto.id()).isEqualTo(id);
     }
 
-    // ✅ GET /api/v1/users/current-user-users
-    @GetMapping("/current-user-users")
-    public ResponseEntity<ApiResponse<List<UserReaffectationDto>>>
-            getUsersCandidateToReaffctetionByCurrentUserProfile() {
-        List<UserReaffectationDto> users =
-            userFacade.getUsersCandidateToReaffctetionByCurrentUserProfile();
-        ApiResponse<List<UserReaffectationDto>> response =
-            ApiResponse.<List<UserReaffectationDto>>builder()
-                .data(users)
-                .message("Users retrieved successfully")
-                .success(true)
-                .build();
-        return ResponseEntity.ok(response);
-    }
+    @Test
+    void getDocumentsById_throwsWhenAbsent() {
+        UUID id = UUID.randomUUID();
+        when(documentRepository.findById(id)).thenReturn(Optional.empty());
 
-    // ✅ GET /api/v1/users/eligible/unassignment
-    @GetMapping("/eligible/unassignment")
-    public ResponseEntity<ApiResponse<List<UserDTO>>>
-            getUsersEligibleForUnassignment() {
-        List<UserDTO> users = userFacade.getUsersEligibleForUnassignment();
-        ApiResponse<List<UserDTO>> response = ApiResponse.<List<UserDTO>>builder()
-            .data(users)
-            .message("Active users retrieved successfully")
-            .success(true)
-            .build();
-        return ResponseEntity.ok(response);
-    }
-
-    // ✅ GET /api/v1/users/{uid}/nplusone
-    @GetMapping("/{uid}/nplusone")
-    public ResponseEntity<ApiResponse<UserDTO>> getNPlusOne(
-            @PathVariable String uid) {
-        UserDTO userNPlusOne = userFacade.getNPlusOne(uid);
-        ApiResponse<UserDTO> response = ApiResponse.<UserDTO>builder()
-            .data(userNPlusOne)
-            .message("Profile assigned to user successfully")
-            .success(true)
-            .build();
-        return ResponseEntity.ok(response);
-    }
-
-    // ✅ GET /api/v1/users/lmr
-    @GetMapping("/lmr")
-    public ResponseEntity<ApiResponse<UserDTO>> getLmrUser() {
-        UserDTO lmrUser = userFacade.getLmrUser();
-        ApiResponse<UserDTO> response = ApiResponse.<UserDTO>builder()
-            .data(lmrUser)
-            .message("Profile assigned to user successfully")
-            .success(true)
-            .build();
-        return ResponseEntity.ok(response);
-    }
-
-    // ✅ GET /api/v1/users/dpac
-    @GetMapping("/dpac")
-    public ResponseEntity<ApiResponse<UserDTO>> getDpacUser() {
-        UserDTO dpacUser = userFacade.getDpacUser();
-        ApiResponse<UserDTO> response = ApiResponse.<UserDTO>builder()
-            .data(dpacUser)
-            .message("Profile assigned to user successfully")
-            .success(true)
-            .build();
-        return ResponseEntity.ok(response);
-    }
-
-    // ✅ GET /api/v1/users/context  — nouvel endpoint agrégé
-    @GetMapping("/context")
-    public ResponseEntity<ApiResponse<UserContextResponse>> getUserContext() {
-        UserContextResponse context = userFacade.getUserContext();
-        ApiResponse<UserContextResponse> response =
-            ApiResponse.<UserContextResponse>builder()
-                .data(context)
-                .message("User context retrieved successfully")
-                .success(true)
-                .build();
-        return ResponseEntity.ok(response);
-    }
-
-    // ===========================
-    // Méthode utilitaire
-    // ===========================
-    private ResponseEntity<ApiResponse<UserDTO>> getApiResponseResponseEntity(
-            Optional<UserDTO> user) {
-        return user.map(u -> {
-            ApiResponse<UserDTO> response = ApiResponse.<UserDTO>builder()
-                .data(u)
-                .message("User retrieved successfully")
-                .success(true)
-                .build();
-            return ResponseEntity.ok(response);
-        }).orElseGet(() -> ResponseEntity.notFound().build());
+        assertThatThrownBy(() -> service.getDocumentsById(id.toString()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Document not found");
     }
 }
 
-package com.bnpparibas.irb.qlickflow.context;
+package com.bnpparibas.irb.qlickflow.documents.service;
 
-import com.bnpparibas.irb.qlickflow.dto.UserReaffectationDto;
-import lombok.*;
-import java.util.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
-@Data @Builder @NoArgsConstructor @AllArgsConstructor
-public class UserContextDTO {
-
-    private String uid;
-    private String username;
-    private String firstName;
-    private String lastName;
-    private Boolean actif;
-
-    // Utilisateurs liés
-    private UserInfo currentUser;
-    private UserInfo nPlusOne;
-    private UserInfo camundaUser;
-    private UserInfo dpacUser;
-    private UserInfo lmrUser;
-
-    // Listes
-    private Set<UserInfo> usersEligibleForUnassignment;
-    private List<UserReaffectationDto> usersCandidateToReaffctetionByCurrentUserProfile;
-
-    // ===========================
-    // Helpers délégués
-    // ===========================
-    public String getProfileCode() {
-        return currentUser != null ? currentUser.getProfileCode() : null;
-    }
-    public String getProfileName() {
-        return currentUser != null ? currentUser.getProfileNom() : null;
-    }
-    public AgenceInfo getAgence() {
-        return currentUser != null ? currentUser.getAgence() : null;
-    }
-    public GroupeInfo getGroupe() {
-        return currentUser != null ? currentUser.getGroupe() : null;
-    }
-    public ZoneInfo getZone() {
-        return currentUser != null ? currentUser.getZone() : null;
-    }
-
-    // ===========================
-    // Inner classes — alignées
-    // avec UserContextUserInfo
-    // de qf-users
-    // ===========================
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class UserInfo {
-        private UUID id;
-        private String uid;
-        private String username;
-        private String email;
-        private String firstName;
-        private String lastName;
-        private Boolean actif;
-        private String profileCode;
-        private String profileNom;
-        // Données plates — pas de UserInfo imbriqué
-        private AgenceInfo agence;
-        private GroupeInfo groupe;
-        private ZoneInfo zone;
-
-        public String getFullName() {
-            return (firstName != null ? firstName : "")
-                + " "
-                + (lastName != null ? lastName : "");
-        }
-    }
-
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class AgenceInfo {
-        private UUID id;
-        private String nom;
-        private String code;
-        private Boolean actif;
-    }
-
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class GroupeInfo {
-        private UUID id;
-        private String nom;
-        private Boolean actif;
-    }
-
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class ZoneInfo {
-        private UUID id;
-        private String nom;
-        private Boolean actif;
-    }
-}
-package com.bnpparibas.irb.qlickflow.client;
-
-import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
-import com.bnpparibas.irb.qlickflow.response.ApiResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
-
-@Slf4j
-@Component
-public class UserClient {
-
-    private final WebClient webClient;
-
-    public UserClient(
-            @Value("${app.users.base-url:http://localhost:8200}") String qfUsersUrl,
-            ObjectMapper objectMapper) {
-        this.webClient = WebClient.builder()
-            .baseUrl(qfUsersUrl)
-            .build();
-    }
-
-    /**
-     * Remplace les 7 appels précédents par un seul.
-     * Appel à l'API interne de qf-users — non exposée par l'API Gateway.
-     */
-    public UserContextDTO getUserContext(String bearerToken) {
-        try {
-            ParameterizedTypeReference<ApiResponse<UserContextDTO>> typeRef =
-                new ParameterizedTypeReference<>() {};
-
-            ApiResponse<UserContextDTO> response = webClient.get()
-                .uri("/api/v1/users/context")
-                .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                .retrieve()
-                .bodyToMono(typeRef)
-                .block();
-
-            if (response == null || response.getData() == null) {
-                log.warn("[UserClient] getUserContext → réponse vide");
-                return null;
-            }
-            return response.getData();
-
-        } catch (WebClientResponseException.NotFound e) {
-            log.warn("[UserClient] getUserContext → 404: {}", e.getMessage());
-            return null;
-        } catch (Exception e) {
-            log.error("[UserClient] getUserContext → erreur: {}", e.getMessage());
-            return null;
-        }
-    }
-}
-
-package com.bnpparibas.irb.qlickflow.filter;
-
-import com.bnpparibas.irb.qlickflow.client.UserClient;
-import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
-import com.bnpparibas.irb.qlickflow.context.UserContextHolder;
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
-
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.List;
-
-@Slf4j
-@Component
-@RequiredArgsConstructor
-public class UserContextFilter extends OncePerRequestFilter {
-
-    private final UserContextHolder userContextHolder;
-    private final UserClient userClient;
-
-    // ✅ Externalisé dans application.yaml
-    @Value("${app.filter.excluded-paths:/auth/,/actuator/,/swagger-ui,/v3/api-docs}")
-    private List<String> excludedPaths;
-
-    @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        return excludedPaths.stream().anyMatch(path::contains);
-    }
-
-    @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain)
-            throws ServletException, IOException {
-
-        String bearerToken = request.getHeader(HttpHeaders.AUTHORIZATION);
-
-        // Pas de token valide → on passe sans contexte
-        if (bearerToken == null || !bearerToken.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        try {
-            // ✅ 1 seul appel HTTP au lieu de 7
-            UserContextDTO context = userClient.getUserContext(bearerToken);
-
-            if (context != null) {
-                // Override uid si header X-User-Uid présent
-                String xUserUid = request.getHeader("X-User-Uid");
-                if (xUserUid != null && !xUserUid.isBlank()) {
-                    context.setUid(xUserUid);
-                }
-                userContextHolder.set(context);
-                log.debug("[UserContextFilter] contexte chargé pour uid: {}",
-                    context.getUid());
-            } else {
-                log.warn("[UserContextFilter] contexte null, requête continuée sans contexte");
-            }
-
-        } catch (Exception e) {
-            log.error("[UserContextFilter] erreur globale: {}", e.getMessage());
-        }
-
-        filterChain.doFilter(request, response);
-    }
-}
-
-package com.bnpparibas.irb.qlickflow.service.habilitation.impl;
-
-import com.bnpparibas.irb.qlickflow.client.UserClient;
-import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
-import com.bnpparibas.irb.qlickflow.context.UserContextHolder;
-import com.bnpparibas.irb.qlickflow.dto.UserReaffectationDto;
-import com.bnpparibas.irb.qlickflow.dto.UserModel;
-import com.bnpparibas.irb.qlickflow.service.habilitation.UserService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Service;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
-
-import java.util.*;
-import java.util.stream.Collectors;
-
-@Slf4j
-@Service
-@RequiredArgsConstructor
-public class UserServiceImpl implements UserService {
-
-    private final UserContextHolder userContextHolder;
-    private final UserClient userClient;
-
-    // ===================================================
-    // Méthode utilitaire — récupération du bearer token
-    // ===================================================
-
-    private String getBearerToken() {
-        try {
-            if (isRequestScopeActive()) {
-                ServletRequestAttributes attrs =
-                    (ServletRequestAttributes) RequestContextHolder
-                        .currentRequestAttributes();
-                return attrs.getRequest()
-                    .getHeader(HttpHeaders.AUTHORIZATION);
-            }
-        } catch (Exception e) {
-            log.warn("[UserServiceImpl] getBearerToken hors contexte HTTP: {}",
-                e.getMessage());
-        }
-        return null;
-    }
-
-    private boolean isRequestScopeActive() {
-        try {
-            RequestContextHolder.currentRequestAttributes();
-            return true;
-        } catch (IllegalStateException e) {
-            return false;
-        }
-    }
-
-    /**
-     * Fallback HTTP — utilisé uniquement si le contexte
-     * n'est pas chargé (jobs schedulés, tests, appels hors HTTP).
-     * Dans le flux normal, le UserContextFilter garantit
-     * que le contexte est toujours chargé avant l'arrivée ici.
-     */
-    private UserContextDTO loadContextFromHttp() {
-        String token = getBearerToken();
-        if (token == null) {
-            log.warn("[UserServiceImpl] fallback HTTP impossible : token null");
-            return null;
-        }
-        log.debug("[UserServiceImpl] fallback HTTP → appel getUserContext()");
-        return userClient.getUserContext(token);
-    }
-
-    /**
-     * Retourne le contexte chargé, ou tente un fallback HTTP.
-     */
-    private Optional<UserContextDTO> getContext() {
-        if (userContextHolder.isLoaded()) {
-            return Optional.of(userContextHolder.get());
-        }
-        log.warn("[UserServiceImpl] contexte non chargé → tentative fallback HTTP");
-        UserContextDTO ctx = loadContextFromHttp();
-        if (ctx != null) {
-            userContextHolder.set(ctx);
-            return Optional.of(ctx);
-        }
-        return Optional.empty();
-    }
-
-    // ===================================================
-    // findById — appel HTTP direct (UUID technique)
-    // ===================================================
-
-    @Override
-    public Optional<UserModel> findById(UUID id) {
-        log.debug("[UserServiceImpl] findById: {}", id);
-        String token = getBearerToken();
-        if (token == null) {
-            log.warn("[UserServiceImpl] findById → token null, retour empty");
-            return Optional.empty();
-        }
-        return userClient.findById(id, token)
-            .map(this::mapToUserModel);
-    }
-
-    // ===================================================
-    // findByUid — vérifie d'abord le contexte
-    // ===================================================
-
-    @Override
-    public Optional<UserModel> findByUid(String uid) {
-        log.debug("[UserServiceImpl] findByUid: {}", uid);
-
-        // Cherche dans le contexte d'abord
-        Optional<UserContextDTO> ctxOpt = getContext();
-        if (ctxOpt.isPresent()) {
-            UserContextDTO ctx = ctxOpt.get();
-
-            // currentUser
-            if (ctx.getCurrentUser() != null
-                    && uid.equals(ctx.getCurrentUser().getUid())) {
-                return Optional.of(mapToUserModel(ctx.getCurrentUser()));
-            }
-            // camundaUser
-            if (ctx.getCamundaUser() != null
-                    && uid.equals(ctx.getCamundaUser().getUid())) {
-                return Optional.of(mapToUserModel(ctx.getCamundaUser()));
-            }
-            // nPlusOne
-            if (ctx.getNPlusOne() != null
-                    && uid.equals(ctx.getNPlusOne().getUid())) {
-                return Optional.of(mapToUserModel(ctx.getNPlusOne()));
-            }
-            // dpacUser
-            if (ctx.getDpacUser() != null
-                    && uid.equals(ctx.getDpacUser().getUid())) {
-                return Optional.of(mapToUserModel(ctx.getDpacUser()));
-            }
-            // lmrUser
-            if (ctx.getLmrUser() != null
-                    && uid.equals(ctx.getLmrUser().getUid())) {
-                return Optional.of(mapToUserModel(ctx.getLmrUser()));
-            }
-        }
-
-        // Non trouvé dans le contexte → appel HTTP
-        log.debug("[UserServiceImpl] findByUid → uid {} non trouvé dans contexte, appel HTTP", uid);
-        String token = getBearerToken();
-        if (token == null) return Optional.empty();
-        return userClient.findByUid(uid, token)
-            .map(this::mapToUserModel);
-    }
-
-    // ===================================================
-    // findByUid avec token explicite
-    // ===================================================
-
-    @Override
-    public Optional<UserModel> findByUid(String uid, String token) {
-        log.debug("[UserServiceImpl] findByUid (token explicite): {}", uid);
-        return userClient.findByUid(uid, token)
-            .map(this::mapToUserModel);
-    }
-
-    // ===================================================
-    // getCurrentUser
-    // ===================================================
-
-    @Override
-    public UserModel getCurrentUser() {
-        log.debug("[UserServiceImpl] getCurrentUser");
-
-        return getContext()
-            .map(ctx -> {
-                if (ctx.getCurrentUser() != null) {
-                    log.debug("[UserServiceImpl] getCurrentUser depuis contexte");
-                    return mapToUserModel(ctx.getCurrentUser());
-                }
-                log.warn("[UserServiceImpl] getCurrentUser : currentUser null dans le contexte");
-                return null;
-            })
-            .orElseGet(() -> {
-                log.warn("[UserServiceImpl] getCurrentUser : contexte indisponible");
-                return null;
-            });
-    }
-
-    // ===================================================
-    // getNPlusOne
-    // ===================================================
-
-    @Override
-    public UserModel getNPlusOne(String uid) {
-        log.debug("[UserServiceImpl] getNPlusOne pour uid: {}", uid);
-
-        Optional<UserContextDTO> ctxOpt = getContext();
-
-        if (ctxOpt.isPresent()) {
-            UserContextDTO ctx = ctxOpt.get();
-
-            // Si l'uid demandé est celui du currentUser → on retourne le nPlusOne du contexte
-            if (ctx.getCurrentUser() != null
-                    && uid.equals(ctx.getCurrentUser().getUid())
-                    && ctx.getNPlusOne() != null) {
-                log.debug("[UserServiceImpl] getNPlusOne depuis contexte pour uid: {}", uid);
-                return mapToUserModel(ctx.getNPlusOne());
-            }
-        }
-
-        // uid différent du currentUser → appel HTTP
-        log.debug("[UserServiceImpl] getNPlusOne HTTP pour uid: {}", uid);
-        String token = getBearerToken();
-        if (token == null) return null;
-        return userClient.getNPlusOne(uid, token)
-            .map(this::mapToUserModel)
-            .orElse(null);
-    }
-
-    // ===================================================
-    // getDpacUser
-    // ===================================================
-
-    @Override
-    public UserModel getDpacUser() {
-        log.debug("[UserServiceImpl] getDpacUser");
-
-        return getContext()
-            .map(ctx -> {
-                if (ctx.getDpacUser() != null) {
-                    log.debug("[UserServiceImpl] getDpacUser depuis contexte");
-                    return mapToUserModel(ctx.getDpacUser());
-                }
-                log.warn("[UserServiceImpl] getDpacUser : null dans le contexte");
-                return null;
-            })
-            .orElse(null);
-    }
-
-    // ===================================================
-    // getLmrUser
-    // ===================================================
-
-    @Override
-    public UserModel getLmrUser() {
-        log.debug("[UserServiceImpl] getLmrUser");
-
-        return getContext()
-            .map(ctx -> {
-                if (ctx.getLmrUser() != null) {
-                    log.debug("[UserServiceImpl] getLmrUser depuis contexte");
-                    return mapToUserModel(ctx.getLmrUser());
-                }
-                log.warn("[UserServiceImpl] getLmrUser : null dans le contexte");
-                return null;
-            })
-            .orElse(null);
-    }
-
-    // ===================================================
-    // getUsersEligibleForUnassignment
-    // ===================================================
-
-    @Override
-    public Set<UserModel> getUsersEligibleForUnassignment() {
-        log.debug("[UserServiceImpl] getUsersEligibleForUnassignment");
-
-        return getContext()
-            .map(ctx -> {
-                Set<UserContextDTO.UserInfo> eligibles =
-                    ctx.getUsersEligibleForUnassignment();
-                if (eligibles == null || eligibles.isEmpty()) {
-                    log.debug("[UserServiceImpl] aucun éligible dans le contexte");
-                    return Set.<UserModel>of();
-                }
-                return eligibles.stream()
-                    .map(this::mapToUserModel)
-                    .collect(Collectors.toSet());
-            })
-            .orElse(Set.of());
-    }
-
-    // ===================================================
-    // getUsersCandidateToReaffctetionByCurrentUserProfile
-    // ===================================================
-
-    @Override
-    public List<UserReaffectationDto> getUsersCandidateToReaffctetionByCurrentUserProfile() {
-        log.debug("[UserServiceImpl] getUsersCandidateToReaffctetionByCurrentUserProfile");
-
-        return getContext()
-            .map(ctx -> {
-                List<UserReaffectationDto> candidates =
-                    ctx.getUsersCandidateToReaffctetionByCurrentUserProfile();
-                if (candidates == null) {
-                    log.debug("[UserServiceImpl] aucun candidat réaffectation dans le contexte");
-                    return List.<UserReaffectationDto>of();
-                }
-                return candidates;
-            })
-            .orElse(List.of());
-    }
-
-    // ===================================================
-    // Mapping UserContextDTO.UserInfo → UserModel
-    // ===================================================
-
-    private UserModel mapToUserModel(UserContextDTO.UserInfo info) {
-        if (info == null) return null;
-
-        return UserModel.builder()
-            .id(info.getId())
-            .uid(info.getUid())
-            .username(info.getUsername())
-            .email(info.getEmail())
-            .firstName(info.getFirstName())
-            .lastName(info.getLastName())
-            .actif(info.getActif())
-            .profileCode(info.getProfileCode())
-            .profileName(info.getProfileNom())
-            .agence(mapAgence(info.getAgence()))
-            .groupe(mapGroupe(info.getGroupe()))
-            .zone(mapZone(info.getZone()))
-            .build();
-    }
-
-    private UserModel.AgenceModel mapAgence(UserContextDTO.AgenceInfo agence) {
-        if (agence == null) return null;
-        return UserModel.AgenceModel.builder()
-            .id(agence.getId())
-            .nom(agence.getNom())
-            .code(agence.getCode())
-            .actif(agence.getActif())
-            .build();
-    }
-
-    private UserModel.GroupeModel mapGroupe(UserContextDTO.GroupeInfo groupe) {
-        if (groupe == null) return null;
-        return UserModel.GroupeModel.builder()
-            .id(groupe.getId())
-            .nom(groupe.getNom())
-            .actif(groupe.getActif())
-            .build();
-    }
-
-    private UserModel.ZoneModel mapZone(UserContextDTO.ZoneInfo zone) {
-        if (zone == null) return null;
-        return UserModel.ZoneModel.builder()
-            .id(zone.getId())
-            .nom(zone.getNom())
-            .actif(zone.getActif())
-            .build();
-    }
-}
-
-package com.bnpparibas.irb.qlickflow.service.habilitation;
-
-import com.bnpparibas.irb.qlickflow.dto.UserModel;
-import com.bnpparibas.irb.qlickflow.dto.UserReaffectationDto;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
-public interface UserService {
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 
-    // Recherches directes
-    Optional<UserModel> findById(UUID id);
-    Optional<UserModel> findByUid(String uid);
-    Optional<UserModel> findByUid(String uid, String token);
+/**
+ * Tests unitaires (Mockito) pour DocumentStorageService.
+ * Couvre storeAndHash (succès + catch -> RuntimeException) et
+ * openForDownload (succès + catch -> StorageException).
+ *
+ * ⚠️ ADAPTER : LocalFileSystemStorage, StoredObject, StoreAndHashResult,
+ * InputStreamResourceWithType, StorageException selon vos signatures réelles.
+ */
+@ExtendWith(MockitoExtension.class)
+class DocumentStorageServiceTest {
 
-    // Utilisateurs du contexte
-    UserModel getCurrentUser();
-    UserModel getNPlusOne(String uid);
-    UserModel getDpacUser();
-    UserModel getLmrUser();
-    UserModel getCamundaUser(); // ✅ manquait
+    @Mock LocalFileSystemStorage localFileSystemStorage;
 
-    // Listes
-    Set<UserModel> getUsersEligibleForUnassignment();
-    List<UserReaffectationDto>
-        getUsersCandidateToReaffctetionByCurrentUserProfile();
+    @InjectMocks DocumentStorageService service;
+
+    // =============== storeAndHash ===============
+
+    @Test
+    void storeAndHash_returnsResultOnSuccess() throws Exception {
+        UUID id = UUID.randomUUID();
+        MultipartFile file = new MockMultipartFile(
+                "file", "doc.pdf", "application/pdf", "hello".getBytes());
+
+        when(localFileSystemStorage.store(eq(id), any(), any(), eq("pdf")))
+                .thenReturn(new StoredObject("storage/key/1"));
+
+        StoreAndHashResult result = service.storeAndHash(id, file, "pdf");
+
+        assertThat(result).isNotNull();
+        assertThat(result.storedObject().storageKey()).isEqualTo("storage/key/1");
+        // SHA-256 de "hello" attendu (déterministe)
+        assertThat(result.sha256()).isNotBlank();
+    }
+
+    @Test
+    void storeAndHash_wrapsExceptionInRuntimeException() throws Exception {
+        UUID id = UUID.randomUUID();
+        // file.getInputStream() lève une IOException => entre dans le catch
+        MultipartFile broken = new MockMultipartFile(
+                "file", "doc.pdf", "application/pdf", new byte[]{1}) {
+            @Override
+            public java.io.InputStream getInputStream() throws IOException {
+                throw new IOException("boom");
+            }
+        };
+
+        assertThatThrownBy(() -> service.storeAndHash(id, broken, "pdf"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Unable to store document");
+    }
+
+    // =============== openForDownload ===============
+
+    @Test
+    void openForDownload_returnsResourceOnSuccess() throws Exception {
+        when(localFileSystemStorage.open("storage/key/1"))
+                .thenReturn(new ByteArrayInputStream("data".getBytes()));
+
+        var result = service.openForDownload("storage/key/1");
+
+        assertThat(result).isNotNull();
+    }
+
+    @Test
+    void openForDownload_wrapsExceptionInStorageException() throws Exception {
+        when(localFileSystemStorage.open("bad-key"))
+                .thenThrow(new IOException("not found"));
+
+        assertThatThrownBy(() -> service.openForDownload("bad-key"))
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining("Unable to open document");
+    }
 }
 
-package com.bnpparibas.irb.qlickflow.client;
+package com.bnpparibas.irb.qlickflow.documents.api.internal;
 
-import com.bnpparibas.irb.qlickflow.context.UserContextDTO;
-import com.bnpparibas.irb.qlickflow.response.ApiResponse;
+import com.bnpparibas.irb.qlickflow.documents.service.DocumentAttachmentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.Optional;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
-@Slf4j
-@Component
-public class UserClient {
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-    private final WebClient webClient;
+/**
+ * @WebMvcTest pour InternalDocumentAttachmentController.
+ * Pas de Spring Security dans le projet => pas de config particulière.
+ *
+ * ⚠️ ADAPTER : si le package du controller diffère, ajuster l'import et @WebMvcTest.
+ */
+@WebMvcTest(InternalDocumentAttachmentController.class)
+class InternalDocumentAttachmentControllerTest {
 
-    public UserClient(
-            @Value("${app.users.base-url:http://localhost:8200}") String qfUsersUrl,
-            ObjectMapper objectMapper) {
-        this.webClient = WebClient.builder()
-            .baseUrl(qfUsersUrl)
-            .build();
-    }
+    @Autowired MockMvc mockMvc;
+    @Autowired ObjectMapper objectMapper;
 
-    // ===================================================
-    // Méthode centrale — 1 seul appel pour tout le contexte
-    // ===================================================
+    @MockBean DocumentAttachmentService documentAttachmentService;
 
-    public UserContextDTO getUserContext(String bearerToken) {
-        return fetchSingle(
-            "/api/v1/users/context",
-            null,
-            bearerToken,
-            new ParameterizedTypeReference<ApiResponse<UserContextDTO>>() {},
-            "getUserContext"
+    @Test
+    void commit_returns200WithAttachedIds() throws Exception {
+        UUID docId = UUID.randomUUID();
+        when(documentAttachmentService.commitAttachments(
+                anyString(), anyList(), anyString(), anyString()))
+                .thenReturn(List.of(docId));
+
+        var body = Map.of(
+                "ownerRef", "OWNER-1",
+                "documentIds", List.of(docId.toString()),
+                "correlationId", "corr-1",
+                "user", "user-1"
         );
+
+        mockMvc.perform(post("/api/v1/internal/documents/attachments:commit")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ownerRef").value("OWNER-1"))
+                .andExpect(jsonPath("$.attachedDocumentIds[0]").value(docId.toString()));
     }
 
-    // ===================================================
-    // Fallbacks HTTP — utilisés uniquement hors contexte
-    // (jobs, tests, uid différent du currentUser)
-    // ===================================================
+    @Test
+    void commit_returns400WhenValidationFails() throws Exception {
+        // ownerRef blank => @NotBlank doit déclencher 400
+        var body = Map.of(
+                "ownerRef", "",
+                "documentIds", List.of(UUID.randomUUID().toString()),
+                "correlationId", "corr-1",
+                "user", "user-1"
+        );
 
-    public Optional<UserContextDTO.UserInfo> findById(
-            UUID id, String bearerToken) {
-        return Optional.ofNullable(fetchSingle(
-            "/api/v1/users/{id}",
-            id,
-            bearerToken,
-            new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {},
-            "findById"
-        ));
+        mockMvc.perform(post("/api/v1/internal/documents/attachments:commit")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
     }
 
-    public Optional<UserContextDTO.UserInfo> findByUid(
-            String uid, String bearerToken) {
-        return Optional.ofNullable(fetchSingle(
-            "/api/v1/users/uid/{uid}",
-            uid,
-            bearerToken,
-            new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {},
-            "findByUid"
-        ));
+    @Test
+    void detach_returns200WithDetachedIds() throws Exception {
+        UUID docId = UUID.randomUUID();
+        when(documentAttachmentService.detachAttachments(anyList(), any()))
+                .thenReturn(List.of(docId));
+
+        var body = Map.of(
+                "documentIds", List.of(docId.toString()),
+                "userUid", "user-1"
+        );
+
+        mockMvc.perform(post("/api/v1/internal/documents/attachments:detach")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.detachedDocumentIds[0]").value(docId.toString()));
     }
 
-    public Optional<UserContextDTO.UserInfo> getNPlusOne(
-            String uid, String bearerToken) {
-        return Optional.ofNullable(fetchSingle(
-            "/api/v1/users/{uid}/nplusone",
-            uid,
-            bearerToken,
-            new ParameterizedTypeReference<ApiResponse<UserContextDTO.UserInfo>>() {},
-            "getNPlusOne"
-        ));
-    }
+    @Test
+    void detach_returns400WhenDocumentIdsEmpty() throws Exception {
+        // @NotEmpty sur documentIds
+        var body = Map.of(
+                "documentIds", List.of(),
+                "userUid", "user-1"
+        );
 
-    // ===================================================
-    // Méthode utilitaire commune de fetch
-    // ===================================================
-
-    private <T> T fetchSingle(
-            String uri,
-            Object uriVar,
-            String bearerToken,
-            ParameterizedTypeReference<ApiResponse<T>> typeRef,
-            String methodName) {
-        try {
-            ApiResponse<T> response = webClient.get()
-                .uri(uri, uriVar != null ? uriVar : "")
-                .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                .retrieve()
-                .bodyToMono(typeRef)
-                .block();
-
-            if (response == null || response.getData() == null) {
-                log.warn("[UserClient] {} → réponse null", methodName);
-                return null;
-            }
-            return response.getData();
-
-        } catch (WebClientResponseException.NotFound e) {
-            log.warn("[UserClient] {} → 404: {}", methodName, e.getMessage());
-            return null;
-        } catch (Exception e) {
-            log.error("[UserClient] {} → erreur: {}", methodName, e.getMessage());
-            return null;
-        }
+        mockMvc.perform(post("/api/v1/internal/documents/attachments:detach")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
     }
 }
 
-package com.bnpparibas.irb.qlickflow.dto;
+package com.bnpparibas.irb.qlickflow.documents.api.internal;
 
-import lombok.*;
-import java.util.UUID;
+import com.bnpparibas.irb.qlickflow.documents.service.DocumentDto;
+import com.bnpparibas.irb.qlickflow.documents.service.DocumentQueryService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.web.servlet.MockMvc;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserModel {
-
-    private UUID id;
-    private String uid;
-    private String username;
-    private String email;
-    private String firstName;
-    private String lastName;
-    private Boolean actif;
-    private String profileCode;
-    private String profileName;
-
-    // Données organisationnelles plates — plus de UserModel imbriqué
-    private AgenceModel agence;
-    private GroupeModel groupe;
-    private ZoneModel zone;
-
-    public String getFullName() {
-        return (firstName != null ? firstName : "")
-            + " "
-            + (lastName != null ? lastName : "");
-    }
-
-    public ProfileModel getProfile() {
-        if (profileCode == null) return null;
-        return new ProfileModel(profileCode, profileName);
-    }
-
-    // ===========================
-    // Inner classes
-    // ===========================
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ProfileModel {
-        private String code;
-        private String name;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class AgenceModel {
-        private UUID id;
-        private String nom;
-        private String code;
-        private Boolean actif;
-        // ✅ Plus de UserModel directoryAgency — résolu via UserModel.nPlusOne/dpacUser
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class GroupeModel {
-        private UUID id;
-        private String nom;
-        private Boolean actif;
-        // ✅ Plus de UserModel directorGroup
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ZoneModel {
-        private UUID id;
-        private String nom;
-        private Boolean actif;
-        // ✅ Plus de UserModel directorZone
-    }
-}
-
-package com.bnpparibas.irb.qlickflow.context;
-
-import org.springframework.stereotype.Component;
-import org.springframework.web.context.annotation.RequestScope;
-
-@Component
-@RequestScope
-public class UserContextHolder {
-
-    private UserContextDTO userContext;
-
-    public UserContextDTO get() {
-        return userContext;
-    }
-
-    public void set(UserContextDTO userContext) {
-        this.userContext = userContext;
-    }
-
-    public boolean isLoaded() {
-        return userContext != null;
-    }
-}
-
-
-package com.bnpparibas.irb.qlickflow.dto;
-
-import lombok.*;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserContextResponse {
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-    private UserContextUserInfo currentUser;
-    private UserContextUserInfo nPlusOne;
-    private UserContextUserInfo dpacUser;
-    private UserContextUserInfo lmrUser;
-    private UserContextUserInfo camundaUser;
-    private List<UserContextUserInfo> usersEligibleForUnassignment;
-    private List<UserReaffectationDto> usersCandidateToReaffctetionByCurrentUserProfile;
+/**
+ * @WebMvcTest pour InternalDocumentQueryController.
+ * ⚠️ ADAPTER les imports de package si besoin.
+ */
+@WebMvcTest(InternalDocumentQueryController.class)
+class InternalDocumentQueryControllerTest {
 
-    // ===========================
-    // Inner class — DTO léger
-    // sans cycle UserDTO imbriqué
-    // ===========================
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class UserContextUserInfo {
-        private UUID id;
-        private String uid;
-        private String username;
-        private String email;
-        private String firstName;
-        private String lastName;
-        private Boolean actif;
-        private String profileCode;
-        private String profileNom;
-        // Agence — données plates
-        private UUID agenceId;
-        private String agenceNom;
-        private String agenceCode;
-        private Boolean agenceActif;
-        // Groupe — données plates
-        private UUID groupeId;
-        private String groupeNom;
-        private Boolean groupeActif;
-        // Zone — données plates
-        private UUID zoneId;
-        private String zoneNom;
-        private Boolean zoneActif;
+    @Autowired MockMvc mockMvc;
 
-        public String getFullName() {
-            return (firstName != null ? firstName : "")
-                + " "
-                + (lastName != null ? lastName : "");
-        }
+    @MockBean DocumentQueryService documentQueryService;
+
+    private DocumentDto dto(UUID id) {
+        return new DocumentDto(id, "OWNER-1", "file.pdf", "application/pdf",
+                123L, "ATTACHED", OffsetDateTime.now(), "user-1",
+                OffsetDateTime.now(), "storage/key/1");
+    }
+
+    @Test
+    void getDocuments_byOwner_returns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(documentQueryService.getDocumentsByOwnerRef("OWNER-1"))
+                .thenReturn(List.of(dto(id)));
+
+        mockMvc.perform(get("/api/v1/internal/documents/by-owner")
+                        .param("ownerRef", "OWNER-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(id.toString()))
+                .andExpect(jsonPath("$[0].ownerRef").value("OWNER-1"));
+    }
+
+    @Test
+    void getDocumentsByIds_returns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(documentQueryService.getDocumentsByIds(anyList()))
+                .thenReturn(List.of(dto(id)));
+
+        mockMvc.perform(get("/api/v1/internal/documents/by-ids")
+                        .param("ids", id.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(id.toString()));
+    }
+
+    @Test
+    void getDocument_byId_returns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(documentQueryService.getDocumentsById(anyString()))
+                .thenReturn(dto(id));
+
+        mockMvc.perform(get("/api/v1/internal/documents/{documentId}", id.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()));
     }
 }
 
-package com.bnpparibas.irb.qlickflow.mapper;
+package com.bnpparibas.irb.qlickflow.documents.api.publicapi;
 
-import com.bnpparibas.irb.qlickflow.dto.*;
-import com.bnpparibas.irb.qlickflow.dto.UserContextResponse.UserContextUserInfo;
-import com.bnpparibas.irb.qlickflow.entities.habilitation.*;
-import org.mapstruct.*;
+import com.bnpparibas.irb.qlickflow.documents.service.AttachmentResult;
+import com.bnpparibas.irb.qlickflow.documents.service.DocumentAttachmentService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.web.servlet.MockMvc;
 
-@Mapper(componentModel = "spring")
-public interface UserMapper {
-
-    // ===========================
-    // User → UserDTO
-    // ===========================
-
-    @Mapping(target = "profile",  source = "profile")
-    @Mapping(target = "agence",   source = "agence")
-    @Mapping(target = "groupe",   source = "groupe")
-    @Mapping(target = "zone",     source = "zone")
-    UserDTO toDTO(User user);
-
-    @Mapping(target = "profile",  ignore = true)
-    @Mapping(target = "agence",   ignore = true)
-    @Mapping(target = "groupe",   ignore = true)
-    @Mapping(target = "zone",     ignore = true)
-    @Mapping(target = "password", ignore = true)
-    User toEntity(UserDTO userDTO);
-
-    // ===========================
-    // User → UserInfoDTO
-    // (version légère sans
-    //  relations imbriquées)
-    // ===========================
-
-    @Mapping(target = "profileCode",
-             expression = "java(user.getProfile() != null "
-                        + "? user.getProfile().getCode() : null)")
-    @Mapping(target = "profileNom",
-             expression = "java(user.getProfile() != null "
-                        + "? user.getProfile().getNom() : null)")
-    @Mapping(target = "agenceNom",
-             expression = "java(user.getAgence() != null "
-                        + "? user.getAgence().getNom() : null)")
-    UserInfoDTO toInfoDTO(User user);
-
-    // ===========================
-    // User → UserContextUserInfo
-    // (DTO plat — pas de UserDTO
-    //  imbriqué → pas de cycle)
-    // ===========================
-
-    @Mapping(target = "profileCode",
-             expression = "java(user.getProfile() != null "
-                        + "? user.getProfile().getCode() : null)")
-    @Mapping(target = "profileNom",
-             expression = "java(user.getProfile() != null "
-                        + "? user.getProfile().getNom() : null)")
-    @Mapping(target = "agenceId",
-             expression = "java(user.getAgence() != null "
-                        + "? user.getAgence().getId() : null)")
-    @Mapping(target = "agenceNom",
-             expression = "java(user.getAgence() != null "
-                        + "? user.getAgence().getNom() : null)")
-    @Mapping(target = "agenceCode",
-             expression = "java(user.getAgence() != null "
-                        + "? user.getAgence().getCode() : null)")
-    @Mapping(target = "agenceActif",
-             expression = "java(user.getAgence() != null "
-                        + "? user.getAgence().getActif() : null)")
-    @Mapping(target = "groupeId",
-             expression = "java(resolveGroupeId(user))")
-    @Mapping(target = "groupeNom",
-             expression = "java(resolveGroupeNom(user))")
-    @Mapping(target = "groupeActif",
-             expression = "java(resolveGroupeActif(user))")
-    @Mapping(target = "zoneId",
-             expression = "java(resolveZoneId(user))")
-    @Mapping(target = "zoneNom",
-             expression = "java(resolveZoneNom(user))")
-    @Mapping(target = "zoneActif",
-             expression = "java(resolveZoneActif(user))")
-    UserContextUserInfo toContextUserInfo(User user);
-
-    // ===========================
-    // Helpers — résolution
-    // hiérarchique des relations
-    // organisationnelles
-    // ===========================
-
-    /**
-     * Groupe : user.groupe en priorité,
-     * sinon user.agence.groupe
-     */
-    default Groupe resolveGroupe(User user) {
-        if (user == null) return null;
-        if (user.getGroupe() != null) return user.getGroupe();
-        if (user.getAgence() != null) return user.getAgence().getGroupe();
-        return null;
-    }
-
-    default java.util.UUID resolveGroupeId(User user) {
-        Groupe g = resolveGroupe(user);
-        return g != null ? g.getId() : null;
-    }
-
-    default String resolveGroupeNom(User user) {
-        Groupe g = resolveGroupe(user);
-        return g != null ? g.getNom() : null;
-    }
-
-    default Boolean resolveGroupeActif(User user) {
-        Groupe g = resolveGroupe(user);
-        return g != null ? g.getActif() : null;
-    }
-
-    /**
-     * Zone : user.zone en priorité,
-     * sinon user.groupe.zone,
-     * sinon user.agence.groupe.zone
-     */
-    default Zone resolveZone(User user) {
-        if (user == null) return null;
-        if (user.getZone() != null) return user.getZone();
-        if (user.getGroupe() != null
-                && user.getGroupe().getZone() != null) {
-            return user.getGroupe().getZone();
-        }
-        if (user.getAgence() != null
-                && user.getAgence().getGroupe() != null
-                && user.getAgence().getGroupe().getZone() != null) {
-            return user.getAgence().getGroupe().getZone();
-        }
-        return null;
-    }
-
-    default java.util.UUID resolveZoneId(User user) {
-        Zone z = resolveZone(user);
-        return z != null ? z.getId() : null;
-    }
-
-    default String resolveZoneNom(User user) {
-        Zone z = resolveZone(user);
-        return z != null ? z.getNom() : null;
-    }
-
-    default Boolean resolveZoneActif(User user) {
-        Zone z = resolveZone(user);
-        return z != null ? z.getActif() : null;
-    }
-
-    // ===========================
-    // Mappings relations
-    // ===========================
-
-    @Mapping(target = "permissions", source = "permissions")
-    ProfileDTO toProfileDTO(Profile profile);
-
-    PermissionDTO toPermissionDTO(Permission permission);
-
-    @Mapping(target = "groupe",         source = "groupe")
-    @Mapping(target = "directoryAgency", source = "directoryAgency")
-    AgenceDTO toAgenceDTO(Agence agence);
-
-    @Mapping(target = "zone",          source = "zone")
-    @Mapping(target = "directorGroup", source = "directorGroup")
-    GroupeDTO toGroupeDTO(Groupe groupe);
-
-    @Mapping(target = "directorZone", source = "directorZone")
-    ZoneDTO toZoneDTO(Zone zone);
-}
-
-package com.bnpparibas.irb.qlickflow.service;
-
-import com.bnpparibas.irb.qlickflow.entities.habilitation.User;
-import java.util.List;
-import java.util.Optional;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
-public interface UserService {
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-    // Lecture
-    Optional<User> findById(UUID id);
-    Optional<User> findByUid(String uid);
-    Optional<User> findByEmail(String email);
+/**
+ * @WebMvcTest pour PublicDocumentAttachmentController.
+ * Couvre la branche principal == null -> "anonymous" (sans sécurité, principal est null
+ * par défaut dans les requêtes MockMvc).
+ *
+ * ⚠️ ADAPTER : AttachmentResult (suppose @Builder + getters). Le endpoint attend un
+ * @RequestParam("file") MultipartFile + Principal + Jwt. Sans sécurité, on poste juste le fichier.
+ */
+@WebMvcTest(PublicDocumentAttachmentController.class)
+class PublicDocumentAttachmentControllerTest {
 
-    // Utilisateur courant — depuis Spring Security
-    User getCurrentUser();
+    @Autowired MockMvc mockMvc;
 
-    // Écriture
-    User createUser(User user);
-    User updateUser(User user);
+    @MockBean DocumentAttachmentService documentAttachmentService;
 
-    // Listes
-    List<User> findAllActiveUsers();
-    List<User> getUsersEligibleForUnassignment();
-    List<User> getUsersCandidateToReaffctetionByCurrentUserProfile();
+    @Test
+    void stage_returns201_anonymousWhenNoPrincipal() throws Exception {
+        UUID docId = UUID.randomUUID();
+        AttachmentResult result = AttachmentResult.builder()
+                .documentId(docId)
+                .status("STAGED")
+                .originalFileName("doc.pdf")
+                .contentType("application/pdf")
+                .size(123L)
+                .sha256("hash")
+                .stagedAt(OffsetDateTime.now())
+                .createdBy("anonymous")
+                .build();
 
-    // Habilitation
-    User assignProfileToUser(UUID userId, UUID profileId);
+        // principal null => le controller passe "anonymous"
+        when(documentAttachmentService.stageDocument(any(), eq("anonymous")))
+                .thenReturn(result);
 
-    // Résolution hiérarchique
-    User getNPlusOne(String uid);
-    User getLmrUser();
-    User getDpacUser();
-}
+        var file = new MockMultipartFile(
+                "file", "doc.pdf", "application/pdf", "hello".getBytes());
 
-package com.bnpparibas.irb.qlickflow.service.impl;
-
-import com.bnpparibas.irb.qlickflow.entities.habilitation.*;
-import com.bnpparibas.irb.qlickflow.enums.ProfileEnum;
-import com.bnpparibas.irb.qlickflow.repository.*;
-import com.bnpparibas.irb.qlickflow.service.UserService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.*;
-
-@Slf4j
-@Service
-@RequiredArgsConstructor
-public class UserServiceImpl implements UserService {
-
-    private final UserRepository userRepository;
-    private final ProfileRepository profileRepository;
-
-    // ===========================
-    // Lecture simple
-    // ===========================
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<User> findById(UUID id) {
-        log.debug("[UserService] findById: {}", id);
-        return userRepository.findById(id);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<User> findByUid(String uid) {
-        log.debug("[UserService] findByUid: {}", uid);
-        return userRepository.findByUid(uid);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<User> findByEmail(String email) {
-        log.debug("[UserService] findByEmail: {}", email);
-        return userRepository.findByEmail(email);
-    }
-
-    // ===========================
-    // Utilisateur courant
-    // depuis Spring Security
-    // ===========================
-
-    @Override
-    @Transactional(readOnly = true)
-    public User getCurrentUser() {
-        Authentication authentication =
-            SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new IllegalStateException(
-                "Aucune authentification dans le SecurityContext"
-            );
-        }
-        String uid = authentication.getName();
-        log.debug("[UserService] getCurrentUser uid: {}", uid);
-        return userRepository.findByUid(uid)
-            .orElseThrow(() -> new IllegalArgumentException(
-                "Utilisateur courant non trouvé, uid: " + uid
-            ));
-    }
-
-    // ===========================
-    // Écriture
-    // ===========================
-
-    @Override
-    @Transactional
-    public User createUser(User user) {
-        log.debug("[UserService] createUser uid: {}", user.getUid());
-        return userRepository.save(user);
-    }
-
-    @Override
-    @Transactional
-    public User updateUser(User user) {
-        log.debug("[UserService] updateUser uid: {}", user.getUid());
-        return userRepository.save(user);
-    }
-
-    // ===========================
-    // Habilitation
-    // ===========================
-
-    @Override
-    @Transactional
-    public User assignProfileToUser(UUID userId, UUID profileId) {
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException(
-                "User non trouvé, id: " + userId
-            ));
-        Profile profile = profileRepository.findById(profileId)
-            .orElseThrow(() -> new IllegalArgumentException(
-                "Profile non trouvé, id: " + profileId
-            ));
-        user.setProfile(profile);
-        log.debug("[UserService] assignProfileToUser userId: {} profileId: {}",
-            userId, profileId);
-        return userRepository.save(user);
-    }
-
-    // ===========================
-    // Listes
-    // ===========================
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<User> findAllActiveUsers() {
-        log.debug("[UserService] findAllActiveUsers");
-        return userRepository.findAllByActifTrue();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<User> getUsersEligibleForUnassignment() {
-        User currentUser = getCurrentUser();
-        ProfileEnum profileEnum =
-            ProfileEnum.valueOf(currentUser.getProfile().getCode());
-
-        log.debug("[UserService] getUsersEligibleForUnassignment profil: {}",
-            profileEnum);
-
-        return switch (profileEnum) {
-            case DA -> userRepository
-                .findConseillersByAgence(currentUser.getAgence());
-            case DZ -> userRepository
-                .findDirecteursByZone(currentUser.getZone());
-            default -> {
-                log.debug("[UserService] profil {} non éligible au désassignement",
-                    profileEnum);
-                yield Collections.emptyList();
-            }
-        };
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<User> getUsersCandidateToReaffctetionByCurrentUserProfile() {
-        User currentUser = getCurrentUser();
-        ProfileEnum profileEnum =
-            ProfileEnum.valueOf(currentUser.getProfile().getCode());
-
-        log.debug("[UserService] getUsersCandidateToReaffctetionByCurrentUserProfile "
-            + "profil: {}", profileEnum);
-
-        return switch (profileEnum) {
-            case DA -> userRepository
-                .findConseillersByAgence(currentUser.getAgence());
-            case DG -> userRepository
-                .findDirecteursByGroupe(currentUser.getGroupe());
-            case DZ -> userRepository
-                .findDirecteursByZone(currentUser.getZone());
-            default -> {
-                log.debug("[UserService] profil {} sans candidats réaffectation",
-                    profileEnum);
-                yield Collections.emptyList();
-            }
-        };
-    }
-
-    // ===========================
-    // Résolution hiérarchique
-    // ===========================
-
-    @Override
-    @Transactional(readOnly = true)
-    public User getNPlusOne(String uid) {
-        User user = userRepository.findByUid(uid)
-            .orElseThrow(() -> new IllegalArgumentException(
-                "User non trouvé, uid: " + uid
-            ));
-
-        ProfileEnum profileEnum =
-            ProfileEnum.valueOf(user.getProfile().getCode());
-
-        log.debug("[UserService] getNPlusOne uid: {} profil: {}",
-            uid, profileEnum);
-
-        return switch (profileEnum) {
-
-            // CONSEILLER → directeur de son agence
-            case CONSEILLER -> {
-                if (user.getAgence() != null
-                        && user.getAgence().getDirectoryAgency() != null) {
-                    yield user.getAgence().getDirectoryAgency();
-                }
-                throw new IllegalArgumentException(
-                    "Aucun directeur d'agence trouvé pour uid: " + uid
-                );
-            }
-
-            // DA → directeur de son groupe
-            case DA -> {
-                if (user.getAgence() != null
-                        && user.getAgence().getGroupe() != null
-                        && user.getAgence().getGroupe().getDirectorGroup() != null) {
-                    yield user.getAgence().getGroupe().getDirectorGroup();
-                }
-                throw new IllegalArgumentException(
-                    "Aucun directeur de groupe trouvé pour uid: " + uid
-                );
-            }
-
-            // DG → directeur de sa zone
-            case DG -> {
-                if (user.getGroupe() != null
-                        && user.getGroupe().getZone() != null
-                        && user.getGroupe().getZone().getDirectorZone() != null) {
-                    yield user.getGroupe().getZone().getDirectorZone();
-                }
-                throw new IllegalArgumentException(
-                    "Aucun directeur de zone trouvé pour uid: " + uid
-                );
-            }
-
-            // DZ → pas de N+1
-            default -> throw new IllegalArgumentException(
-                "Pas de N+1 pour le profil: " + profileEnum
-            );
-        };
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public User getLmrUser() {
-        User currentUser = getCurrentUser();
-        log.debug("[UserService] getLmrUser pour uid: {}",
-            currentUser.getUid());
-
-        // LMR = directeur de zone
-        // Priorité 1 : zone directe du user
-        if (currentUser.getZone() != null
-                && currentUser.getZone().getDirectorZone() != null) {
-            return currentUser.getZone().getDirectorZone();
-        }
-        // Priorité 2 : zone via groupe direct
-        if (currentUser.getGroupe() != null
-                && currentUser.getGroupe().getZone() != null
-                && currentUser.getGroupe().getZone().getDirectorZone() != null) {
-            return currentUser.getGroupe().getZone().getDirectorZone();
-        }
-        // Priorité 3 : zone via agence → groupe
-        if (currentUser.getAgence() != null
-                && currentUser.getAgence().getGroupe() != null
-                && currentUser.getAgence().getGroupe().getZone() != null
-                && currentUser.getAgence().getGroupe().getZone()
-                    .getDirectorZone() != null) {
-            return currentUser.getAgence().getGroupe().getZone()
-                .getDirectorZone();
-        }
-        throw new IllegalArgumentException(
-            "LMR non trouvé pour uid: " + currentUser.getUid()
-        );
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public User getDpacUser() {
-        User currentUser = getCurrentUser();
-        log.debug("[UserService] getDpacUser pour uid: {}",
-            currentUser.getUid());
-
-        // DPAC = directeur de groupe
-        // Priorité 1 : groupe direct du user
-        if (currentUser.getGroupe() != null
-                && currentUser.getGroupe().getDirectorGroup() != null) {
-            return currentUser.getGroupe().getDirectorGroup();
-        }
-        // Priorité 2 : groupe via agence
-        if (currentUser.getAgence() != null
-                && currentUser.getAgence().getGroupe() != null
-                && currentUser.getAgence().getGroupe().getDirectorGroup() != null) {
-            return currentUser.getAgence().getGroupe().getDirectorGroup();
-        }
-        throw new IllegalArgumentException(
-            "DPAC non trouvé pour uid: " + currentUser.getUid()
-        );
+        mockMvc.perform(multipart("/api/v1/public/documents/attachments:stage").file(file))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.documentId").value(docId.toString()))
+                .andExpect(jsonPath("$.status").value("STAGED"))
+                .andExpect(jsonPath("$.originalFileName").value("doc.pdf"))
+                .andExpect(jsonPath("$.createdBy").value("anonymous"));
     }
 }
 
-package com.bnpparibas.irb.qlickflow.facade;
+package com.bnpparibas.irb.qlickflow.documents.api.publicapi;
 
-import com.bnpparibas.irb.qlickflow.dto.*;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import com.bnpparibas.irb.qlickflow.documents.service.DocumentDto;
+import com.bnpparibas.irb.qlickflow.documents.service.DocumentQueryService;
+import com.bnpparibas.irb.qlickflow.documents.service.DocumentStorageService;
+import com.bnpparibas.irb.qlickflow.documents.service.InputStreamResourceWithType;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.ByteArrayInputStream;
+import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
-public interface UserFacade {
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-    // Lecture
-    Optional<UserDTO> findById(UUID id);
-    Optional<UserDTO> findByUid(String uid);
-    Optional<UserDTO> findByEmail(String email);
-    Optional<UserInfoDTO> getUserInfo(String uid);
+/**
+ * @WebMvcTest pour PublicDocumentQueryController.
+ * Couvre by-owner, by-ids, by-id, et surtout download :
+ *   - branche try OK (contentType parsable)
+ *   - branche catch (contentType invalide -> APPLICATION_OCTET_STREAM)
+ *   - sanitizeFilename (filename normal / null-blank -> "document")
+ *
+ * ⚠️ ADAPTER : DocumentDto possède getStorageKey()/storageKey() et contentType().
+ * getEntityOrThrow renvoie un DocumentDto ici (vu dans les captures). openForDownload
+ * renvoie un InputStreamResourceWithType exposant inputStream().
+ */
+@WebMvcTest(PublicDocumentQueryController.class)
+class PublicDocumentQueryControllerTest {
 
-    // Écriture
-    UserDTO createUser(UserDTO userDTO);
-    UserDTO updateUser(UserDTO userDTO);
+    @Autowired MockMvc mockMvc;
 
-    // Listes
-    List<UserDTO> findAllActiveUsers();
-    List<UserDTO> getUsersEligibleForUnassignment();
-    List<UserReaffectationDto>
-        getUsersCandidateToReaffctetionByCurrentUserProfile();
+    @MockBean DocumentQueryService documentQueryService;
+    @MockBean DocumentStorageService documentStorageService;
 
-    // Habilitation
-    UserDTO assignProfileToUser(UUID userId, UUID profileId);
-    Page<UserDTO> findAllUsersByProfileCode(Pageable pageable);
-    Page<UserDTO> findAllUsersByNonAdminProfileCode(Pageable pageable);
-
-    // Résolution hiérarchique
-    UserDTO getNPlusOne(String uid);
-    UserDTO getLmrUser();
-    UserDTO getDpacUser();
-
-    // ✅ Endpoint agrégé — 1 seul appel pour qf-back
-    UserContextResponse getUserContext();
-}
-
-package com.bnpparibas.irb.qlickflow.facade.impl;
-
-import com.bnpparibas.irb.qlickflow.dto.*;
-import com.bnpparibas.irb.qlickflow.dto.UserContextResponse.UserContextUserInfo;
-import com.bnpparibas.irb.qlickflow.entities.habilitation.User;
-import com.bnpparibas.irb.qlickflow.enums.ProfileEnum;
-import com.bnpparibas.irb.qlickflow.facade.UserFacade;
-import com.bnpparibas.irb.qlickflow.mapper.UserMapper;
-import com.bnpparibas.irb.qlickflow.repository.UserRepository;
-import com.bnpparibas.irb.qlickflow.service.UserService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.*;
-import java.util.stream.Collectors;
-
-@Slf4j
-@Service
-@RequiredArgsConstructor
-public class UserFacadeImpl implements UserFacade {
-
-    private final UserService userService;
-    private final UserMapper userMapper;
-    private final UserRepository userRepository;
-
-    @Value("${app.users.camunda-uid:camunda}")
-    private String camundaUid;
-
-    // ===========================
-    // Lecture simple
-    // ===========================
-
-    @Override
-    public Optional<UserDTO> findById(UUID id) {
-        return userService.findById(id)
-            .map(userMapper::toDTO);
+    private DocumentDto dto(UUID id, String contentType, String fileName) {
+        return new DocumentDto(id, "OWNER-1", fileName, contentType,
+                123L, "ATTACHED", OffsetDateTime.now(), "user-1",
+                OffsetDateTime.now(), "storage/key/1");
     }
 
-    @Override
-    public Optional<UserDTO> findByUid(String uid) {
-        return userService.findByUid(uid)
-            .map(userMapper::toDTO);
+    @Test
+    void getDocuments_byOwner_returns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(documentQueryService.getDocumentsByOwnerRef("OWNER-1"))
+                .thenReturn(List.of(dto(id, "application/pdf", "f.pdf")));
+
+        mockMvc.perform(get("/api/v1/public/documents/by-owner")
+                        .param("ownerRef", "OWNER-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(id.toString()));
     }
 
-    @Override
-    public Optional<UserDTO> findByEmail(String email) {
-        return userService.findByEmail(email)
-            .map(userMapper::toDTO);
+    @Test
+    void getDocumentsByIds_returns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(documentQueryService.getDocumentsByIds(anyList()))
+                .thenReturn(List.of(dto(id, "application/pdf", "f.pdf")));
+
+        mockMvc.perform(get("/api/v1/public/documents/by-ids")
+                        .param("ids", id.toString()))
+                .andExpect(status().isOk());
     }
 
-    @Override
-    public Optional<UserInfoDTO> getUserInfo(String uid) {
-        return userService.findByUid(uid)
-            .map(userMapper::toInfoDTO);
+    @Test
+    void getDocument_byId_returns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(documentQueryService.getDocumentsById(anyString()))
+                .thenReturn(dto(id, "application/pdf", "f.pdf"));
+
+        mockMvc.perform(get("/api/v1/public/documents/{documentId}", id.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()));
     }
 
-    // ===========================
-    // Écriture
-    // ===========================
+    @Test
+    void download_returns200_withParsableContentType() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(documentQueryService.getEntityOrThrow(anyString()))
+                .thenReturn(dto(id, "application/pdf", "rapport.pdf"));
+        when(documentStorageService.openForDownload(anyString()))
+                .thenReturn(new InputStreamResourceWithType(
+                        new ByteArrayInputStream("data".getBytes())));
 
-    @Override
-    public UserDTO createUser(UserDTO userDTO) {
-        User user = userMapper.toEntity(userDTO);
-        return userMapper.toDTO(userService.createUser(user));
+        mockMvc.perform(get("/api/v1/public/documents/{documentId}/download", id.toString()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(header().string("Content-Disposition",
+                        org.hamcrest.Matchers.containsString("rapport.pdf")));
     }
 
-    @Override
-    public UserDTO updateUser(UserDTO userDTO) {
-        User user = userMapper.toEntity(userDTO);
-        return userMapper.toDTO(userService.updateUser(user));
+    @Test
+    void download_fallsBackToOctetStream_whenContentTypeInvalid() throws Exception {
+        // contentType non parsable => catch => APPLICATION_OCTET_STREAM
+        UUID id = UUID.randomUUID();
+        when(documentQueryService.getEntityOrThrow(anyString()))
+                .thenReturn(dto(id, "not a valid mime!!!", "rapport.pdf"));
+        when(documentStorageService.openForDownload(anyString()))
+                .thenReturn(new InputStreamResourceWithType(
+                        new ByteArrayInputStream("data".getBytes())));
+
+        mockMvc.perform(get("/api/v1/public/documents/{documentId}/download", id.toString()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type",
+                        "application/octet-stream"));
     }
 
-    // ===========================
-    // Listes
-    // ===========================
+    @Test
+    void download_sanitizesNullFilename_toDocument() throws Exception {
+        // originalFileName null => sanitizeFilename renvoie "document"
+        UUID id = UUID.randomUUID();
+        when(documentQueryService.getEntityOrThrow(anyString()))
+                .thenReturn(dto(id, "application/pdf", null));
+        when(documentStorageService.openForDownload(anyString()))
+                .thenReturn(new InputStreamResourceWithType(
+                        new ByteArrayInputStream("data".getBytes())));
 
-    @Override
-    public List<UserDTO> findAllActiveUsers() {
-        return userService.findAllActiveUsers()
-            .stream()
-            .map(userMapper::toDTO)
-            .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<UserDTO> getUsersEligibleForUnassignment() {
-        return userService.getUsersEligibleForUnassignment()
-            .stream()
-            .map(userMapper::toDTO)
-            .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<UserReaffectationDto>
-            getUsersCandidateToReaffctetionByCurrentUserProfile() {
-        return userService
-            .getUsersCandidateToReaffctetionByCurrentUserProfile()
-            .stream()
-            .map(u -> UserReaffectationDto.builder()
-                .id(u.getId())
-                .uid(u.getUid())
-                .firstName(u.getFirstName())
-                .lastName(u.getLastName())
-                .email(u.getEmail())
-                .profileCode(u.getProfile() != null
-                    ? u.getProfile().getCode() : null)
-                .agenceNom(u.getAgence() != null
-                    ? u.getAgence().getNom() : null)
-                .build()
-            )
-            .collect(Collectors.toList());
-    }
-
-    // ===========================
-    // Habilitation
-    // ===========================
-
-    @Override
-    public UserDTO assignProfileToUser(UUID userId, UUID profileId) {
-        return userMapper.toDTO(
-            userService.assignProfileToUser(userId, profileId)
-        );
-    }
-
-    @Override
-    public Page<UserDTO> findAllUsersByProfileCode(Pageable pageable) {
-        return userRepository
-            .findAllByProfileCodeIn(
-                List.of("ADMIN", "SUPER_ADMIN"), pageable)
-            .map(userMapper::toDTO);
-    }
-
-    @Override
-    public Page<UserDTO> findAllUsersByNonAdminProfileCode(Pageable pageable) {
-        return userRepository
-            .findAllByProfileCodeNotIn(
-                List.of("ADMIN", "SUPER_ADMIN"), pageable)
-            .map(userMapper::toDTO);
-    }
-
-    // ===========================
-    // Résolution hiérarchique
-    // ===========================
-
-    @Override
-    public UserDTO getNPlusOne(String uid) {
-        return userMapper.toDTO(userService.getNPlusOne(uid));
-    }
-
-    @Override
-    public UserDTO getLmrUser() {
-        return userMapper.toDTO(userService.getLmrUser());
-    }
-
-    @Override
-    public UserDTO getDpacUser() {
-        return userMapper.toDTO(userService.getDpacUser());
-    }
-
-    // ===========================
-    // Endpoint agrégé
-    // GET /api/v1/users/context
-    // ===========================
-
-    @Override
-    @Transactional(readOnly = true)
-    public UserContextResponse getUserContext() {
-        User currentUser = userService.getCurrentUser();
-        String uid = currentUser.getUid();
-        ProfileEnum profileEnum =
-            ProfileEnum.valueOf(currentUser.getProfile().getCode());
-
-        log.debug("[UserFacade] getUserContext uid: {} profil: {}",
-            uid, profileEnum);
-
-        // N+1 — isolé, ne bloque pas le reste
-        User nPlusOne = null;
-        try {
-            nPlusOne = userService.getNPlusOne(uid);
-        } catch (Exception e) {
-            log.warn("[UserFacade] N+1 non trouvé pour uid: {}", uid);
-        }
-
-        // DPAC
-        User dpacUser = null;
-        try {
-            dpacUser = userService.getDpacUser();
-        } catch (Exception e) {
-            log.warn("[UserFacade] DPAC non trouvé pour uid: {}", uid);
-        }
-
-        // LMR
-        User lmrUser = null;
-        try {
-            lmrUser = userService.getLmrUser();
-        } catch (Exception e) {
-            log.warn("[UserFacade] LMR non trouvé pour uid: {}", uid);
-        }
-
-        // Camunda — uid externalisé dans application.yaml
-        User camundaUser = userService.findByUid(camundaUid).orElse(null);
-        if (camundaUser == null) {
-            log.warn("[UserFacade] utilisateur camunda '{}' non trouvé",
-                camundaUid);
-        }
-
-        // Éligibles au désassignement
-        List<User> eligibles;
-        try {
-            eligibles = userService.getUsersEligibleForUnassignment();
-        } catch (Exception e) {
-            log.warn("[UserFacade] eligibles non trouvés pour uid: {}", uid);
-            eligibles = Collections.emptyList();
-        }
-
-        // Candidats à la réaffectation
-        List<User> candidates;
-        try {
-            candidates = userService
-                .getUsersCandidateToReaffctetionByCurrentUserProfile();
-        } catch (Exception e) {
-            log.warn("[UserFacade] candidats réaffectation non trouvés "
-                + "pour uid: {}", uid);
-            candidates = Collections.emptyList();
-        }
-
-        return UserContextResponse.builder()
-            .currentUser(userMapper.toContextUserInfo(currentUser))
-            .nPlusOne(userMapper.toContextUserInfo(nPlusOne))
-            .dpacUser(userMapper.toContextUserInfo(dpacUser))
-            .lmrUser(userMapper.toContextUserInfo(lmrUser))
-            .camundaUser(userMapper.toContextUserInfo(camundaUser))
-            .usersEligibleForUnassignment(
-                eligibles.stream()
-                    .map(userMapper::toContextUserInfo)
-                    .collect(Collectors.toList())
-            )
-            .usersCandidateToReaffctetionByCurrentUserProfile(
-                candidates.stream()
-                    .map(u -> UserReaffectationDto.builder()
-                        .id(u.getId())
-                        .uid(u.getUid())
-                        .firstName(u.getFirstName())
-                        .lastName(u.getLastName())
-                        .email(u.getEmail())
-                        .profileCode(u.getProfile() != null
-                            ? u.getProfile().getCode() : null)
-                        .agenceNom(u.getAgence() != null
-                            ? u.getAgence().getNom() : null)
-                        .build()
-                    )
-                    .collect(Collectors.toList())
-            )
-            .build();
+        mockMvc.perform(get("/api/v1/public/documents/{documentId}/download", id.toString()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition",
+                        org.hamcrest.Matchers.containsString("document")));
     }
 }
-
