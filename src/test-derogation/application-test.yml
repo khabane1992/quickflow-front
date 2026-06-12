@@ -1,3 +1,9 @@
+<dependency>
+    <groupId>com.h2database</groupId>
+    <artifactId>h2</artifactId>
+    <scope>test</scope>
+</dependency>
+
 package com.bnpparibas.irb.qlickflow.wfdtrp.service.derogation.impl.filters;
 // ⚠️ Package confirmé par le rapport JaCoCo : service.derogation.impl.filters
 // PRÉREQUIS : src/test/resources/application-test.yml (déjà fourni) + h2 en scope test dans le pom.
