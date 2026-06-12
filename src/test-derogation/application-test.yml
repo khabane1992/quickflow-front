@@ -1,463 +1,185 @@
-<dependency>
-    <groupId>com.h2database</groupId>
-    <artifactId>h2</artifactId>
-    <scope>test</scope>
-</dependency>
-
-package com.bnpparibas.irb.qlickflow.wfdtrp.service.derogation.impl.filters;
-// ⚠️ Package confirmé par le rapport JaCoCo : service.derogation.impl.filters
-// PRÉREQUIS : src/test/resources/application-test.yml (déjà fourni) + h2 en scope test dans le pom.
-
-import com.bnpparibas.irb.qlickflow.wfdtrp.bpm.WfTask;
-import com.bnpparibas.irb.qlickflow.wfdtrp.bpm.WfTaskAssignment;
-import com.bnpparibas.irb.qlickflow.wfdtrp.bpm.WfType;
-import com.bnpparibas.irb.qlickflow.wfdtrp.entities.DerogationRequest;
-import com.bnpparibas.irb.qlickflow.wfdtrp.entities.DerogationStatus;
-import com.bnpparibas.irb.qlickflow.wfdtrp.entities.user.ProfileEnum;
-import com.bnpparibas.irb.qlickflow.wfdtrp.entities.user.UserEntity;
-import com.bnpparibas.irb.qlickflow.wfdtrp.repository.DerogationRequestRepository;
-// TODO : ajuster les imports selon tes packages réels (WfTask/WfTaskAssignment/WfType notamment)
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.test.context.ActiveProfiles;
-
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
-/**
- * VAGUE 4 — Exécution RÉELLE des 3 Specifications JPA sur H2 (mode PostgreSQL).
- * C'est le seul moyen de couvrir le code Criteria (joins, subqueries, predicates).
- *
- * Si le schéma H2 échoue sur la colonne "package" (mot réservé), ajouter dans
- * l'URL JDBC de application-test.yml : ;NON_KEYWORDS=PACKAGE
- */
-@DataJpaTest
-@ActiveProfiles("test")
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class DerogationSearchFiltersTest {
-
-    @Autowired
-    private TestEntityManager em;
-    @Autowired
-    private DerogationRequestRepository repository;
-
-    private UserEntity conseiller;   // utilisateur courant des scénarios
-    private UserEntity collegue;     // autre utilisateur
-
-    @BeforeEach
-    void setUp() {
-        conseiller = persistUser("conseiller1", ProfileEnum.CONSEILLER);
-        collegue = persistUser("collegue1", ProfileEnum.DA);
-    }
-
-    // ------------------------------------------------------------------
-    // Helpers de persistance
-    // ------------------------------------------------------------------
-
-    private UserEntity persistUser(String uid, ProfileEnum profile) {
-        UserEntity u = UserEntity.builder()
-                .uid(uid)
-                .email(uid + "@bnpparibas.com")
-                .firstName("First-" + uid)
-                .lastName("Last-" + uid)
-                .profile(profile)
-                .build();
-        return em.persist(u);
-    }
-
-    /** Crée et attache une WfTask (CREATED) assignée à `assignee` — devient la latestTask. */
-    private WfTask attachTask(DerogationRequest derog, UserEntity assignee) {
-        WfTaskAssignment assignment = WfTaskAssignment.builder()
-                .assignee(assignee)
-                .assignedBy(assignee)
-                .assignedAt(Instant.now())
-                .syncStatus(WfTaskAssignment.SyncStatus.CONFIRMED)
-                .build();
-        WfTask task = WfTask.builder()
-                .status(WfTask.WfTaskStatus.CREATED)
-                .name("Tâche")
-                .createdAt(OffsetDateTime.now())
-                .assignments(new LinkedHashSet<>())
-                .build();
-        assignment.setTask(task);
-        task.getAssignments().add(assignment);
-        task.setCurrentAssignment(assignment);
-        derog.addTask(task); // pose tasks + latestTask + back-ref
-        return task;
-    }
-
-    private DerogationRequest persistDerog(String businessKey, DerogationStatus status,
-                                           UserEntity initiateur, UserEntity assignee) {
-        DerogationRequest derog = DerogationRequest.builder()
-                .wfType(WfType.DER_TAR_RET_PACK)
-                .businessKey(businessKey)
-                .status(status.name())
-                .clientSubId("0406102")
-                .firstName("Ahmed")
-                .lastName("El Amrani")
-                .agency("Agence Casa")
-                .initiateur(initiateur)
-                .commentaires(new java.util.ArrayList<>())
-                .documentIds(new LinkedHashSet<>())
-                .build();
-        attachTask(derog, assignee);
-        em.persist(derog);
-        em.flush();
-        return derog;
-    }
-
-    // ==================================================================
-    // DerogTarifToProcessSearchFilter
-    // ==================================================================
-
-    @Test
-    void toProcess_returnsNonDraftAssignedToEligibleUser() {
-        persistDerog("BK-TP-1", DerogationStatus.SUBMITTED, collegue, conseiller);
-
-        DerogTarifToProcessSearchFilter filter =
-                new DerogTarifToProcessSearchFilter(Set.of(conseiller), conseiller, null);
-        List<DerogationRequest> result = repository.findAll(filter.toSpec());
-
-        assertThat(result).extracting(DerogationRequest::getBusinessKey).containsExactly("BK-TP-1");
-    }
-
-    @Test
-    void toProcess_returnsOwnDraft() {
-        persistDerog("BK-TP-DRAFT", DerogationStatus.DRAFT, conseiller, conseiller);
-
-        DerogTarifToProcessSearchFilter filter =
-                new DerogTarifToProcessSearchFilter(Set.of(conseiller), conseiller, null);
-
-        assertThat(repository.findAll(filter.toSpec()))
-                .extracting(DerogationRequest::getBusinessKey).containsExactly("BK-TP-DRAFT");
-    }
-
-    @Test
-    void toProcess_excludesOthersDraft() {
-        persistDerog("BK-TP-DRAFT-AUTRE", DerogationStatus.DRAFT, collegue, collegue);
-
-        DerogTarifToProcessSearchFilter filter =
-                new DerogTarifToProcessSearchFilter(Set.of(conseiller), conseiller, null);
-
-        assertThat(repository.findAll(filter.toSpec())).isEmpty();
-    }
-
-    @Test
-    void toProcess_excludesNonDraftAssignedToSomeoneElse() {
-        persistDerog("BK-TP-AUTRE", DerogationStatus.SUBMITTED, collegue, collegue);
-
-        DerogTarifToProcessSearchFilter filter =
-                new DerogTarifToProcessSearchFilter(Set.of(conseiller), conseiller, null);
-
-        assertThat(repository.findAll(filter.toSpec())).isEmpty();
-    }
-
-    @Test
-    void toProcess_freeTextMatchesBusinessKey() {
-        persistDerog("BK-TP-FT", DerogationStatus.SUBMITTED, collegue, conseiller);
-
-        DerogTarifToProcessSearchFilter matching =
-                new DerogTarifToProcessSearchFilter(Set.of(conseiller), conseiller, "BK-TP-FT");
-        DerogTarifToProcessSearchFilter notMatching =
-                new DerogTarifToProcessSearchFilter(Set.of(conseiller), conseiller, "ZZZZZ");
-
-        assertThat(repository.findAll(matching.toSpec())).hasSize(1);
-        assertThat(repository.findAll(notMatching.toSpec())).isEmpty();
-    }
-
-    @Test
-    void toProcess_freeTextBlank_behavesLikeNoFilter() {
-        persistDerog("BK-TP-BLANK", DerogationStatus.SUBMITTED, collegue, conseiller);
-
-        DerogTarifToProcessSearchFilter filter =
-                new DerogTarifToProcessSearchFilter(Set.of(conseiller), conseiller, "   ");
-
-        assertThat(repository.findAll(filter.toSpec())).hasSize(1); // branche conjunction()
-    }
-
-    // ==================================================================
-    // DerogTarifToFollowUpSearchFilter
-    // ==================================================================
-
-    @Test
-    void followUp_returnsCaseWhereUserParticipatedBeforeAndIsNotCurrentAssignee() {
-        // tâche 1 : assignée au conseiller (participation passée)
-        DerogationRequest derog = persistDerog("BK-FU-1", DerogationStatus.SUBMITTED, conseiller, conseiller);
-        // tâche 2 : assignée au collègue → devient la latestTask
-        attachTask(derog, collegue);
-        em.flush();
-
-        DerogTarifToFollowUpSearchFilter filter =
-                new DerogTarifToFollowUpSearchFilter(conseiller, null);
-
-        assertThat(repository.findAll(filter.toSpec()))
-                .extracting(DerogationRequest::getBusinessKey).containsExactly("BK-FU-1");
-    }
-
-    @Test
-    void followUp_excludesCaseCurrentlyAssignedToUser() {
-        persistDerog("BK-FU-MOI", DerogationStatus.SUBMITTED, conseiller, conseiller);
-
-        DerogTarifToFollowUpSearchFilter filter =
-                new DerogTarifToFollowUpSearchFilter(conseiller, null);
-
-        assertThat(repository.findAll(filter.toSpec())).isEmpty();
-    }
-
-    @Test
-    void followUp_excludesCaseUserNeverParticipatedIn() {
-        persistDerog("BK-FU-JAMAIS", DerogationStatus.SUBMITTED, collegue, collegue);
-
-        DerogTarifToFollowUpSearchFilter filter =
-                new DerogTarifToFollowUpSearchFilter(conseiller, null);
-
-        assertThat(repository.findAll(filter.toSpec())).isEmpty();
-    }
-
-    @Test
-    void followUp_excludesNonFollowUpStatus() {
-        // DRAFT n'est pas dans la liste des statuts follow-up
-        DerogationRequest derog = persistDerog("BK-FU-DRAFT", DerogationStatus.DRAFT, conseiller, conseiller);
-        attachTask(derog, collegue);
-        em.flush();
-
-        DerogTarifToFollowUpSearchFilter filter =
-                new DerogTarifToFollowUpSearchFilter(conseiller, null);
-
-        assertThat(repository.findAll(filter.toSpec())).isEmpty();
-    }
-
-    @Test
-    void followUp_freeTextOnClientSubId() {
-        DerogationRequest derog = persistDerog("BK-FU-FT", DerogationStatus.SUBMITTED, conseiller, conseiller);
-        attachTask(derog, collegue);
-        em.flush();
-
-        DerogTarifToFollowUpSearchFilter matching =
-                new DerogTarifToFollowUpSearchFilter(conseiller, "0406102");
-        DerogTarifToFollowUpSearchFilter notMatching =
-                new DerogTarifToFollowUpSearchFilter(conseiller, "introuvable");
-
-        assertThat(repository.findAll(matching.toSpec())).hasSize(1);
-        assertThat(repository.findAll(notMatching.toSpec())).isEmpty();
-    }
-
-    // ==================================================================
-    // FinalizedDerogTarifSearchFilter
-    // ==================================================================
-
-    @Test
-    void finalized_returnsApprovedCaseWhereUserWasAssigned() {
-        persistDerog("BK-FIN-1", DerogationStatus.APPROVED, collegue, conseiller);
-
-        FinalizedDerogTarifSearchFilter filter =
-                new FinalizedDerogTarifSearchFilter(conseiller, null);
-
-        assertThat(repository.findAll(filter.toSpec()))
-                .extracting(DerogationRequest::getBusinessKey).containsExactly("BK-FIN-1");
-    }
-
-    @Test
-    void finalized_excludesNonFinalStatus() {
-        persistDerog("BK-FIN-SUB", DerogationStatus.SUBMITTED, collegue, conseiller);
-
-        FinalizedDerogTarifSearchFilter filter =
-                new FinalizedDerogTarifSearchFilter(conseiller, null);
-
-        assertThat(repository.findAll(filter.toSpec())).isEmpty();
-    }
-
-    @Test
-    void finalized_excludesCaseWhereUserWasNeverAssigned() {
-        persistDerog("BK-FIN-AUTRE", DerogationStatus.APPROVED, collegue, collegue);
-
-        FinalizedDerogTarifSearchFilter filter =
-                new FinalizedDerogTarifSearchFilter(conseiller, null);
-
-        assertThat(repository.findAll(filter.toSpec())).isEmpty();
-    }
-
-    @Test
-    void finalized_coversAllFinalStatuses() {
-        persistDerog("BK-FIN-REJ", DerogationStatus.REJECTED, collegue, conseiller);
-        persistDerog("BK-FIN-CLO", DerogationStatus.CLOSED, collegue, conseiller);
-
-        FinalizedDerogTarifSearchFilter filter =
-                new FinalizedDerogTarifSearchFilter(conseiller, null);
-
-        assertThat(repository.findAll(filter.toSpec()))
-                .extracting(DerogationRequest::getBusinessKey)
-                .containsExactlyInAnyOrder("BK-FIN-REJ", "BK-FIN-CLO");
-    }
-
-    @Test
-    void finalized_freeTextOnAgency() {
-        persistDerog("BK-FIN-FT", DerogationStatus.APPROVED, collegue, conseiller);
-
-        FinalizedDerogTarifSearchFilter matching =
-                new FinalizedDerogTarifSearchFilter(conseiller, "casa");
-        FinalizedDerogTarifSearchFilter notMatching =
-                new FinalizedDerogTarifSearchFilter(conseiller, "rabat");
-
-        assertThat(repository.findAll(matching.toSpec())).hasSize(1); // like lower() → insensible à la casse
-        assertThat(repository.findAll(notMatching.toSpec())).isEmpty();
-    }
-}
-
-package com.bnpparibas.irb.qlickflow.wfdtrp.mapper.referentiel;
-// ⚠️ TODO : ajuster ce package pour qu'il corresponde au package des interfaces @Mapper
-// (mapper.referentiel d'après le rapport JaCoCo).
-
+package facade;
+// ⚠️ Garde le package que TU utilises pour tes tests de facade.
+// IMPORTS À AJUSTER (Alt+Entrée) :
+// - CoreBankingFacade (package wfdtrp.facade)
+// - GestionDesTiersApi + ApiException + Account : classes générées — laisse IntelliJ
+//   trouver les bons packages (probablement services.*.client.api / .invoker / .model)
+// - ClientSabDTO, AccountDTO, DeviseDTO (package wfdtrp.dto)
+
+import com.bnpparibas.irb.qlickflow.wfdtrp.dto.AccountDTO;
+import com.bnpparibas.irb.qlickflow.wfdtrp.dto.ClientSabDTO;
 import com.bnpparibas.irb.qlickflow.wfdtrp.dto.DeviseDTO;
-import com.bnpparibas.irb.qlickflow.wfdtrp.dto.MotifDerogationDTO;
-import com.bnpparibas.irb.qlickflow.wfdtrp.dto.PackageCommissionDTO;
-import com.bnpparibas.irb.qlickflow.wfdtrp.dto.SegmentDTO;
-import com.bnpparibas.irb.qlickflow.wfdtrp.entities.referentiel.Devise;
-import com.bnpparibas.irb.qlickflow.wfdtrp.entities.referentiel.MotifDerogation;
-import com.bnpparibas.irb.qlickflow.wfdtrp.entities.referentiel.PackageCommission;
-import com.bnpparibas.irb.qlickflow.wfdtrp.entities.referentiel.Segment;
+import com.bnpparibas.irb.qlickflow.wfdtrp.facade.CoreBankingFacade;
 
 import org.junit.jupiter.api.Test;
-import org.mapstruct.factory.Mappers;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
- * Mappers MapStruct (@Mapper componentModel="spring") : on teste les implémentations
- * générées (XxxMapperImpl) via Mappers.getMapper — pas besoin de contexte Spring.
- * Si Mappers.getMapper pose problème, remplacer par : new DeviseMapperImpl() etc.
+ * Astuce : l'API est mockée en RETURNS_DEEP_STUBS, ce qui permet de stubber des chaînes
+ * comme api.getClientInfosByIdClient(...).getBusinessLinkName().getFirstName() SANS
+ * connaître les types générés intermédiaires.
  */
-class ReferentielMappersTest {
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class CoreBankingFacadeTest {
 
-    private final DeviseMapper deviseMapper = Mappers.getMapper(DeviseMapper.class);
-    private final MotifDerogationMapper motifMapper = Mappers.getMapper(MotifDerogationMapper.class);
-    private final PackageCommissionMapper packageMapper = Mappers.getMapper(PackageCommissionMapper.class);
-    private final SegmentMapper segmentMapper = Mappers.getMapper(SegmentMapper.class);
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+    private GestionDesTiersApi gestionDesTiersApi;
 
-    // ================= DeviseMapper =================
+    @InjectMocks
+    private CoreBankingFacade facade;
+
+    /** RIB marocain valide : 24 caractères = banque(3) + ville(3) + compte(16) + clé(2). */
+    private static final String RIB_VALIDE = "011780" + "1000000023456789" + "23";
+
+    private void stubClientInfo(String sabId) throws Exception {
+        when(gestionDesTiersApi.getClientInfosByIdClient("01", sabId)
+                .getBusinessLinkName().getFirstName()).thenReturn("Ahmed");
+        when(gestionDesTiersApi.getClientInfosByIdClient("01", sabId)
+                .getBusinessLinkName().getLastName()).thenReturn("El Amrani");
+        when(gestionDesTiersApi.getClientInfosByIdClient("01", sabId)
+                .getBusinessLinkType()).thenReturn("RET");
+        when(gestionDesTiersApi.getClientInfosByIdClient("01", sabId)
+                .getDetailedClientCategory()).thenReturn("GRP");
+    }
+
+    // ------------------------------------------------------------------
+    // getClientInfo — branche SANS comptes (accountsResp null)
+    // ------------------------------------------------------------------
 
     @Test
-    void devise_toDto_mapsCodeAndLibelle() {
-        DeviseDTO dto = deviseMapper.toDto(new Devise("MAD", "Dirham marocain"));
+    void getClientInfo_withoutAccounts_mapsClientFieldsOnly() throws Exception {
+        stubClientInfo("0406102");
+        when(gestionDesTiersApi.getAccountsBySabId("01", "0406102")).thenReturn(null);
 
-        assertThat(dto.getCode()).isEqualTo("MAD");
-        assertThat(dto.getLibelle()).isEqualTo("Dirham marocain");
+        ClientSabDTO dto = facade.getClientInfo("0406102");
+
+        assertThat(dto.getSubId()).isEqualTo("0406102");
+        assertThat(dto.getFirstName()).isEqualTo("Ahmed");
+        assertThat(dto.getLastName()).isEqualTo("El Amrani");
+        assertThat(dto.getBusinessLine()).isEqualTo("RET");
+        assertThat(dto.getSegment()).isEqualTo("GRP");
+        assertThat(dto.getAccountList()).isNull(); // branche if non exécutée
+        assertThat(dto.getDevises()).isNull();
     }
 
     @Test
-    void devise_toDto_null_returnsNull() {
-        assertThat(deviseMapper.toDto(null)).isNull();
+    void getClientInfo_emptyAccountsList_skipsAccountMapping() throws Exception {
+        stubClientInfo("0406102");
+        when(gestionDesTiersApi.getAccountsBySabId("01", "0406102").getAccounts())
+                .thenReturn(List.of()); // branche isEmpty()
+
+        ClientSabDTO dto = facade.getClientInfo("0406102");
+
+        assertThat(dto.getSubId()).isEqualTo("0406102");
+        assertThat(dto.getAccountList()).isNull();
     }
 
+    // ------------------------------------------------------------------
+    // getClientInfo — branche AVEC comptes (filtres, RIB, devises)
+    // ------------------------------------------------------------------
+
     @Test
-    void devise_toEntity_mapsCodeAndLibelle_actifIgnored() {
-        DeviseDTO dto = DeviseDTO.builder().code("EUR").libelle("Euro").build();
+    void getClientInfo_withAccounts_mapsAccountsAndCurrencies() throws Exception {
+        stubClientInfo("0406102");
 
-        Devise entity = deviseMapper.toEntity(dto);
+        // Compte valide : agreement + bankDetails + RIB 24 chars + devise MAD
+        // ⚠️ TODO : "Account" = nom de la classe générée des éléments de getAccounts()
+        // (laisse IntelliJ importer le bon package)
+        Account compteOk = mock(Account.class, RETURNS_DEEP_STUBS);
+        when(compteOk.getAccountAgreementDetails().getBankDetails()
+                .getBasicBankAccountNumber()).thenReturn(RIB_VALIDE);
+        when(compteOk.getAccountCurrency().getShortName()).thenReturn("MAD");
+        when(compteOk.getAccountCurrency().getLabel()).thenReturn("Dirham marocain");
 
-        assertThat(entity.getCode()).isEqualTo("EUR");
-        assertThat(entity.getLibelle()).isEqualTo("Euro");
-        // @Mapping(target="actif", ignore=true) → on n'asserte pas sa valeur
+        // Compte avec RIB au mauvais format → branche warn + accountNumber null
+        Account compteRibInvalide = mock(Account.class, RETURNS_DEEP_STUBS);
+        when(compteRibInvalide.getAccountAgreementDetails().getBankDetails()
+                .getBasicBankAccountNumber()).thenReturn("123");
+        when(compteRibInvalide.getAccountCurrency().getShortName()).thenReturn("EUR");
+        when(compteRibInvalide.getAccountCurrency().getLabel()).thenReturn("Euro");
+
+        // Compte sans agreementDetails → filtré de la liste des comptes
+        // (mais sa devise est conservée dans la liste des devises)
+        Account compteSansAgreement = mock(Account.class, RETURNS_DEEP_STUBS);
+        when(compteSansAgreement.getAccountAgreementDetails()).thenReturn(null);
+        when(compteSansAgreement.getAccountCurrency().getShortName()).thenReturn("USD");
+        when(compteSansAgreement.getAccountCurrency().getLabel()).thenReturn("Dollar américain");
+
+        when(gestionDesTiersApi.getAccountsBySabId("01", "0406102").getAccounts())
+                .thenReturn(List.of(compteOk, compteRibInvalide, compteSansAgreement));
+
+        ClientSabDTO dto = facade.getClientInfo("0406102");
+
+        // comptes : seuls les 2 avec agreement+bankDetails passent le filtre
+        assertThat(dto.getAccountList()).hasSize(2);
+        AccountDTO accountOk = dto.getAccountList().get(0);
+        // extraction depuis le RIB : substring(6, length-2) = le numéro de compte sur 16 positions
+        // ⚠️ TODO : ajuster si extractAccountNumberFromRib découpe différemment
+        assertThat(accountOk.getAccountNumber()).isEqualTo("1000000023456789");
+        assertThat(accountOk.getAccountCurrency()).isEqualTo("MAD");
+        // RIB invalide → accountNumber null (branche warn de extractAccountNumberFromRib)
+        assertThat(dto.getAccountList().get(1).getAccountNumber()).isNull();
+
+        // devises : les 3 comptes ont une devise
+        assertThat(dto.getDevises())
+                .extracting(DeviseDTO::getCode)
+                .containsExactly("MAD", "EUR", "USD");
+        assertThat(dto.getDevises().get(0).getLibelle()).isEqualTo("Dirham marocain");
     }
 
+    // ------------------------------------------------------------------
+    // getClientInfo — ApiException → RuntimeException
+    // ------------------------------------------------------------------
+
     @Test
-    void devise_toEntity_null_returnsNull() {
-        assertThat(deviseMapper.toEntity(null)).isNull();
+    void getClientInfo_apiException_wrapsInRuntimeException() throws Exception {
+        // ⚠️ TODO : si ApiException n'a pas de ctor (String), utiliser new ApiException()
+        when(gestionDesTiersApi.getClientInfosByIdClient("01", "999"))
+                .thenThrow(new ApiException("SAB indisponible"));
+
+        assertThatThrownBy(() -> facade.getClientInfo("999"))
+                .isInstanceOf(RuntimeException.class);
     }
 
-    // ================= MotifDerogationMapper =================
+    // ------------------------------------------------------------------
+    // getSimulatedClientBySabId
+    // ------------------------------------------------------------------
 
     @Test
-    void motif_toDto_mapsCodeAndLibelle() {
-        MotifDerogationDTO dto = motifMapper.toDto(new MotifDerogation("M1", "Motif un"));
-
-        assertThat(dto.getCode()).isEqualTo("M1");
-        assertThat(dto.getLibelle()).isEqualTo("Motif un");
-    }
-
-    @Test
-    void motif_toDto_null_returnsNull() {
-        assertThat(motifMapper.toDto(null)).isNull();
-    }
-
-    @Test
-    void motif_toEntity_mapsFields() {
-        MotifDerogationDTO dto = MotifDerogationDTO.builder().code("M2").libelle("Motif deux").build();
-
-        MotifDerogation entity = motifMapper.toEntity(dto);
-
-        assertThat(entity.getCode()).isEqualTo("M2");
-        assertThat(entity.getLibelle()).isEqualTo("Motif deux");
-    }
-
-    // ================= PackageCommissionMapper =================
-
-    @Test
-    void packageCommission_toDto_mapsFieldsIncludingCodes() {
-        PackageCommission entity = new PackageCommission("PACK1", "Package 1", List.of("C1", "C2"));
-
-        PackageCommissionDTO dto = packageMapper.toDto(entity);
-
-        assertThat(dto.getCode()).isEqualTo("PACK1");
-        assertThat(dto.getLibelle()).isEqualTo("Package 1");
-        assertThat(dto.getCodesCommission()).containsExactly("C1", "C2");
-    }
-
-    @Test
-    void packageCommission_toDto_null_returnsNull() {
-        assertThat(packageMapper.toDto(null)).isNull();
-    }
-
-    @Test
-    void packageCommission_toEntity_mapsFields() {
-        PackageCommissionDTO dto = PackageCommissionDTO.builder()
-                .code("PACK2").libelle("Package 2")
-                .codesCommission(List.of("C3"))
-                .build();
-
-        PackageCommission entity = packageMapper.toEntity(dto);
-
-        assertThat(entity.getCode()).isEqualTo("PACK2");
-        assertThat(entity.getCodesCommission()).containsExactly("C3");
-    }
-
-    // ================= SegmentMapper =================
-
-    @Test
-    void segment_toDto_mapsCodeAndLibelle() {
-        SegmentDTO dto = segmentMapper.toDto(new Segment("GRP", "Grand public"));
-
-        assertThat(dto.getCode()).isEqualTo("GRP");
-        assertThat(dto.getLibelle()).isEqualTo("Grand public");
-    }
-
-    @Test
-    void segment_toDto_null_returnsNull() {
-        assertThat(segmentMapper.toDto(null)).isNull();
-    }
-
-    @Test
-    void segment_toEntity_mapsFields() {
-        SegmentDTO dto = SegmentDTO.builder().code("PRE").libelle("Premium").build();
-
-        Segment entity = segmentMapper.toEntity(dto);
-
-        assertThat(entity.getCode()).isEqualTo("PRE");
-        assertThat(entity.getLibelle()).isEqualTo("Premium");
+    void getSimulatedClientBySabId_emptyMap_returnsNull() {
+        assertThat(facade.getSimulatedClientBySabId("0406102")).isNull();
     }
 }
+
+sonar.projectName=p-6411-derog-tar-retail-ci
+sonar.projectVersion=1.0
+sonar.sources=src/main
+sonar.tests=src/test
+sonar.exclusions=**/tmp-secops-services/**,**/component_scripts/**,**/pipeline/**,pom.xml
+sonar.sourceEncoding=UTF-8
+sonar.java.binaries=target
+
+# === AJOUTS COUVERTURE ===
+# Indique à Sonar où lire le rapport JaCoCo (format XML, le seul accepté par les versions récentes)
+sonar.coverage.jacoco.xmlReportPaths=target/jacoco/jacoco.xml
+
+# Exclut du calcul de couverture ce qu'on a exclu dans JaCoCo (sinon Sonar les compte à 0%)
+sonar.coverage.exclusions=**/bpm/outbox/**,**/audit/**,**/config/**,**/integration/**,**/observability/**,**/common/logging/**,**/*Application.java,**/TaskSyncCronJob.java
 
 server:
   port: 0
