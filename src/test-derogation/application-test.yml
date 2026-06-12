@@ -77,18 +77,20 @@ logging:
 
 
  <!-- jacoco -->
+<!-- jacoco -->
 <plugin>
     <groupId>org.jacoco</groupId>
     <artifactId>jacoco-maven-plugin</artifactId>
     <version>0.8.9</version>
-
-    <!-- ▼▼▼ SEUL AJOUT : exclusions du code généré ▼▼▼ -->
+    <!-- ▼▼▼ SEUL AJOUT : exclusions du code généré et framework ▼▼▼ -->
     <configuration>
         <excludes>
             <!-- Clients API générés (openapi-generator) -->
             <exclude>com/bnpparibas/irb/qlickflow/services/**</exclude>
             <exclude>com/bnpparibas/irb/qlickflow/adminconsole/**</exclude>
             <exclude>com/bnpparibas/irb/qlickflow/documents/**</exclude>
+            <!-- Framework outbox interne -->
+            <exclude>com/bnpparibas/irb/qlickflow/bpm/outbox/**</exclude>
             <!-- Classe d'application + technique -->
             <exclude>**/QlickflowWfDTRPApplication.class</exclude>
             <exclude>com/bnpparibas/irb/qlickflow/wfdtrp/config/**</exclude>
@@ -96,7 +98,6 @@ logging:
         </excludes>
     </configuration>
     <!-- ▲▲▲ FIN DE L'AJOUT ▲▲▲ -->
-
     <executions>
         <execution>
             <id>pre-unit-test</id>
@@ -140,4 +141,4 @@ logging:
             </configuration>
         </execution>
     </executions>
-</plugin>   
+</plugin>
