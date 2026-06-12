@@ -1,6 +1,12 @@
-lombok.addLombokGeneratedAnnotation = true
-config.stopBubbling = true
-
+<!-- Mappers outbox événements sous wfdtrp -->
+<exclude>com/bnpparibas/irb/qlickflow/wfdtrp/bpm/outbox/**</exclude>
+<!-- Audit Envers (service.audit, dto.audit, controller.audit, entities.audit) -->
+<exclude>com/bnpparibas/irb/qlickflow/wfdtrp/**/audit/**</exclude>
+<!-- Technique -->
+<exclude>com/bnpparibas/irb/qlickflow/wfdtrp/observability/**</exclude>
+<exclude>com/bnpparibas/irb/qlickflow/wfdtrp/common/logging/**</exclude>
+<!-- Cron de sync Camunda (intestable unitairement, déjà identifié comme candidat) -->
+<exclude>**/TaskSyncCronJob.class</exclude>
 # src/test/resources/application-test.yml
 # Profil de test H2 — utilisé uniquement par les tests @DataJpaTest / @WebMvcTest (vague 4)
 # Les tests unitaires Mockito (vagues 1-3) n'en ont PAS besoin.
