@@ -1,185 +1,20 @@
-package facade;
-// ⚠️ Garde le package que TU utilises pour tes tests de facade.
-// IMPORTS À AJUSTER (Alt+Entrée) :
-// - CoreBankingFacade (package wfdtrp.facade)
-// - GestionDesTiersApi + ApiException + Account : classes générées — laisse IntelliJ
-//   trouver les bons packages (probablement services.*.client.api / .invoker / .model)
-// - ClientSabDTO, AccountDTO, DeviseDTO (package wfdtrp.dto)
+@Test
+void handleDateValidationException_returns422() {
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getRequestURI()).thenReturn("/api/derogations");
 
-import com.bnpparibas.irb.qlickflow.wfdtrp.dto.AccountDTO;
-import com.bnpparibas.irb.qlickflow.wfdtrp.dto.ClientSabDTO;
-import com.bnpparibas.irb.qlickflow.wfdtrp.dto.DeviseDTO;
-import com.bnpparibas.irb.qlickflow.wfdtrp.facade.CoreBankingFacade;
+    var response = handler.handleDateValidationException(request,
+            new DateValidationException("La date de fin doit être postérieure"));
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Answers;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
-
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-/**
- * Astuce : l'API est mockée en RETURNS_DEEP_STUBS, ce qui permet de stubber des chaînes
- * comme api.getClientInfosByIdClient(...).getBusinessLinkName().getFirstName() SANS
- * connaître les types générés intermédiaires.
- */
-@ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
-class CoreBankingFacadeTest {
-
-    @Mock(answer = Answers.RETURNS_DEEP_STUBS)
-    private GestionDesTiersApi gestionDesTiersApi;
-
-    @InjectMocks
-    private CoreBankingFacade facade;
-
-    /** RIB marocain valide : 24 caractères = banque(3) + ville(3) + compte(16) + clé(2). */
-    private static final String RIB_VALIDE = "011780" + "1000000023456789" + "23";
-
-    private void stubClientInfo(String sabId) throws Exception {
-        when(gestionDesTiersApi.getClientInfosByIdClient("01", sabId)
-                .getBusinessLinkName().getFirstName()).thenReturn("Ahmed");
-        when(gestionDesTiersApi.getClientInfosByIdClient("01", sabId)
-                .getBusinessLinkName().getLastName()).thenReturn("El Amrani");
-        when(gestionDesTiersApi.getClientInfosByIdClient("01", sabId)
-                .getBusinessLinkType()).thenReturn("RET");
-        when(gestionDesTiersApi.getClientInfosByIdClient("01", sabId)
-                .getDetailedClientCategory()).thenReturn("GRP");
-    }
-
-    // ------------------------------------------------------------------
-    // getClientInfo — branche SANS comptes (accountsResp null)
-    // ------------------------------------------------------------------
-
-    @Test
-    void getClientInfo_withoutAccounts_mapsClientFieldsOnly() throws Exception {
-        stubClientInfo("0406102");
-        when(gestionDesTiersApi.getAccountsBySabId("01", "0406102")).thenReturn(null);
-
-        ClientSabDTO dto = facade.getClientInfo("0406102");
-
-        assertThat(dto.getSubId()).isEqualTo("0406102");
-        assertThat(dto.getFirstName()).isEqualTo("Ahmed");
-        assertThat(dto.getLastName()).isEqualTo("El Amrani");
-        assertThat(dto.getBusinessLine()).isEqualTo("RET");
-        assertThat(dto.getSegment()).isEqualTo("GRP");
-        assertThat(dto.getAccountList()).isNull(); // branche if non exécutée
-        assertThat(dto.getDevises()).isNull();
-    }
-
-    @Test
-    void getClientInfo_emptyAccountsList_skipsAccountMapping() throws Exception {
-        stubClientInfo("0406102");
-        when(gestionDesTiersApi.getAccountsBySabId("01", "0406102").getAccounts())
-                .thenReturn(List.of()); // branche isEmpty()
-
-        ClientSabDTO dto = facade.getClientInfo("0406102");
-
-        assertThat(dto.getSubId()).isEqualTo("0406102");
-        assertThat(dto.getAccountList()).isNull();
-    }
-
-    // ------------------------------------------------------------------
-    // getClientInfo — branche AVEC comptes (filtres, RIB, devises)
-    // ------------------------------------------------------------------
-
-    @Test
-    void getClientInfo_withAccounts_mapsAccountsAndCurrencies() throws Exception {
-        stubClientInfo("0406102");
-
-        // Compte valide : agreement + bankDetails + RIB 24 chars + devise MAD
-        // ⚠️ TODO : "Account" = nom de la classe générée des éléments de getAccounts()
-        // (laisse IntelliJ importer le bon package)
-        Account compteOk = mock(Account.class, RETURNS_DEEP_STUBS);
-        when(compteOk.getAccountAgreementDetails().getBankDetails()
-                .getBasicBankAccountNumber()).thenReturn(RIB_VALIDE);
-        when(compteOk.getAccountCurrency().getShortName()).thenReturn("MAD");
-        when(compteOk.getAccountCurrency().getLabel()).thenReturn("Dirham marocain");
-
-        // Compte avec RIB au mauvais format → branche warn + accountNumber null
-        Account compteRibInvalide = mock(Account.class, RETURNS_DEEP_STUBS);
-        when(compteRibInvalide.getAccountAgreementDetails().getBankDetails()
-                .getBasicBankAccountNumber()).thenReturn("123");
-        when(compteRibInvalide.getAccountCurrency().getShortName()).thenReturn("EUR");
-        when(compteRibInvalide.getAccountCurrency().getLabel()).thenReturn("Euro");
-
-        // Compte sans agreementDetails → filtré de la liste des comptes
-        // (mais sa devise est conservée dans la liste des devises)
-        Account compteSansAgreement = mock(Account.class, RETURNS_DEEP_STUBS);
-        when(compteSansAgreement.getAccountAgreementDetails()).thenReturn(null);
-        when(compteSansAgreement.getAccountCurrency().getShortName()).thenReturn("USD");
-        when(compteSansAgreement.getAccountCurrency().getLabel()).thenReturn("Dollar américain");
-
-        when(gestionDesTiersApi.getAccountsBySabId("01", "0406102").getAccounts())
-                .thenReturn(List.of(compteOk, compteRibInvalide, compteSansAgreement));
-
-        ClientSabDTO dto = facade.getClientInfo("0406102");
-
-        // comptes : seuls les 2 avec agreement+bankDetails passent le filtre
-        assertThat(dto.getAccountList()).hasSize(2);
-        AccountDTO accountOk = dto.getAccountList().get(0);
-        // extraction depuis le RIB : substring(6, length-2) = le numéro de compte sur 16 positions
-        // ⚠️ TODO : ajuster si extractAccountNumberFromRib découpe différemment
-        assertThat(accountOk.getAccountNumber()).isEqualTo("1000000023456789");
-        assertThat(accountOk.getAccountCurrency()).isEqualTo("MAD");
-        // RIB invalide → accountNumber null (branche warn de extractAccountNumberFromRib)
-        assertThat(dto.getAccountList().get(1).getAccountNumber()).isNull();
-
-        // devises : les 3 comptes ont une devise
-        assertThat(dto.getDevises())
-                .extracting(DeviseDTO::getCode)
-                .containsExactly("MAD", "EUR", "USD");
-        assertThat(dto.getDevises().get(0).getLibelle()).isEqualTo("Dirham marocain");
-    }
-
-    // ------------------------------------------------------------------
-    // getClientInfo — ApiException → RuntimeException
-    // ------------------------------------------------------------------
-
-    @Test
-    void getClientInfo_apiException_wrapsInRuntimeException() throws Exception {
-        // ⚠️ TODO : si ApiException n'a pas de ctor (String), utiliser new ApiException()
-        when(gestionDesTiersApi.getClientInfosByIdClient("01", "999"))
-                .thenThrow(new ApiException("SAB indisponible"));
-
-        assertThatThrownBy(() -> facade.getClientInfo("999"))
-                .isInstanceOf(RuntimeException.class);
-    }
-
-    // ------------------------------------------------------------------
-    // getSimulatedClientBySabId
-    // ------------------------------------------------------------------
-
-    @Test
-    void getSimulatedClientBySabId_emptyMap_returnsNull() {
-        assertThat(facade.getSimulatedClientBySabId("0406102")).isNull();
-    }
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    assertThat(response.getBody().getMessage()).contains("postérieure");
 }
 
-sonar.projectName=p-6411-derog-tar-retail-ci
-sonar.projectVersion=1.0
-sonar.sources=src/main
-sonar.tests=src/test
-sonar.exclusions=**/tmp-secops-services/**,**/component_scripts/**,**/pipeline/**,pom.xml
-sonar.sourceEncoding=UTF-8
-sonar.java.binaries=target
-
-# === AJOUTS COUVERTURE ===
-# Indique à Sonar où lire le rapport JaCoCo (format XML, le seul accepté par les versions récentes)
-sonar.coverage.jacoco.xmlReportPaths=target/jacoco/jacoco.xml
-
-# Exclut du calcul de couverture ce qu'on a exclu dans JaCoCo (sinon Sonar les compte à 0%)
-sonar.coverage.exclusions=**/bpm/outbox/**,**/audit/**,**/config/**,**/integration/**,**/observability/**,**/common/logging/**,**/*Application.java,**/TaskSyncCronJob.java
+@Test
+void toListLineDTO_null_returnsNull() {
+    assertThat(mapper.toListLineDTO(null, currentUser)).isNull();
+    // TODO : ajuster les arguments selon la signature exacte (entity, currentUser, ...)
+}
 
 server:
   port: 0
