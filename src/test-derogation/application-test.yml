@@ -1,21 +1,48 @@
-@Test
-void handleDateValidationException_returns422() {
-    HttpServletRequest request = mock(HttpServletRequest.class);
-    when(request.getRequestURI()).thenReturn("/api/derogations");
+<plugin>
+    <groupId>org.jacoco</groupId>
+    <artifactId>jacoco-maven-plugin</artifactId>
+    <version>0.8.12</version>
+    <configuration>
+        <excludes>
+            <exclude>com/bnpparibas/irb/qlickflow/services/opal/**/*</exclude>
+            <exclude>**/dto/**/*</exclude>
+            <exclude>**/entities/**/*</exclude>
+            <exclude>**/enums/**/*</exclude>
+            <exclude>**/config/**/*</exclude>
+            <exclude>**/mapper/**/*</exclude>
+            <exclude>**/AdminApplication.class</exclude>
+        </excludes>
+    </configuration>
+    <executions>
+        <execution>
+            <id>pre-unit-test</id>
+            <goals>
+                <goal>prepare-agent</goal>
+            </goals>
+        </execution>
+        <execution>
+            <id>pre-integration-test</id>
+            <goals>
+                <goal>prepare-agent-integration</goal>
+            </goals>
+        </execution>
+        <execution>
+            <id>report</id>
+            <phase>verify</phase>
+            <goals>
+                <goal>report</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
 
-    var response = handler.handleDateValidationException(request,
-            new DateValidationException("La date de fin doit être postérieure"));
 
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-    assertThat(response.getBody().getMessage()).contains("postérieure");
-}
+<sonar.jacoco.reportPath>target/jacoco.exec</sonar.jacoco.reportPath>
+<sonar.jacoco.outReportPath>target/jacoco</sonar.jacoco.outReportPath>
+<sonar.jacoco.itReportPath>target/jacoco-it.exec</sonar.jacoco.itReportPath>
+<sonar.jacoco.outItReportPath>target/jacoco-it</sonar.jacoco.outItReportPath>
 
-@Test
-void toListLineDTO_null_returnsNull() {
-    assertThat(mapper.toListLineDTO(null, currentUser)).isNull();
-    // TODO : ajuster les arguments selon la signature exacte (entity, currentUser, ...)
-}
-
+<sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 server:
   port: 0
 
