@@ -1,48 +1,14 @@
-<plugin>
-    <groupId>org.jacoco</groupId>
-    <artifactId>jacoco-maven-plugin</artifactId>
-    <version>0.8.12</version>
-    <configuration>
-        <excludes>
-            <exclude>com/bnpparibas/irb/qlickflow/services/opal/**/*</exclude>
-            <exclude>**/dto/**/*</exclude>
-            <exclude>**/entities/**/*</exclude>
-            <exclude>**/enums/**/*</exclude>
-            <exclude>**/config/**/*</exclude>
-            <exclude>**/mapper/**/*</exclude>
-            <exclude>**/AdminApplication.class</exclude>
-        </excludes>
-    </configuration>
-    <executions>
-        <execution>
-            <id>pre-unit-test</id>
-            <goals>
-                <goal>prepare-agent</goal>
-            </goals>
-        </execution>
-        <execution>
-            <id>pre-integration-test</id>
-            <goals>
-                <goal>prepare-agent-integration</goal>
-            </goals>
-        </execution>
-        <execution>
-            <id>report</id>
-            <phase>verify</phase>
-            <goals>
-                <goal>report</goal>
-            </goals>
-        </execution>
-    </executions>
-</plugin>
+@Test
+void toEntity_devrait_retourner_null_si_request_null() {
+    assertThat(mapper.toEntity(null)).isNull();
+}
+
+@Test
+void toResponse_devrait_retourner_null_si_entity_null() {
+    assertThat(mapper.toResponse(null)).isNull();
+}
 
 
-<sonar.jacoco.reportPath>target/jacoco.exec</sonar.jacoco.reportPath>
-<sonar.jacoco.outReportPath>target/jacoco</sonar.jacoco.outReportPath>
-<sonar.jacoco.itReportPath>target/jacoco-it.exec</sonar.jacoco.itReportPath>
-<sonar.jacoco.outItReportPath>target/jacoco-it</sonar.jacoco.outItReportPath>
-
-<sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 server:
   port: 0
 
