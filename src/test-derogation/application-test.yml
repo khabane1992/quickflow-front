@@ -1,11 +1,88 @@
-@Test
-void toEntity_devrait_retourner_null_si_request_null() {
-    assertThat(mapper.toEntity(null)).isNull();
-}
+package com.bnpparibas.irb.droitscommunication.mapper;
 
-@Test
-void toResponse_devrait_retourner_null_si_entity_null() {
-    assertThat(mapper.toResponse(null)).isNull();
+import com.bnpparibas.irb.droitscommunication.TestFixtures;
+import com.bnpparibas.irb.droitscommunication.dto.DroitCommunicationRequest;
+import com.bnpparibas.irb.droitscommunication.dto.DroitCommunicationResponse;
+import com.bnpparibas.irb.droitscommunication.entity.DroitCommunicationEntity;
+import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Vérifie le mapping généré par MapStruct (impl réelle, pas un mock).
+ */
+class DroitCommunicationMapperTest {
+
+    private final DroitCommunicationMapper mapper =
+            Mappers.getMapper(DroitCommunicationMapper.class);
+
+    @Test
+    void toEntity_devrait_copier_les_champs_et_ignorer_le_suivi() {
+        DroitCommunicationRequest request = TestFixtures.request();
+
+        DroitCommunicationEntity entity = mapper.toEntity(request);
+
+        assertThat(entity.getOrganisme()).isEqualTo("DGFIP");
+        assertThat(entity.getCanalDemande()).isEqualTo(request.canalDemande());
+        assertThat(entity.getTypesDemande()).isEqualTo(request.typesDemande());
+        assertThat(entity.getDocumentReference()).isEqualTo("doc-uuid-123");
+        // Champs de suivi ignorés à la création
+        assertThat(entity.getId()).isNull();
+        assertThat(entity.getStatut()).isNull();
+        assertThat(entity.getDateCreation()).isNull();
+    }
+
+    @Test
+    void toResponse_devrait_copier_tous_les_champs() {
+        DroitCommunicationEntity entity = TestFixtures.entity();
+
+        DroitCommunicationResponse response = mapper.toResponse(entity);
+
+        assertThat(response.id()).isEqualTo(1L);
+        assertThat(response.organisme()).isEqualTo("DGFIP");
+        assertThat(response.statut()).isEqualTo(entity.getStatut());
+        assertThat(response.typesDemande()).isEqualTo(entity.getTypesDemande());
+        assertThat(response.dateCreation()).isEqualTo(entity.getDateCreation());
+    }
+
+    // --- Couverture des branches défensives générées par MapStruct ---
+
+    @Test
+    void toEntity_devrait_retourner_null_si_request_null() {
+        assertThat(mapper.toEntity(null)).isNull();
+    }
+
+    @Test
+    void toResponse_devrait_retourner_null_si_entity_null() {
+        assertThat(mapper.toResponse(null)).isNull();
+    }
+
+    @Test
+    void toEntity_devrait_gerer_typesDemande_null() {
+        // Couvre la branche "set == null" de toEntity (ligne if (set != null)).
+        DroitCommunicationRequest request = new DroitCommunicationRequest(
+                "DGFIP", "12 rue de la Paix", "BAT", "Objet",
+                com.bnpparibas.irb.droitscommunication.enums.CanalDemande.COURRIER,
+                "REF-1", java.time.LocalDate.of(2026, 6, 20),
+                null,                    // typesDemande null
+                "doc-1", "f.pdf", "application/pdf");
+
+        DroitCommunicationEntity entity = mapper.toEntity(request);
+
+        assertThat(entity.getTypesDemande()).isNull();
+    }
+
+    @Test
+    void toResponse_devrait_gerer_typesDemande_null() {
+        // Couvre la branche "set == null" de toResponse.
+        DroitCommunicationEntity entity = TestFixtures.entity();
+        entity.setTypesDemande(null);
+
+        DroitCommunicationResponse response = mapper.toResponse(entity);
+
+        assertThat(response.typesDemande()).isNull();
+    }
 }
 
 
