@@ -1,0 +1,105 @@
+server:
+  port: 8100
+
+spring:
+  application:
+    name: Droits de Communication
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/droitsdb?currentSchema=dc-droits-communication
+    username: postgres
+    password: postgres
+
+  flyway:
+    enabled: false
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    schemas: dc-droits-communication
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 20
+        # Configuration Hibernate Envers pour l'audit
+        org.hibernate.envers.audit_table_suffix: _AUD
+        org.hibernate.envers.revision_field_name: REV
+        org.hibernate.envers.revision_type_field_name: REVTYPE
+        org.hibernate.envers.store_data_at_delete: true
+
+  cloud:
+    vault:
+      enabled: false   # En local seulement
+
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: always
+
+CODE_APP: DC0001
+APIGEE_BASE_URL: http://localhost:3030
+APIGEE_TOKEN_URL: https://morocco.apigee.dev.echonet/auth/oauth/v2/token
+APIGEE_BASIC_USERNAME: changeme
+APIGEE_BASIC_PASSWORD: changeme
+
+qf:
+  security:
+    auth-mode: mock   # mock | oauth
+    public-endpoints:
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+      - /actuator/**
+      - /error
+      - /favicon.ico
+  integration:
+    internal:
+      documents:
+        base-url: http://localhost:8090
+      adminconsole:
+        base-url: http://localhost:8091
+    external:
+      sab-referential:
+        base-url: ${APIGEE_BASE_URL}/referential/v1/01
+        token-url: ${APIGEE_TOKEN_URL}
+        username: ${APIGEE_BASIC_USERNAME}
+        password: ${APIGEE_BASIC_PASSWORD}
+      camunda:
+        token-url: ${APIGEE_TOKEN_URL}
+        username: ${APIGEE_BASIC_USERNAME}
+        password: ${APIGEE_BASIC_PASSWORD}
+        base-url: ${APIGEE_BASE_URL}/engine-rest
+        tenant-id: DROITS_COMMUNICATION
+        process-definition-keys:
+          - DC_DROIT_COMMUNICATION
+        external-tasks:
+          worker-id: droits-communication-worker
+          max-tasks: 10
+          async-response-timeout: 5000
+          subscriptions:
+            dc_update_status:
+              enabled: true
+              topic-name: dc_update_status
+              lock-duration: 30000
+
+logging:
+  level:
+    root: info
+    org.springframework: info
+    org.hibernate.sql: info
+
+management:
+  endpoint:
+    health:
+      show-details: always
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info

@@ -41,6 +41,35 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+        <!-- Resource server : fournit BearerTokenAuthenticationFilter (point d'ancrage de la
+             chaîne d'auth mock) et le support JWT du futur mode qf.security.auth-mode=oauth. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <!-- Audit des entités (Hibernate Envers) : tables _AUD / REVINFO. -->
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-envers</artifactId>
+        </dependency>
+        <!-- Utilitaires (StringUtils) utilisés par les filtres de sécurité. -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+
+        <!-- Phase 2 : traitement par lots de la liste clients (envoi à SAB) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-batch</artifactId>
+        </dependency>
+
+        <!-- Phase 2 : lecture du fichier .xlsx (liste des droits) -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.security</groupId>

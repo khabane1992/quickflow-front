@@ -27,11 +27,6 @@ public class ReferentielController {
         return referentielService.getOrganismes();
     }
 
-    @GetMapping("/complements-adresse")
-    public List<ReferentielItem> complementsAdresse() {
-        return referentielService.getComplementsAdresse();
-    }
-
     @GetMapping("/canaux-demande")
     public List<ReferentielItem> canauxDemande() {
         return referentielService.getCanauxDemande();

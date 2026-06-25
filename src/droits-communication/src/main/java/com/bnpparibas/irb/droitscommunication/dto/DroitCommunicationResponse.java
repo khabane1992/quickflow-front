@@ -6,13 +6,19 @@ import com.bnpparibas.irb.droitscommunication.enums.TypeDemande;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 /**
- * Représentation renvoyée au client après création/consultation d'une demande.
+ * Détail d'une demande (création / consultation).
+ * Le fichier est référencé par son {@code documentId} (MS Document) ; ses métadonnées
+ * (nom, taille, type) ne sont pas dupliquées ici.
  */
 public record DroitCommunicationResponse(
         Long id,
+        String numeroDemande,
+        UUID businessKey,
         String organisme,
         String adressePostale,
         String complementAdresse,
@@ -21,10 +27,13 @@ public record DroitCommunicationResponse(
         String referenceDemande,
         LocalDate dateReception,
         Set<TypeDemande> typesDemande,
-        String documentReference,
-        String documentNom,
-        String documentContentType,
+        UUID documentId,
+        int nombreClients,
         StatutDemande statut,
+        String initiateur,
+        String valideur,
+        String motifRejet,
+        List<ClientDemandeResponse> clients,
         LocalDateTime dateCreation,
         LocalDateTime dateModification
 ) {

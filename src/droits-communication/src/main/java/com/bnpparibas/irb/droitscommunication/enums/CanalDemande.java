@@ -2,16 +2,14 @@ package com.bnpparibas.irb.droitscommunication.enums;
 
 /**
  * Référentiel stable : canal par lequel la demande est reçue.
- * Codé en enum car les valeurs évoluent rarement.
+ * La maquette n'expose que deux valeurs ("Mail", "Courrier"),
+ * codées en enum car le référentiel évolue rarement.
  * Alimente le drop-down "Canal de la demande" du formulaire.
  */
 public enum CanalDemande {
 
-    COURRIER("Courrier"),
-    EMAIL("Email"),
-    GUICHET("Guichet"),
-    TELEPHONE("Téléphone"),
-    PORTAIL("Portail en ligne");
+    MAIL("Mail"),
+    COURRIER("Courrier");
 
     private final String libelle;
 
